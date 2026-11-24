@@ -172,6 +172,16 @@ describe('readWorkspaceToken', () => {
     expect(safeStorageMock.decryptStringAsync).toHaveBeenCalledTimes(1)
   })
 
+  it('on macOS with the async encryptor unavailable reports the decrypt error without a sync read', async () => {
+    writeTokenFile('ws-a', CIPHERTEXT_A)
+    safeStorageMock.isAsyncEncryptionAvailable.mockResolvedValue(false)
+    const { read } = await loadStore()
+
+    await expect(read('ws-a')).rejects.toThrow('Could not decrypt saved Plane credential')
+    expect(safeStorageMock.decryptString).not.toHaveBeenCalled()
+    expect(safeStorageMock.isEncryptionAvailable).not.toHaveBeenCalled()
+  })
+
   it('uses the sync API when the async encryptor is unavailable (Linux without a keyring)', async () => {
     setPlatform('linux')
     writeTokenFile('ws-a', Buffer.from('plain-token'))

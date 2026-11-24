@@ -38,16 +38,16 @@ export function storedAuthConfig(
 // Env vars win over in-app credentials so existing headless/SSH setups keep
 // working unchanged. The stored secret is decrypted lazily and only here, on a
 // real API call — never on a status read.
-export function resolveBitbucketAuthConfig(): BitbucketAuthConfig {
+export async function resolveBitbucketAuthConfig(): Promise<BitbucketAuthConfig> {
   const env = getEnvAuthConfig()
   if (hasAuth(env)) {
     return env
   }
   try {
-    const secret = loadStoredBitbucketSecret({ force: true })
+    const secret = await loadStoredBitbucketSecret({ force: true })
     return secret ? storedAuthConfig(getStoredBitbucketMetadata(), secret) : env
   } catch {
-    // Decryption denied or unavailable: fall through as unauthenticated.
+    // Decryption denied, unavailable or unanswered: fall through as unauthenticated.
     return env
   }
 }

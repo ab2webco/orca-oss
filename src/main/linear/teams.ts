@@ -20,7 +20,7 @@ import {
 export async function listTeams(
   workspaceId?: LinearWorkspaceSelection | null
 ): Promise<LinearTeam[]> {
-  const entries = getClients(workspaceId)
+  const entries = await getClients(workspaceId)
   if (entries.length === 0) {
     return []
   }
@@ -51,7 +51,7 @@ export async function listTeams(
 export async function listTeamsOrThrow(
   workspaceId?: LinearWorkspaceSelection | null
 ): Promise<LinearTeam[]> {
-  const entries = getClients(workspaceId)
+  const entries = await getClients(workspaceId)
   if (entries.length === 0) {
     return []
   }
@@ -77,7 +77,7 @@ export async function listTeamsOrThrow(
 export async function listTeamsForAgent(
   workspaceId?: LinearWorkspaceSelection | null
 ): Promise<{ teams: LinearTeam[]; errors: LinearWorkspaceError[] }> {
-  const entries = getClients(workspaceId)
+  const entries = await getClients(workspaceId)
   if (entries.length === 0) {
     return { teams: [], errors: [] }
   }
@@ -117,7 +117,7 @@ async function readTeamResource<T>(
   fetchAll: (team: Team) => Promise<T[]>,
   fallbackWarning?: string
 ): Promise<T[]> {
-  const entry = getClients(workspaceId)[0]
+  const entry = (await getClients(workspaceId))[0]
   if (!entry) {
     return []
   }
@@ -185,7 +185,7 @@ export async function getTeamMembersOrThrow(
 export async function getViewerForWorkspaceOrThrow(
   workspaceId: string
 ): Promise<{ id: string; displayName?: string | null; avatarUrl?: string | null }> {
-  const entry = getClients(workspaceId)[0]
+  const entry = (await getClients(workspaceId))[0]
   if (!entry) {
     throw new Error('Not connected to Linear')
   }

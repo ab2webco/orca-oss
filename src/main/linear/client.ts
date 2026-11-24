@@ -23,7 +23,10 @@ import {
   replaceLegacyWorkspace,
   saveWorkspaceToken
 } from './linear-token-store'
-import { CredentialDecryptionError } from '../integration-credential-file'
+import {
+  CredentialDecryptionError,
+  CredentialKeychainWaitError
+} from '../integration-credential-file'
 import type {
   LinearConnectionStatus,
   LinearViewer,
@@ -42,8 +45,8 @@ export const LINEAR_PUBLIC_FILE_URL_EXPIRY_SECONDS = 60 * 60
 // ── Client factory ───────────────────────────────────────────────────
 // Why: issues/teams modules call this for real Linear actions — at that point
 // decrypting the token and surfacing a keychain prompt is expected.
-export function getClient(workspaceId?: string | null): LinearClient | null {
-  const token = loadToken({
+export async function getClient(workspaceId?: string | null): Promise<LinearClient | null> {
+  const token = await loadToken({
     force: true,
     workspaceId: resolveWorkspaceId(workspaceId) ?? undefined
   })
@@ -53,41 +56,49 @@ export function getClient(workspaceId?: string | null): LinearClient | null {
   return new (loadLinearSdk().LinearClient)({ apiKey: token })
 }
 
-export function getClients(
+export async function getClients(
   workspaceId?: LinearWorkspaceSelection | null
-): LinearClientForWorkspace[] {
+): Promise<LinearClientForWorkspace[]> {
   const state = getWorkspaceState()
   const isAllSelection = workspaceId === 'all'
   const selectedWorkspaces = isAllSelection
     ? state.workspaces
     : state.workspaces.filter((workspace) => workspace.id === resolveWorkspaceId(workspaceId))
 
-  const clients: LinearClientForWorkspace[] = []
-  for (const workspace of selectedWorkspaces) {
-    let token: string | null
-    try {
-      token = loadToken({ force: true, workspaceId: workspace.id })
-    } catch (error) {
-      // Why: under an 'all' selection one un-decryptable workspace must not
-      // collapse reads for the healthy ones. loadToken already recorded the
-      // per-workspace credentialError for getStatus to surface, so skip this
-      // workspace like a missing token. A specific-workspace selection still
-      // rethrows so the renderer can surface the decrypt banner promptly.
-      if (isAllSelection && error instanceof CredentialDecryptionError) {
-        continue
+  // Why: in parallel, so N workspaces waiting on Keychain cost one bound, not N.
+  const tokens = await Promise.all(
+    selectedWorkspaces.map(async (workspace) => {
+      try {
+        return await loadToken({ force: true, workspaceId: workspace.id })
+      } catch (error) {
+        // Why: under an 'all' selection one unreadable workspace must not
+        // collapse reads for the healthy ones. loadToken already recorded a
+        // decrypt failure for getStatus to surface, so skip this workspace like
+        // a missing token. A specific-workspace selection still rethrows so the
+        // renderer can surface the decrypt banner promptly.
+        if (
+          isAllSelection &&
+          (error instanceof CredentialDecryptionError ||
+            error instanceof CredentialKeychainWaitError)
+        ) {
+          return null
+        }
+        throw error
       }
-      throw error
-    }
-    if (!token) {
-      continue
-    }
-    clients.push({
-      workspace,
-      client: new (loadLinearSdk().LinearClient)({ apiKey: token }),
-      apiKey: token
     })
-  }
-  return clients
+  )
+  return selectedWorkspaces.flatMap((workspace, index) => {
+    const token = tokens[index]
+    return token
+      ? [
+          {
+            workspace,
+            client: new (loadLinearSdk().LinearClient)({ apiKey: token }),
+            apiKey: token
+          }
+        ]
+      : []
+  })
 }
 
 export function getPublicFileUrlClient(entry: LinearClientForWorkspace): LinearClient {
@@ -198,7 +209,7 @@ export async function testConnection(
   }
   let token: string | null
   try {
-    token = loadToken({ force: true, workspaceId: resolvedWorkspaceId })
+    token = await loadToken({ force: true, workspaceId: resolvedWorkspaceId })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Test failed'
     return { ok: false, error: message }

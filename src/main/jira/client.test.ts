@@ -91,12 +91,18 @@ function writeMultiSiteFiles(
 
 async function loadClientModule(options: SafeStorageMockOptions = {}) {
   vi.resetModules()
+  const decryptString = options.decryptString ?? ((value: Buffer) => value.toString('utf-8'))
   vi.doMock('electron', () => ({
     net: { fetch: netFetchMock },
     safeStorage: {
       isEncryptionAvailable: () => options.encryptionAvailable ?? false,
       encryptString: (value: string) => Buffer.from(value),
-      decryptString: options.decryptString ?? ((value: Buffer) => value.toString('utf-8'))
+      decryptString,
+      isAsyncEncryptionAvailable: async () => options.encryptionAvailable ?? false,
+      decryptStringAsync: async (value: Buffer) => ({
+        result: decryptString(value),
+        shouldReEncrypt: false
+      })
     },
     session: {
       defaultSession: {
@@ -190,7 +196,7 @@ describe('Jira client credential storage', () => {
       })
     )
     const jira = await loadClientModule({ encryptionAvailable: true })
-    const client = jira.getClients(siteId)[0]
+    const client = (await jira.getClients(siteId))[0]
 
     if (!client) {
       throw new Error('Expected stored Jira client')
@@ -404,7 +410,7 @@ describe('Jira client credential storage', () => {
       }
     })
 
-    const clients = jira.getClients('all')
+    const clients = await jira.getClients('all')
     expect(clients.map((client) => client.site.id)).toEqual(['good'])
     // The bad site's decrypt error is still recorded for the status banner.
     expect(jira.getStatus().credentialError).toContain('Could not decrypt')
@@ -425,7 +431,7 @@ describe('Jira client credential storage', () => {
       }
     })
 
-    expect(() => jira.getClients('bad')).toThrow('Could not decrypt')
+    await expect(jira.getClients('bad')).rejects.toThrow('Could not decrypt')
   })
 
   it('does not clear credentials when Electron transport fails after a network change', async () => {

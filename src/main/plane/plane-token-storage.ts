@@ -6,12 +6,12 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { safeStorage } from 'electron'
 import {
-  boundCredentialKeychainWait,
   CredentialDecryptionError,
   credentialFileHasContent,
   readIntegrationCredentialFileSync,
   readStoredCredentialTokenAsync
 } from '../integration-credential-file'
+import { PendingCredentialReads } from '../integration-credential-pending-reads'
 import {
   assertIntegrationCredentialBytes,
   assertIntegrationStringBytes,
@@ -25,7 +25,7 @@ const cachedTokens = new Map<string, string>()
 // Why: decrypt failures are recorded per workspace so status() can explain
 // failing reads without re-touching the keychain on every status poll.
 const credentialErrors = new Map<string, string>()
-const pendingReads = new Map<string, Promise<string | null>>()
+const pendingReads = new PendingCredentialReads<string>('Plane')
 
 function cacheToken(workspaceId: string, apiKey: string): void {
   if (!cachedTokens.has(workspaceId) && cachedTokens.size >= MAX_INTEGRATION_ACCOUNTS) {
@@ -87,45 +87,24 @@ export async function readWorkspaceToken(workspaceId: string): Promise<string | 
   if (!existsSync(path)) {
     return null
   }
-  // Why: concurrent calls share one Keychain request, and a read that outlives
-  // its caller's bound still fills the cache once the prompt is answered.
-  let read = pendingReads.get(workspaceId)
-  if (!read) {
-    read = startTokenRead(workspaceId, path)
-    pendingReads.set(workspaceId, read)
-  }
-  return boundCredentialKeychainWait('Plane', read)
-}
-
-function startTokenRead(workspaceId: string, path: string): Promise<string | null> {
-  // Why: a save or delete while the prompt is open replaces this read, so its late result is dropped.
-  const isCurrent = (): boolean => pendingReads.get(workspaceId) === read
-  const read: Promise<string | null> = (async () => {
-    const token = await readStoredCredentialTokenAsync(
-      'Plane',
-      readIntegrationCredentialFileSync(path)
-    )
-    if (token) {
-      assertIntegrationCredentialBytes('Plane', token)
-    }
-    return token
-  })().then(
-    (token) => {
-      if (!isCurrent()) {
-        return cachedTokens.get(workspaceId) ?? null
+  return pendingReads.read(workspaceId, {
+    load: async () => {
+      const token = await readStoredCredentialTokenAsync(
+        'Plane',
+        readIntegrationCredentialFileSync(path)
+      )
+      if (token) {
+        assertIntegrationCredentialBytes('Plane', token)
       }
-      pendingReads.delete(workspaceId)
+      return token
+    },
+    commit: (token) => {
       if (token) {
         cacheToken(workspaceId, token)
       }
       credentialErrors.delete(workspaceId)
-      return token
     },
-    (error: unknown) => {
-      if (!isCurrent()) {
-        return cachedTokens.get(workspaceId) ?? null
-      }
-      pendingReads.delete(workspaceId)
+    fail: (error) => {
       if (
         error instanceof CredentialDecryptionError ||
         error instanceof IntegrationAccountPersistenceLimitError
@@ -134,21 +113,21 @@ function startTokenRead(workspaceId: string, path: string): Promise<string | nul
         throw error
       }
       return null
-    }
-  )
-  return read
+    },
+    latest: () => cachedTokens.get(workspaceId) ?? null
+  })
 }
 
 export function saveWorkspaceToken(workspaceId: string, apiKey: string): void {
   ensureTokenDir()
   writeEncryptedToken(getTokenPath(workspaceId), apiKey)
-  pendingReads.delete(workspaceId)
+  pendingReads.forget(workspaceId)
   cacheToken(workspaceId, apiKey)
   credentialErrors.delete(workspaceId)
 }
 
 export function deleteWorkspaceToken(workspaceId: string): void {
-  pendingReads.delete(workspaceId)
+  pendingReads.forget(workspaceId)
   cachedTokens.delete(workspaceId)
   credentialErrors.delete(workspaceId)
   try {

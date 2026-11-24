@@ -90,11 +90,17 @@ async function loadClientModule(options: SafeStorageMockOptions = {}) {
       })
     })
   })
+  const decryptString = options.decryptString ?? ((value: Buffer) => value.toString('utf-8'))
   vi.doMock('electron', () => ({
     safeStorage: {
       isEncryptionAvailable: () => options.encryptionAvailable ?? false,
       encryptString: (value: string) => Buffer.from(value),
-      decryptString: options.decryptString ?? ((value: Buffer) => value.toString('utf-8'))
+      decryptString,
+      isAsyncEncryptionAvailable: async () => options.encryptionAvailable ?? false,
+      decryptStringAsync: async (value: Buffer) => ({
+        result: decryptString(value),
+        shouldReEncrypt: false
+      })
     }
   }))
   vi.doMock('os', async () => {
@@ -367,7 +373,7 @@ describe('Linear client workspace storage', () => {
       }
     })
 
-    const clients = linear.getClients('all')
+    const clients = await linear.getClients('all')
     expect(clients.map((client) => client.workspace.id)).toEqual(['good'])
     expect(linear.getStatus().credentialError).toContain('Could not decrypt')
   })
@@ -387,6 +393,6 @@ describe('Linear client workspace storage', () => {
       }
     })
 
-    expect(() => linear.getClients('bad')).toThrow('Could not decrypt')
+    await expect(linear.getClients('bad')).rejects.toThrow('Could not decrypt')
   })
 })

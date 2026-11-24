@@ -805,7 +805,7 @@ async function readCollection<T>(
   return coalesce(
     key,
     async () => {
-      const entries = getClients(workspaceId)
+      const entries = await getClients(workspaceId)
       if (entries.length === 0) {
         return { items: [] }
       }
@@ -896,7 +896,7 @@ export async function listProjectsByExactName(
   return coalesce(
     key,
     async () => {
-      const entries = getClients(concreteWorkspaceId)
+      const entries = await getClients(concreteWorkspaceId)
       const entry = entries[0]
       if (!entry) {
         return []
@@ -959,7 +959,7 @@ export async function getProject(
   return coalesce(
     key,
     async () => {
-      const entries = getClients(concreteWorkspaceId)
+      const entries = await getClients(concreteWorkspaceId)
       const entry = entries[0]
       if (!entry) {
         return null
@@ -990,7 +990,7 @@ export async function createProject(
   input: LinearProjectCreateInput,
   workspaceId?: string | null
 ): Promise<{ ok: true; project: LinearProjectDetail } | { ok: false; error: string }> {
-  const entry = getClients(workspaceId)[0]
+  const entry = (await getClients(workspaceId))[0]
   if (!entry) {
     return { ok: false, error: 'Not connected to Linear' }
   }
@@ -1065,7 +1065,7 @@ export async function listProjectTeams(
   return coalesce(
     key,
     async () => {
-      const entry = getClients(concreteWorkspaceId)[0]
+      const entry = (await getClients(concreteWorkspaceId))[0]
       if (!entry) {
         return []
       }
@@ -1164,7 +1164,7 @@ export async function getCustomView(
   return coalesce(
     key,
     async () => {
-      const entries = getClients(concreteWorkspaceId)
+      const entries = await getClients(concreteWorkspaceId)
       const entry = entries[0]
       if (!entry) {
         return null

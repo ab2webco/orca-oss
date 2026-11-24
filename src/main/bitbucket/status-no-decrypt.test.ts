@@ -23,7 +23,12 @@ async function loadModules() {
     safeStorage: {
       isEncryptionAvailable: () => true,
       encryptString: (value: string) => Buffer.from(value),
-      decryptString: decryptSpy
+      decryptString: decryptSpy,
+      isAsyncEncryptionAvailable: async () => true,
+      decryptStringAsync: async (value: Buffer) => ({
+        result: decryptSpy(value),
+        shouldReEncrypt: false
+      })
     }
   }))
   vi.doMock('node:os', async () => {

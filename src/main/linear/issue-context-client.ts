@@ -47,9 +47,11 @@ export async function searchLinearIssuesForAgents(args: {
   const limit = clampLinearSearchLimit(args.limit)
   const workspaceId = resolveSearchWorkspaceId(args.workspaceId)
   const { entries, failures: entryFailures } =
-    workspaceId === 'all' ? getFanoutClientEntries() : getExplicitClientEntries(workspaceId)
+    workspaceId === 'all'
+      ? await getFanoutClientEntries()
+      : await getExplicitClientEntries(workspaceId)
   if (entries.length === 0) {
-    throwIfExplicitWorkspaceHasConnectedAlternatives(workspaceId)
+    await throwIfExplicitWorkspaceHasConnectedAlternatives(workspaceId)
     if (entryFailures[0]) {
       throw entryFailures[0].error
     }
@@ -94,9 +96,9 @@ export async function resolveIssue(
   const workspace = resolveWorkspaceSelector(selectors, getConnectedWorkspaces())
   const selection = workspace?.id ?? selectors.workspaceId ?? 'all'
   const { entries, failures: entryFailures } =
-    selection === 'all' ? getFanoutClientEntries() : getExplicitClientEntries(selection)
+    selection === 'all' ? await getFanoutClientEntries() : await getExplicitClientEntries(selection)
   if (entries.length === 0) {
-    throwIfExplicitWorkspaceHasConnectedAlternatives(selection)
+    await throwIfExplicitWorkspaceHasConnectedAlternatives(selection)
     if (entryFailures[0]) {
       throw entryFailures[0].error
     }
@@ -121,20 +123,20 @@ export async function resolveIssue(
 
 export const getConnectedWorkspaces = (): LinearWorkspace[] => getStatus().workspaces ?? []
 
-export function getRequiredEntry(workspaceId: string): LinearClientForWorkspace {
-  const entry = getClients(workspaceId)[0]
+export async function getRequiredEntry(workspaceId: string): Promise<LinearClientForWorkspace> {
+  const entry = (await getClients(workspaceId))[0]
   if (!entry) {
     throw linearError('linear_not_connected', 'Linear is not connected.')
   }
   return entry
 }
 
-function getExplicitClientEntries(workspaceId?: string): {
+async function getExplicitClientEntries(workspaceId?: string): Promise<{
   entries: LinearClientForWorkspace[]
   failures: WorkspaceReadFailure[]
-} {
+}> {
   try {
-    return { entries: getClients(workspaceId), failures: [] }
+    return { entries: await getClients(workspaceId), failures: [] }
   } catch (error) {
     if (error instanceof LinearAgentAccessError) {
       throw error
@@ -152,14 +154,14 @@ function resolveSearchWorkspaceId(
   return resolveWorkspaceSelector({ workspaceId }, getConnectedWorkspaces())?.id ?? workspaceId
 }
 
-function throwIfExplicitWorkspaceHasConnectedAlternatives(
+async function throwIfExplicitWorkspaceHasConnectedAlternatives(
   workspaceId?: (string & {}) | 'all'
-): void {
+): Promise<void> {
   if (!workspaceId || workspaceId === 'all') {
     return
   }
   try {
-    if (getClients('all').length > 0) {
+    if ((await getClients('all')).length > 0) {
       throw unknownWorkspace(workspaceId)
     }
   } catch (error) {

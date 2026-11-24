@@ -23,7 +23,12 @@ async function loadStore(
     safeStorage: {
       isEncryptionAvailable: () => true,
       encryptString: (value: string) => Buffer.from(value),
-      decryptString: decryptStringMock
+      decryptString: decryptStringMock,
+      isAsyncEncryptionAvailable: async () => true,
+      decryptStringAsync: async (value: Buffer) => ({
+        result: decryptStringMock(value),
+        shouldReEncrypt: false
+      })
     }
   }))
   vi.doMock('node:os', async () => {
@@ -94,7 +99,7 @@ describe('Bitbucket credential store', () => {
       email: 'ada@example.com',
       account: 'ada'
     })
-    expect(store.loadStoredBitbucketSecret()).toMatchObject({
+    expect(await store.loadStoredBitbucketSecret()).toMatchObject({
       accessToken: null,
       apiToken: 'secret-token',
       // Why (STA-3941): auth fields live in the envelope so a torn write cannot
@@ -164,17 +169,17 @@ describe('Bitbucket credential store', () => {
     expect(decryptStringMock).not.toHaveBeenCalled()
 
     // Without force, the secret stays unread.
-    expect(store.loadStoredBitbucketSecret()).toBeNull()
+    expect(await store.loadStoredBitbucketSecret()).toBeNull()
     expect(decryptStringMock).not.toHaveBeenCalled()
 
     // Forcing the load decrypts exactly once, then caches.
-    expect(store.loadStoredBitbucketSecret({ force: true })).toMatchObject({
+    expect(await store.loadStoredBitbucketSecret({ force: true })).toMatchObject({
       accessToken: 'access-secret',
       apiToken: null,
       authMode: 'token'
     })
     expect(decryptStringMock).toHaveBeenCalledTimes(1)
-    expect(store.loadStoredBitbucketSecret()).not.toBeNull()
+    expect(await store.loadStoredBitbucketSecret()).not.toBeNull()
     expect(decryptStringMock).toHaveBeenCalledTimes(1)
   })
 
@@ -201,7 +206,7 @@ describe('Bitbucket credential store', () => {
     store._resetBitbucketCredentialCache()
 
     expect(store.getStoredBitbucketMetadata()).toMatchObject({ email: null, account: null })
-    expect(store.loadStoredBitbucketSecret({ force: true })).toMatchObject({
+    expect(await store.loadStoredBitbucketSecret({ force: true })).toMatchObject({
       accessToken: null,
       apiToken: null
     })
@@ -268,7 +273,7 @@ describe('Bitbucket credential store', () => {
     const { resolveBitbucketAuthConfig } = await import('./resolve-auth')
     // Auth follows the envelope, so the pair stays usable; only the displayed
     // account is stale until the next status refresh.
-    expect(resolveBitbucketAuthConfig()).toMatchObject({
+    expect(await resolveBitbucketAuthConfig()).toMatchObject({
       email: 'grace@example.com',
       apiToken: 'second-token'
     })
@@ -293,7 +298,7 @@ describe('Bitbucket credential store', () => {
     store._resetBitbucketCredentialCache()
 
     const { resolveBitbucketAuthConfig } = await import('./resolve-auth')
-    expect(resolveBitbucketAuthConfig()).toMatchObject({
+    expect(await resolveBitbucketAuthConfig()).toMatchObject({
       email: 'ada@example.com',
       apiToken: 'legacy-token'
     })
@@ -311,7 +316,7 @@ describe('Bitbucket credential store', () => {
     })
     store._resetBitbucketCredentialCache()
 
-    expect(store.loadStoredBitbucketSecret({ force: true })).toMatchObject({
+    expect(await store.loadStoredBitbucketSecret({ force: true })).toMatchObject({
       apiToken: 'a-token-long-enough-to-need-several-writes',
       email: 'ada@example.com'
     })

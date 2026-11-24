@@ -1,5 +1,5 @@
 import { safeStorage } from 'electron'
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
 import {
   LEGACY_WORKSPACE_ID,
   ensureOrcaDir,
@@ -28,9 +28,13 @@ import {
 } from './linear-workspace-registry'
 import {
   CredentialDecryptionError,
-  readStoredCredentialToken
+  readIntegrationCredentialFileSync,
+  readStoredCredentialTokenAsync
 } from '../integration-credential-file'
+import { PendingCredentialReads } from '../integration-credential-pending-reads'
 import type { LinearWorkspace } from '../../shared/linear/workspace-types'
+
+const pendingReads = new PendingCredentialReads<string>('Linear')
 
 function writeEncryptedToken(path: string, apiKey: string): void {
   if (safeStorage.isEncryptionAvailable()) {
@@ -50,6 +54,7 @@ export function saveWorkspaceToken(workspaceId: string, apiKey: string): void {
   }
   const tokenPath = getWorkspaceTokenPath(workspaceId)
   writeEncryptedToken(tokenPath, apiKey)
+  pendingReads.forget(workspaceId)
   cacheToken(workspaceId, apiKey)
   clearCredentialError(workspaceId)
 }
@@ -59,7 +64,9 @@ export function saveToken(apiKey: string): void {
   saveWorkspaceToken(LEGACY_WORKSPACE_ID, apiKey)
 }
 
-export function loadToken(options: { force?: boolean; workspaceId?: string } = {}): string | null {
+export async function loadToken(
+  options: { force?: boolean; workspaceId?: string } = {}
+): Promise<string | null> {
   const workspaceId = options.workspaceId ?? resolveWorkspaceId()
   if (!workspaceId) {
     return null
@@ -75,24 +82,28 @@ export function loadToken(options: { force?: boolean; workspaceId?: string } = {
   if (!existsSync(tokenPath)) {
     return null
   }
-  try {
-    const raw = readFileSync(tokenPath)
-    const token = readStoredCredentialToken('Linear', raw)
-    if (token) {
-      cacheToken(workspaceId, token)
-    }
-    clearCredentialError(workspaceId)
-    return token
-  } catch (error) {
-    if (error instanceof CredentialDecryptionError) {
-      recordCredentialError(workspaceId, error.message)
-      throw error
-    }
-    return null
-  }
+  return pendingReads.read(workspaceId, {
+    load: async () =>
+      readStoredCredentialTokenAsync('Linear', readIntegrationCredentialFileSync(tokenPath)),
+    commit: (token) => {
+      if (token) {
+        cacheToken(workspaceId, token)
+      }
+      clearCredentialError(workspaceId)
+    },
+    fail: (error) => {
+      if (error instanceof CredentialDecryptionError) {
+        recordCredentialError(workspaceId, error.message)
+        throw error
+      }
+      return null
+    },
+    latest: () => getCachedToken(workspaceId) ?? null
+  })
 }
 
 export function clearTokenFile(workspaceId: string): void {
+  pendingReads.forget(workspaceId)
   forgetCachedToken(workspaceId)
   try {
     unlinkSync(getWorkspaceTokenPath(workspaceId))
@@ -107,6 +118,7 @@ export function clearToken(workspaceId?: string): void {
     for (const workspace of state.workspaces) {
       clearTokenFile(workspace.id)
     }
+    pendingReads.clear()
     resetCredentialCaches()
     resetLegacyViewerCache()
     resetWorkspaceFileCacheToEmpty()

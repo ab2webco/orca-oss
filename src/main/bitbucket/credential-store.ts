@@ -4,10 +4,12 @@ import { join } from 'node:path'
 import {
   CredentialDecryptionError,
   credentialFileHasContent,
-  readStoredCredentialToken,
+  readIntegrationCredentialFileSync,
+  readStoredCredentialTokenAsync,
   writeCredentialFileAtomic,
   writeEncryptedCredential
 } from '../integration-credential-file'
+import { PendingCredentialReads } from '../integration-credential-pending-reads'
 import type { BitbucketAuthMode } from '../../shared/bitbucket-credentials'
 
 // Why: the secret stays encrypted via safeStorage while this metadata stays
@@ -47,6 +49,9 @@ let cachedMetadata: BitbucketStoredMetadata | null = null
 let metadataLoadedFromDisk = false
 let cachedSecret: BitbucketStoredSecret | null = null
 let credentialError: string | null = null
+// One saved Bitbucket credential, so one pending read.
+const SECRET_READ_KEY = 'bitbucket'
+const pendingReads = new PendingCredentialReads<BitbucketStoredSecret>('Bitbucket')
 
 function getOrcaDir(): string {
   return join(homedir(), '.orca')
@@ -116,10 +121,11 @@ export function getStoredBitbucketCredentialError(): string | null {
 
 // Cache-first; only touches the keychain when `force` is set and the secret is
 // not already in memory (mirrors Linear's `loadToken({ force })`). Throws
-// CredentialDecryptionError when ciphertext cannot be decrypted.
-export function loadStoredBitbucketSecret(
+// CredentialDecryptionError when ciphertext cannot be decrypted, and
+// CredentialKeychainWaitError when the Keychain prompt is not answered in time.
+export async function loadStoredBitbucketSecret(
   options: { force?: boolean } = {}
-): BitbucketStoredSecret | null {
+): Promise<BitbucketStoredSecret | null> {
   if (cachedSecret !== null) {
     return cachedSecret
   }
@@ -130,29 +136,41 @@ export function loadStoredBitbucketSecret(
   if (!existsSync(path)) {
     return null
   }
-  try {
-    const token = readStoredCredentialToken('Bitbucket', readFileSync(path))
-    if (!token) {
+  return pendingReads.read(SECRET_READ_KEY, {
+    load: async () => {
+      const token = await readStoredCredentialTokenAsync(
+        'Bitbucket',
+        readIntegrationCredentialFileSync(path)
+      )
+      return token ? parseStoredSecret(token) : null
+    },
+    commit: (secret) => {
+      if (secret) {
+        cachedSecret = secret
+        credentialError = null
+      }
+    },
+    fail: (error) => {
+      if (error instanceof CredentialDecryptionError) {
+        credentialError = error.message
+        throw error
+      }
       return null
-    }
-    const parsed = JSON.parse(token) as Partial<BitbucketStoredSecret>
-    cachedSecret = {
-      accessToken: asOptionalString(parsed.accessToken),
-      apiToken: asOptionalString(parsed.apiToken),
-      ...(parsed.authMode === 'token' || parsed.authMode === 'basic'
-        ? { authMode: parsed.authMode }
-        : {}),
-      email: asOptionalString(parsed.email),
-      baseUrl: asOptionalString(parsed.baseUrl)
-    }
-    credentialError = null
-    return cachedSecret
-  } catch (error) {
-    if (error instanceof CredentialDecryptionError) {
-      credentialError = error.message
-      throw error
-    }
-    return null
+    },
+    latest: () => cachedSecret
+  })
+}
+
+function parseStoredSecret(token: string): BitbucketStoredSecret {
+  const parsed = JSON.parse(token) as Partial<BitbucketStoredSecret>
+  return {
+    accessToken: asOptionalString(parsed.accessToken),
+    apiToken: asOptionalString(parsed.apiToken),
+    ...(parsed.authMode === 'token' || parsed.authMode === 'basic'
+      ? { authMode: parsed.authMode }
+      : {}),
+    email: asOptionalString(parsed.email),
+    baseUrl: asOptionalString(parsed.baseUrl)
   }
 }
 
@@ -180,6 +198,7 @@ export function saveBitbucketCredential(input: BitbucketCredentialSaveInput): vo
   )
   cachedMetadata = metadata
   metadataLoadedFromDisk = true
+  pendingReads.clear()
   cachedSecret = secret
   credentialError = null
 }
@@ -202,6 +221,7 @@ export function clearStoredBitbucketCredential(): void {
     // keeps authenticating with a credential the user just disconnected.
     cachedMetadata = null
     metadataLoadedFromDisk = true
+    pendingReads.clear()
     cachedSecret = null
     credentialError = null
   }
@@ -209,6 +229,7 @@ export function clearStoredBitbucketCredential(): void {
 
 /** @internal - tests need a clean in-memory cache between cases. */
 export function _resetBitbucketCredentialCache(): void {
+  pendingReads.clear()
   cachedMetadata = null
   metadataLoadedFromDisk = false
   cachedSecret = null

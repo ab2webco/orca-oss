@@ -15,29 +15,31 @@ export type WorkspaceReadFailure = {
   error: LinearAgentAccessError
 }
 
-export function getFanoutClientEntries(): {
+export async function getFanoutClientEntries(): Promise<{
   entries: LinearClientForWorkspace[]
   failures: WorkspaceReadFailure[]
-} {
+}> {
   const workspaces = getStatus().workspaces ?? []
   if (workspaces.length === 0) {
-    return { entries: getClients('all'), failures: [] }
+    return { entries: await getClients('all'), failures: [] }
   }
 
   const entries: LinearClientForWorkspace[] = []
   const failures: WorkspaceReadFailure[] = []
-  for (const workspace of workspaces) {
-    try {
-      const entry = getClients(workspace.id)[0]
-      if (entry) {
-        entries.push(entry)
+  // Why: in parallel, so workspaces waiting on Keychain cost one bound, not one each.
+  const reads = await Promise.allSettled(
+    workspaces.map(async (workspace) => (await getClients(workspace.id))[0])
+  )
+  reads.forEach((read, index) => {
+    if (read.status === 'fulfilled') {
+      if (read.value) {
+        entries.push(read.value)
       }
-    } catch (error) {
-      const failure = workspaceFailure(workspace, toLinearAccessError(error))
-      failures.push(failure)
-      console.warn('[linear] agent workspace credential read failed:', error)
+      return
     }
-  }
+    failures.push(workspaceFailure(workspaces[index], toLinearAccessError(read.reason)))
+    console.warn('[linear] agent workspace credential read failed:', read.reason)
+  })
   return { entries, failures }
 }
 
