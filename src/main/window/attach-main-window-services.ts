@@ -372,6 +372,7 @@ function registerRuntimeWindowLifecycle(
     gameOwnerQuestionsChanged: () => send('runtime:gameOwnerQuestionsChanged'),
     gameInboxChanged: () => send('runtime:gameInboxChanged'),
     gameAdvisorChanged: () => send('runtime:gameAdvisorChanged'),
+    gameLeadStarted: (worktreeId) => send('runtime:gameLeadStarted', worktreeId),
     activateWorktree: (
       repoId,
       worktreeId,

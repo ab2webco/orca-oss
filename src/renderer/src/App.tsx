@@ -62,6 +62,7 @@ import {
 import RightSidebar from './components/right-sidebar'
 import { MobileInstallRequestDialog } from './components/MobileInstallRequestDialog'
 import { GameOwnerQuestionsWatcher } from './components/game-inbox/GameOwnerQuestionsWatcher'
+import { TeamTabAutoOpen } from './components/team-panel/TeamTabAutoOpen'
 import { StarNagCard } from './components/StarNagCard'
 import { MemoryPressureWarningCard } from './components/memory-pressure/MemoryPressureWarningCard'
 import { StarNagAgentValueMomentObserver } from './components/star-nag/StarNagAgentValueMomentObserver'
@@ -2880,6 +2881,7 @@ function App(): React.JSX.Element {
       <Toaster closeButton toastOptions={{ className: 'font-sans text-sm' }} />
       <SkillFreshnessNudge />
       <GameOwnerQuestionsWatcher />
+      <TeamTabAutoOpen />
       <WorktreeBaseFallbackDialog />
       <PinnedTabCloseDialog />
       <RunningTerminalCloseDialog />

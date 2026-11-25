@@ -197,6 +197,7 @@ import { isDirectSshReconnectCoordinatorRoutingEnabled } from './direct-ssh-reco
 import { signalGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 import { signalGameInboxChanged } from '@/components/game-inbox/game-inbox-signal'
 import { signalGameAdvisorChanged } from '@/components/team-panel/game-advisor-signal'
+import { openTeamTabOnLeadStart } from '@/components/team-panel/team-tab-auto-open'
 
 function getShortcutPlatform(): NodeJS.Platform {
   if (navigator.userAgent.includes('Mac')) {
@@ -1024,6 +1025,10 @@ export function useIpcEvents(): void {
       }
       if (event.type === 'gameAdvisorChanged') {
         signalGameAdvisorChanged()
+        return
+      }
+      if (event.type === 'gameLeadStarted') {
+        openTeamTabOnLeadStart(event.worktreeId)
         return
       }
       if (event.type === 'linearLinkedIssueUpdated') {

@@ -99,6 +99,8 @@ export type PersistedUIState = {
   _antigravityStatusBarDefaultAdded?: boolean
   /** One-shot migration flag for adding the default-on Grok status item. */
   _grokStatusBarDefaultAdded?: boolean
+  /** One-shot: Team became the right sidebar's tab once, or the person picked a tab first (ORCA-1414). */
+  _rightSidebarTeamTabDefaulted?: boolean
   statusBarItems: StatusBarItem[]
   statusBarVisible: boolean
   /** Why: this is client-side presentation, not a provider/account or execution-host setting. */

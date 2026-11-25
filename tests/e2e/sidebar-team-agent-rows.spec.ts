@@ -223,6 +223,16 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
         return registered.result.registered
       })
       .toBe(true)
+    // Why: a lead start opens the Team panel (ORCA-1414); shut it again so the rows read alone.
+    await expect
+      .poll(() =>
+        orcaPage.evaluate(() => {
+          const state = window.__store!.getState()
+          return state.rightSidebarOpen && state.rightSidebarTab === 'team'
+        })
+      )
+      .toBe(true)
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
     const endpoint = await readHookEndpoint(electronApp)
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,
