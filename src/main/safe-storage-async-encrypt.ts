@@ -5,19 +5,38 @@ import { safeStorage } from 'electron'
 // sync decryptString reads. Null means no OS encryption, so callers keep their plaintext fallback.
 export async function encryptSecretOffMainThread(plaintext: string): Promise<Buffer | null> {
   if (await asyncEncryptionAvailable()) {
-    return safeStorage.encryptStringAsync(plaintext)
+    const blob = await safeStorage.encryptStringAsync(plaintext)
+    if (syncDecryptReads(blob)) {
+      return blob
+    }
   }
   return safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(plaintext) : null
 }
 
-// Why: the async-to-sync round trip is proven live only on macOS, where the Keychain prompt froze
-// Orca; Linux and Windows keep the sync pair until a live round trip there widens this gate.
+// Why (ORCA-1406): the async/sync round trip is proven live on macOS (Keychain) and on Linux with
+// GNOME libsecret (Electron 43.8.6); KWallet and Windows DPAPI are unproven and keep the sync pair.
 export function canEncryptOffMainThread(): boolean {
+  if (
+    typeof safeStorage.encryptStringAsync !== 'function' ||
+    typeof safeStorage.isAsyncEncryptionAvailable !== 'function'
+  ) {
+    return false
+  }
+  if (process.platform === 'darwin') {
+    return true
+  }
   return (
-    process.platform === 'darwin' &&
-    typeof safeStorage.encryptStringAsync === 'function' &&
-    typeof safeStorage.isAsyncEncryptionAvailable === 'function'
+    process.platform === 'linux' &&
+    typeof safeStorage.getSelectedStorageBackend === 'function' &&
+    safeStorage.getSelectedStorageBackend() === 'gnome_libsecret'
   )
+}
+
+// Why: with no keyring reachable, Linux's async encryptor still reports available and writes v10
+// blobs that the sync decryptString refuses ("Decryption is not available"); only v11 is
+// keyring-backed, so anything else goes back to the sync pair, which stores plaintext there.
+function syncDecryptReads(blob: Buffer): boolean {
+  return process.platform !== 'linux' || blob.subarray(0, 3).toString('latin1') === 'v11'
 }
 
 async function asyncEncryptionAvailable(): Promise<boolean> {
