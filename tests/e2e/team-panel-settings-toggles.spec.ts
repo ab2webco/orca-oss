@@ -6,6 +6,7 @@ import { WIDTHS } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { writeSettings } from './helpers/settings-write'
+import { closeLeadStartTeamPanel } from './helpers/team-tab-auto-open'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 
 const GB = 1024 ** 3
@@ -170,6 +171,7 @@ test('each panel setting changes the Team panel: PRs and Machines tabs, the merg
         return registered.result.registered
       })
       .toBe(true)
+    await closeLeadStartTeamPanel(orcaPage)
     await emitCodexHookStatus(await readHookEndpoint(electronApp), {
       paneKey: pane.paneKey,
       worktreeId,

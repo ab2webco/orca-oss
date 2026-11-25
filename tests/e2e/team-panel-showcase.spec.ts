@@ -18,6 +18,7 @@ import { startMessagesApi } from './helpers/showcase-messages-api'
 import { createShowcaseRepo } from './helpers/showcase-repo'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { postLeadAgentRow } from './helpers/team-panel-inbox'
+import { closeLeadStartTeamPanel } from './helpers/team-tab-auto-open'
 import {
   execInTerminal,
   sendToTerminal,
@@ -416,6 +417,7 @@ test('the Lumen team in the Team panel: Office across four machines, Figures and
         return registered.result.registered
       })
       .toBe(true)
+    await closeLeadStartTeamPanel(orcaPage)
     await postLeadAgentRow(electronApp, { paneKey: pane.paneKey, worktreeId })
     if (live) {
       // Why before any take: the lead's pane is a third of every window clip, and it must not be empty.
