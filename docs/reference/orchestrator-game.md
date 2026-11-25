@@ -1127,11 +1127,11 @@ state the bar:
   band reads, on each fleet change and at most once a minute otherwise, so it adds no GitHub polling;
   the queue clocks it cannot read from GitHub (a run's checks, a queued launch) start when the watch
   first sees them. After a compaction the lead's context says to re-arm both.
-- **After a compaction.** There is no compaction limit: the lead keeps coordinating. Before it acts it
-  reads `orca game fleet` and `orca game inbox` again (Orca's hook re-injects the current fleet) and
-  answers from that read, not from the summary. `orca game lead --fresh` (`/orca-game:lead fresh`)
-  opens a new lead only when the person asks, with the previous one closed; without the flag Orca
-  reopens the compacted conversation.
+- **After a compaction.** A compaction does not end the lead; it keeps coordinating. Orca's hook
+  re-injects the current `game fleet` and tells the lead to answer from it or a fresh read, never from
+  the summary, and to run `game lead` again if the summary lost its rules. The `/orca-game:lead`
+  skill runs `orca game lead --fresh` only when the person asks for a new lead, with the previous one
+  closed; without the flag Orca reopens the compacted conversation.
 - **Lost sessions.** A `gone from <host>` row in `game fleet` is settled at once: the lead compares the
   host worktree's head with the pushed branch, then closes, merges, or stops and relaunches. It never
   mails work to a gone session.

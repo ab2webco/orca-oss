@@ -5,18 +5,18 @@ Each rule links to the page that carries its detail.
 
 ## Design and UI
 
-- UI work follows [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md), the tokens in `src/renderer/src/assets/main.css` and the shadcn primitives in `src/renderer/src/components/ui/`. Never invent a color, font size or shadow tier a documented one covers; where the guide is silent, use the resolution order in its final section.
+- UI follows [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md) (its final section resolves what it does not cover), the tokens in `src/renderer/src/assets/main.css` and the shadcn primitives in `src/renderer/src/components/ui/`. Never invent a color, font size or shadow tier.
 - Check rendered Orca UI by running one spec under `tests/e2e/` and reading its screenshots, never with computer-use or a bespoke launcher: [`rendered-ui-checks.md`](./docs/reference/rendered-ui-checks.md). README GIFs and site clips come from the `*-showcase` specs: [`showcase-media.md`](./docs/reference/showcase-media.md).
 
 ## Plugins and Sonar
 
-- A plugin is a folder with an `orca-plugin.json` that runs as a sandboxed panel iframe (curated design tokens only) and an out-of-process worker (Node permission model, env allowlist). Consent is bound to the installed tree's hash when it contributes automations, skills, keybindings, VM recipes or agent profiles, so those re-prompt on every update: [`plugin-development.md`](./docs/reference/plugin-development.md). Template: [`examples/plugins/worklog`](./examples/plugins/worklog); minimal demo: [`examples/plugins/hello-orca`](./examples/plugins/hello-orca).
+- Plugins (manifest, sandboxed panel, worker, consent, publishing): [`plugin-development.md`](./docs/reference/plugin-development.md). Template: [`examples/plugins/worklog`](./examples/plugins/worklog); minimal demo: [`examples/plugins/hello-orca`](./examples/plugins/hello-orca).
 - `orca sonar` wiring, warm-up and remote refusal: [`orca-sonar.md`](./docs/reference/orca-sonar.md).
 
 ## Style
 
 - Comments only for a non-obvious WHY, one line when possible. Never walk through the code.
-- Name files after what they contain (`tab-group-state.ts`), never `helpers`, `utils`, `common` or `misc`.
+- Name files after what they contain (`tab-group-state.ts`), never `helpers`, `utils`, `common` or `misc`; reaching for one usually means the file needs a split.
 - Prefer `.ts` over `.d.ts` for type declarations.
 
 ## Lint Rules: Do Not Disable Max Lines
@@ -31,13 +31,16 @@ Never add a `max-lines` disable (eslint or oxlint, file or line), and never add 
 
 ## Members of a lead
 
-If a lead launched you, your brief (`.orca/briefs/…`) is the contract: report only through the `orca orchestration` commands it lists, read CI from `orca game state --json` instead of polling `gh`, and send a split plan before a first commit past ~400 lines. The lead's own rules print from `orca game lead`, not here: [`orchestrator-game.md`](./docs/reference/orchestrator-game.md#the-project-lead-orchestratorgameorchestrator).
+- If a lead launched you, your brief (`.orca/briefs/…`) is the contract: report only through the `orca orchestration` commands it lists.
+- Read CI from `orca game state --json`, not by polling `gh`; send a split plan before a first commit past ~400 lines.
+- The lead's own rules print from `orca game lead`, not here: [`orchestrator-game.md`](./docs/reference/orchestrator-game.md#the-project-lead-orchestratorgameorchestrator).
 
 ## Verification
 
-- **Everything in your run is yours.** A failure you did not cause is still yours: never dismiss it as flaky, pre-existing or someone else's. If you cannot fix it in scope, say so and leave it tracked with the evidence. Review a delegated report, upstream PR or another agent's "verified" before you build on it or contradict it.
-- Before claiming green, ask what the check would show if the thing were broken; if the same output, it proves nothing. Read [`agent-verification-traps.md`](./docs/reference/agent-verification-traps.md) before claiming green or acting on someone else's.
+- **Everything in your run is yours:** never dismiss a failure as flaky, pre-existing or someone else's; if you cannot fix it in scope, say so and leave it tracked with evidence. Review a delegated report, upstream PR or another agent's "verified" before building on it.
+- Before claiming green, ask what the check would show if the thing were broken; the same output proves nothing. Read [`agent-verification-traps.md`](./docs/reference/agent-verification-traps.md) first.
 - Tests need the repo config: `npm test` or `npx vitest run --config config/vitest.config.ts <paths>`, never a bare `npx vitest run` ([trap 1](./docs/reference/agent-verification-traps.md#1-run-tests-with-the-repos-vitest-config)).
+- A test that passes the same against the old code proves nothing ([trap 4](./docs/reference/agent-verification-traps.md#4-a-new-test-proves-a-fix-only-if-it-fails-without-it)).
 - A delegated report's summary is not its evidence: read its `reportPath` file first ([trap 2](./docs/reference/agent-verification-traps.md#2-judge-a-delegated-report-by-its-artifact-not-its-summary)).
 - A green PR push runs only the fast set; Windows, packaging, Git and wire compatibility and the full E2E suite run in the merge queue: [`ci-merge-queue.md`](./docs/reference/ci-merge-queue.md).
 - A red check is not a failed test: name its class from the run summary before you name a spec: [`ci-failure-classification.md`](./docs/reference/ci-failure-classification.md).
@@ -47,10 +50,11 @@ If a lead launched you, your brief (`.orca/briefs/…`) is the contract: report 
 ## Considerations
 
 - **Worktree safety:** read and edit only in the primary working directory (the worktree); never follow absolute paths from subagent results into the main repo.
-- **Cross-platform** (macOS, Linux, Windows): never hardcode `e.metaKey`, pick `metaKey` on Mac and `ctrlKey` elsewhere; menu accelerators use `CmdOrCtrl`; labels show `⌘`/`⇧` on Mac and `Ctrl+`/`Shift+` elsewhere; build paths with `path.join`.
+- **Cross-platform** (macOS, Linux, Windows): never hardcode `e.metaKey`, pick `metaKey` on Mac (`navigator.userAgent.includes('Mac')`) and `ctrlKey` elsewhere; menu accelerators use `CmdOrCtrl`; labels show `⌘`/`⇧` on Mac and `Ctrl+`/`Shift+` elsewhere; build paths with `path.join`.
 - **Windows setup scripts** run as `.cmd` unless they start with `#!`; never a bare `cmd.exe /c` from Git Bash: [`windows-setup-shell.md`](./docs/reference/windows-setup-shell.md).
 - **Linux native modules** keep the glibc 2.31 floor (Ubuntu 20.04): [`linux-glibc-compatibility.md`](./docs/reference/linux-glibc-compatibility.md).
-- **SSH and folder workspaces:** never assume local-only execution, or that every workspace is a git worktree.
+- **SSH Use Case:** every change must work over SSH; never assume local-only execution.
+- **Folder Workspace Use Case:** never assume every workspace is a git worktree.
 - **Remote wire compatibility:** clients and remote servers update independently; a new optional field is safe, a new stream opcode must be capability-negotiated, and a change to what the host publishes reaches old clients: [`remote-wire-compatibility.md`](./docs/reference/remote-wire-compatibility.md).
 - **Git binary:** Git 2.25 is the baseline on native, WSL and SSH hosts; keep a fallback for newer options and cache capability per host with `GitCapabilityCache`: [`git-compatibility.md`](./docs/reference/git-compatibility.md).
 - **Git providers:** consider GitLab and other providers, keep provider behavior behind explicit checks, and avoid GitHub-only names for generic review concepts.
