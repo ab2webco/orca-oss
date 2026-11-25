@@ -1,5 +1,5 @@
 import type { GameAgent } from './orchestrator-game-state'
-import type { GameMemberPhase } from './orchestrator-game-fleet-verbs'
+import type { GameMemberPhase } from './orchestrator-game-member-phase'
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { isAskUserQuestionTool } from './agent-question-answered-intent'
 import { agentToolLabelOf } from './agent-tool-label'
@@ -55,12 +55,15 @@ export function remoteNextOf(agent: GameAgent, ticket: string | null): string | 
       : ' (no reason was published)'
     return `failed to start on ${remote.host}${why}. Find the cause before launching ${ticket ?? agent.displayName ?? agent.paneKey} again.`
   }
-  if (remote?.stateKnown === false) {
-    return silentHostNextOf(remote.host, agent.paneKey)
-  }
   // Why: a found agent has no dispatch, so lead mail cannot reach it until it is adopted (ORCA-943).
   if (remote && agent.found) {
-    return `found on ${remote.host}: orca game adopt ${ticket ?? agent.displayName ?? agent.paneKey} so lead mail reaches it`
+    const adopt = `orca game adopt ${ticket ?? agent.displayName ?? agent.paneKey}`
+    return remote.stateKnown
+      ? `found on ${remote.host}: ${adopt} so lead mail reaches it`
+      : `found on ${remote.host}, which is not answering now: ${adopt} once it answers`
+  }
+  if (remote?.stateKnown === false) {
+    return silentHostNextOf(remote.host, agent.paneKey)
   }
   if (remote?.starting) {
     return `starting on ${remote.host}`
@@ -123,6 +126,12 @@ export function phaseNextOf(
       return limitedNextOf(agent)
     case 'working':
       return 'wait'
+    case 'unknown':
+      return `read its terminal before acting: orca game member ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey}`
+    case 'asleep':
+      return agent.asleepHandle
+        ? `a restart slept its pane: orca terminal wake --terminal ${agent.asleepHandle}`
+        : `a restart slept its pane on ${agent.remote?.host ?? 'its host'}: orca game resume-members ${ticketOfMember(agent) ?? agent.paneKey} wakes it`
     case 'idle':
       return agent.remote?.ticketDone && !agent.review
         ? `run done with no PR: open one, or game stop ${ticketOfMember(agent) ?? agent.displayName ?? agent.paneKey} if nothing is ahead of main`

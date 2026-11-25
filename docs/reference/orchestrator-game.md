@@ -904,7 +904,18 @@ The lead's verbs, run from the lead's terminal
     `worker-start --on`, the connected server builds the launch, so it pins only from a version
     that has this.
 - `orca game fleet` — each member's ticket, state, PR, CI, branch, agent, account, phase
-  (`needs-you`, `limited`, `working`, `idle`, `finished`) and next step, with the free slots. A member is **finished** when its PR is
+  (`needs-you`, `limited`, `unknown`, `working`, `asleep`, `idle`, `finished`) and next step, with the free slots.
+  A member is **unknown** when no fresh hook proves its state: a `working` hook older than the
+  sidebar's 30-minute freshness gate, or a row Orca restored from disk after a restart that no hook
+  has confirmed since, or a remote member whose paired host does not answer. PHASE prints the
+  evidence, as in `unknown (hook 45m old)`, `unknown (restored, hook 3h old)` or
+  `unknown (m1 not answering)`. After a restart that reattaches panes, an idle member sends no hook
+  until something types into it, so a fleet of `unknown (restored, …)` rows then is expected, not a
+  fault. A member is **asleep** when a restart slept its pane, on this machine or a paired host.
+  The watch raises no "idle with no PR" alert for either; a member whose host does not answer gets
+  its own alert instead, and `push` leaves all of them alone. A found row on a paired host is
+  state-known only while that host answered its last read; when a read fails, or hangs past 30 s,
+  the row stays listed as unknown (ORCA-1395). A member is **finished** when its PR is
   merged or closed and its ticket is in review or done (or it has none); a remote member launched
   as an audit, review or captures is also finished once its home Run completed with no open PR.
   The kind is the lead's `game launch` choice, or, when the launch carries none (`--model`, Codex,

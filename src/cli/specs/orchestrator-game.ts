@@ -93,7 +93,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     usage: 'orca game fleet [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
     notes: [
-      'Phases: needs-you (an Inbox question, or a permission prompt or question open in its pane), limited (stopped by its account usage limit; `game move` it or wait), working, idle, finished (PR merged and ticket in review or done).',
+      'Phases: needs-you (an Inbox question, or a permission prompt or question open in its pane), limited (stopped by its account usage limit; `game move` it or wait), unknown (its hook went silent past 30 min, or Orca restarted and no hook confirmed it since; the age is printed), working, asleep (a restart slept its pane; the next step wakes it), idle, finished (PR merged and ticket in review or done).',
       'Running members are every one not finished; free slots are the cap minus them.'
     ],
     examples: ['orca game fleet', 'orca game fleet --json']

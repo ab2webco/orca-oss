@@ -31,7 +31,7 @@ export type GameAgentRow = Pick<
   | 'lastActivityAt'
   | 'orphaned'
 > &
-  Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput' | 'restoredUnconfirmed'>> & {
+  Partial<Pick<RuntimeWorktreeAgentRow, 'toolInput' | 'restoredUnconfirmed' | 'updatedAt'>> & {
     parentPaneKey?: string | null
     stateStartedAt?: number
   }
@@ -128,6 +128,8 @@ export async function gameFleetOf(args: {
   launchOf?: (paneKey: string) => GameMemberLaunch | null
   /** The lead's worktree, where a member without one of its own runs. */
   leadWorktreeId?: string | null
+  /** The wake handle of a member pane a restart left asleep; null when it is awake. */
+  asleepHandleOf?: (member: { paneKey: string; worktreeId: string | null }) => string | null
 }): Promise<GameAgent[]> {
   const { leaderPaneKey, teamHandles } = args
   const isMemberRow = (row: GameAgentRow): boolean =>
@@ -197,6 +199,7 @@ export async function gameFleetOf(args: {
         isMember || row.paneKey === leaderPaneKey ? (args.advisorOf?.(row.paneKey) ?? null) : null
       const launch = isMember ? (args.launchOf?.(row.paneKey) ?? null) : null
       const steward = isMember ? (args.stewardOf?.(row.paneKey) ?? null) : null
+      const asleepHandle = isMember ? (args.asleepHandleOf?.(seat) ?? null) : null
       return {
         ...agent,
         state: gameMemberStateOf(agent.state, limit),
@@ -218,7 +221,10 @@ export async function gameFleetOf(args: {
         ...(isMember && row.stateStartedAt && !row.restoredUnconfirmed
           ? { stateSince: row.stateStartedAt }
           : {}),
-        ...(isMember && row.orphaned ? { orphaned: true as const } : {})
+        ...(isMember && row.orphaned ? { orphaned: true as const } : {}),
+        ...(isMember && row.updatedAt !== undefined ? { hookAt: row.updatedAt } : {}),
+        ...(isMember && row.restoredUnconfirmed ? { restored: true as const } : {}),
+        ...(asleepHandle ? { asleepHandle } : {})
       }
     })
   )

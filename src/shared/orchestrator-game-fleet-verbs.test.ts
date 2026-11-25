@@ -220,7 +220,15 @@ describe('gameFleetReportOf', () => {
       ['CIN-3', 'idle'],
       ['CIN-9', 'finished']
     ])
-    expect(fleet.counts).toEqual({ 'needs-you': 1, limited: 0, working: 1, idle: 1, finished: 1 })
+    expect(fleet.counts).toEqual({
+      'needs-you': 1,
+      limited: 0,
+      unknown: 0,
+      working: 1,
+      asleep: 0,
+      idle: 1,
+      finished: 1
+    })
     expect({ cap: fleet.cap, running: fleet.running, free: fleet.free }).toEqual({
       cap: 4,
       running: 3,
@@ -318,14 +326,15 @@ describe('gameFleetReportOf', () => {
     }).rows
 
     expect(rows).toEqual([
-      expect.objectContaining({ ticket: 'CIN-1', host: 'imac', stateKnown: true }),
-      expect.objectContaining({ ticket: 'CIN-3', host: null, stateKnown: true }),
       expect.objectContaining({
         ticket: 'CIN-2',
         host: 'imac',
         stateKnown: false,
+        phase: 'unknown',
         next: 'imac does not answer: orca orchestration worker-show --dispatch ctx_2'
-      })
+      }),
+      expect.objectContaining({ ticket: 'CIN-1', host: 'imac', stateKnown: true }),
+      expect.objectContaining({ ticket: 'CIN-3', host: null, stateKnown: true })
     ])
   })
 
@@ -490,7 +499,7 @@ describe('gameFleetReportOf', () => {
       ]
     })
 
-    expect(fleet.rows.map((row) => row.ticket)).toEqual(['CIN-1', 'ORCA-857', 'ORCA-854'])
+    expect(fleet.rows.map((row) => row.ticket)).toEqual(['ORCA-857', 'CIN-1', 'ORCA-854'])
     expect({ running: fleet.running, free: fleet.free }).toEqual({ running: 2, free: 0 })
   })
 })

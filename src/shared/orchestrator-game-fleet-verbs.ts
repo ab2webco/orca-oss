@@ -25,13 +25,12 @@ import {
   type GameHostProjectLoad
 } from './orchestrator-game-host-load'
 
-export { ticketInText, ticketOfMember, isFinishedMember, localGameFreeOf }
+import { byPhase, memberPhaseOf, type GameMemberPhase } from './orchestrator-game-member-phase'
+
+export { ticketInText, ticketOfMember, isFinishedMember, localGameFreeOf, memberPhaseOf }
+export type { GameMemberPhase }
 
 /** What the lead's `orca game fleet|wave|sweep|push` decide from one `game.state` read. */
-
-export type GameMemberPhase = 'needs-you' | 'limited' | 'working' | 'idle' | 'finished'
-
-const PHASES: readonly GameMemberPhase[] = ['needs-you', 'limited', 'working', 'idle', 'finished']
 
 export type GameFleetRow = {
   name: string
@@ -58,6 +57,10 @@ export type GameFleetRow = {
   limitedUntil: string | null
   /** When the host last saw its terminal work (ISO); null when unknown. */
   lastActivityAt: string | null
+  /** When its hook last reported (ISO); null when its host sent none. */
+  hookAt: string | null
+  /** Its hook row was restored from disk and no hook confirmed it since. */
+  restored: boolean
   /** Failed for silence yet still working; its ticket has another live attempt (ORCA-658). */
   orphaned: boolean
   /** The paired host a remote member runs on; null when local (ORCA-824). */
@@ -103,28 +106,13 @@ export type GameFleetInput = Pick<
 const mergeQueuedOf = (state: Pick<OrchestratorGameState, 'project'>): ReadonlySet<string> =>
   new Set(state.project?.queue?.entries?.map((entry) => entry.url))
 
-export function memberPhaseOf(agent: GameAgent): GameMemberPhase {
-  if (isFinishedMember(agent)) {
-    return 'finished'
-  }
-  if (agent.limit?.loggedOut) {
-    return 'needs-you'
-  }
-  if (agent.limit) {
-    return 'limited'
-  }
-  if (agent.state === 'waiting') {
-    return 'needs-you'
-  }
-  return agent.state === 'working' ? 'working' : 'idle'
-}
-
 export function gameFleetRowOf(
   agent: GameAgent,
   question?: GameWaitingMessage,
-  queued?: ReadonlySet<string>
+  queued?: ReadonlySet<string>,
+  now = Date.now()
 ): GameFleetRow {
-  const phase = memberPhaseOf(agent)
+  const phase = memberPhaseOf(agent, now)
   return {
     name: agent.displayName ?? agent.paneKey,
     ticket: ticketOfMember(agent),
@@ -147,6 +135,8 @@ export function gameFleetRowOf(
         ? null
         : new Date(agent.limit.resetsAt).toISOString(),
     lastActivityAt: agent.lastActivityAt ?? null,
+    hookAt: agent.hookAt === undefined ? null : new Date(agent.hookAt).toISOString(),
+    restored: agent.restored === true,
     orphaned: agent.orphaned === true,
     host: agent.remote?.host ?? null,
     stateKnown: agent.remote?.stateKnown !== false,
@@ -171,13 +161,7 @@ function nextWithQuestionOf(
 export const gameFleetMembersOf = (state: GameFleetInput): GameAgent[] =>
   state.agents.filter((agent) => agent.isMember && !agent.isLeader)
 
-const byPhase = <T>(items: T[], phaseOf: (item: T) => GameMemberPhase): T[] =>
-  items
-    .map((item, index) => ({ item, index, rank: PHASES.indexOf(phaseOf(item)) }))
-    .sort((a, b) => a.rank - b.rank || a.index - b.index)
-    .map(({ item }) => item)
-
-export function gameFleetReportOf(state: GameFleetInput): GameFleet {
+export function gameFleetReportOf(state: GameFleetInput, now = Date.now()): GameFleet {
   // Why: questions reach the lead's inbox, and each asking member is one ticket there.
   const waiting = state.inboxes?.find((inbox) => inbox.key === 'lead')?.waiting ?? []
   const mergeQueued = mergeQueuedOf(state)
@@ -186,12 +170,21 @@ export function gameFleetReportOf(state: GameFleetInput): GameFleet {
       gameFleetRowOf(
         agent,
         waiting.find((question) => question.from === ticketOfMember(agent)),
-        mergeQueued
+        mergeQueued,
+        now
       )
     ),
     (row) => row.phase
   )
-  const counts = { 'needs-you': 0, limited: 0, working: 0, idle: 0, finished: 0 }
+  const counts: Record<GameMemberPhase, number> = {
+    'needs-you': 0,
+    limited: 0,
+    unknown: 0,
+    working: 0,
+    asleep: 0,
+    idle: 0,
+    finished: 0
+  }
   for (const row of rows) {
     counts[row.phase] += 1
   }
@@ -319,6 +312,9 @@ export function gamePushPlanOf(state: GameFleetInput): GamePushEntry[] {
       }
       if (row.phase === 'limited') {
         return { ...base, action: 'leave', reason: `limited by its account: ${row.next}` }
+      }
+      if (row.phase === 'unknown' || row.phase === 'asleep') {
+        return { ...base, action: 'leave', reason: `${row.phase}: ${row.next}` }
       }
       if (!row.terminalHandle) {
         return { ...base, action: 'leave', reason: 'no terminal to send to' }

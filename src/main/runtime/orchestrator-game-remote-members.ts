@@ -295,6 +295,7 @@ export async function remoteGameMembersOf(
         ...(agent?.toolInput ? { toolInput: agent.toolInput } : {}),
         isLeader: false,
         isMember: true,
+        ...(agent ? { hookAt: agent.updatedAt } : {}),
         remote: {
           host: source.hostName,
           environmentId: source.environmentId,

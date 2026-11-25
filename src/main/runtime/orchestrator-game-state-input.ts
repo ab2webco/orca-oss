@@ -95,6 +95,7 @@ export type OrchestratorGameStateInput = {
   advisorOf?: (paneKey: string) => GameMemberAdvisor | null
   stewardOf?: (paneKey: string) => GameMemberSteward | null
   launchOf?: (paneKey: string) => GameMemberLaunch | null
+  asleepHandleOf?: (member: { paneKey: string; worktreeId: string | null }) => string | null
   /** A member worktree's own review and linked ticket; read only for members outside the lead's. */
   readMemberWork?: (worktreeId: string) => Promise<GameMemberWork | null>
   readScenes?: () => Promise<OrchestratorGameSceneSource[]>

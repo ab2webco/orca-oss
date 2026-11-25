@@ -32976,6 +32976,11 @@ export class OrcaRuntimeService {
       advisorOf: (paneKey) => this.gameMemberAdvisors.of(paneKey, Date.now()),
       stewardOf: (paneKey) => this.gameMemberStewardFor(paneKey),
       launchOf: (paneKey) => this.gameMemberLaunchFor(paneKey),
+      // Why no terminal too: a running pane keeps a 'live' record; the host's remote check is the same (ORCA-915).
+      asleepHandleOf: (member) =>
+        member.worktreeId && this.getTerminalHandleForPaneKey(member.paneKey) === null
+          ? this.sleepingTerminalHandleOfPane(member.worktreeId, member.paneKey)
+          : null,
       leaderPaneKey: args.paneKey ?? null,
       leaderUnreported:
         args.paneKey !== undefined &&

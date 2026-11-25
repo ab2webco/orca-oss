@@ -163,13 +163,30 @@ const formatQueued = (fleet: GameFleet): string[] =>
         ...fleet.queued.map((one) => `${one.ticket}: ${formatSetupQueue(one)}`)
       ]
 
-function sinceOf(at: string | null, now: number): string {
+function ageOf(at: string | null, now: number): string | null {
   const ms = at ? now - Date.parse(at) : Number.NaN
   if (!Number.isFinite(ms)) {
-    return '-'
+    return null
   }
   const minutes = Math.max(0, Math.round(ms / 60_000))
-  return minutes < 60 ? `${minutes}m ago` : `${Math.round(minutes / 60)}h ago`
+  return minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`
+}
+
+function sinceOf(at: string | null, now: number): string {
+  const age = ageOf(at, now)
+  return age === null ? '-' : `${age} ago`
+}
+
+// Why the evidence: `unknown` alone does not say whether the hook went quiet or Orca restarted (ORCA-1395).
+function phaseCellOf(row: GameFleetRow, now: number): string {
+  if (row.phase !== 'unknown') {
+    return row.phase
+  }
+  const age = ageOf(row.hookAt, now)
+  const host = row.stateKnown ? null : `${row.host ?? 'its host'} not answering`
+  const hook = age === null ? null : `hook ${age} old`
+  const said = [host, row.restored ? 'restored' : null, hook].filter((one) => one !== null)
+  return said.length > 0 ? `unknown (${said.join(', ')})` : 'unknown'
 }
 
 export type GameFleetWithBudget = GameFleet & {
@@ -179,7 +196,12 @@ export type GameFleetWithBudget = GameFleet & {
 
 export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()): string {
   const { counts } = fleet
-  const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
+  // Why only when present: most fleets have none, and the head keeps the shape scripts read.
+  const unproven = (['unknown', 'asleep'] as const)
+    .filter((phase) => counts[phase] > 0)
+    .map((phase) => `, ${phase} ${counts[phase]}`)
+    .join('')
+  const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}${unproven}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
   const hosts = fleet.hostCapacity
     ? formatGameHostCapacity(fleet.hostCapacity)
     : fleet.hosts
@@ -192,7 +214,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     return [...top, ...paused].join('\n')
   }
   const rows = fleet.rows.map((row) => [
-    row.phase,
+    phaseCellOf(row, now),
     row.ticket ?? '-',
     row.ticketStatus ?? '-',
     row.stateKnown ? row.state : 'unknown',
