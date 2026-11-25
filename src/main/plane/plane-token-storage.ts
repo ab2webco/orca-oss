@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
   CredentialDecryptionError,
+  CredentialSaveSupersededError,
   credentialFileHasContent,
   encryptCredentialForFile,
   readIntegrationCredentialFileSync,
@@ -120,13 +121,17 @@ export async function saveWorkspaceToken(workspaceId: string, apiKey: string): P
   const isLatest = latestWrites.begin(workspaceId)
   const encrypted = await encryptToken(apiKey)
   if (!isLatest()) {
-    return
+    throw new CredentialSaveSupersededError()
   }
   ensureTokenDir()
   writeFileSync(path, encrypted, { mode: 0o600 })
   pendingReads.forget(workspaceId)
   cacheToken(workspaceId, apiKey)
   credentialErrors.delete(workspaceId)
+}
+
+export function supersedePendingTokenSaves(): void {
+  latestWrites.supersedeAll()
 }
 
 export function deleteWorkspaceToken(workspaceId: string): void {

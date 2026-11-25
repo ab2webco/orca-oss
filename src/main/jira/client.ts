@@ -19,6 +19,7 @@ import {
   hasStoredToken,
   readToken,
   saveToken,
+  supersedePendingTokenSaves,
   writeSiteFile
 } from './site-credential-store'
 import {
@@ -160,6 +161,9 @@ export function disconnect(siteId?: string): void {
   const ids = siteId ? [siteId] : file.sites.map((site) => site.id)
   for (const id of ids) {
     deleteToken(id)
+  }
+  if (!siteId) {
+    supersedePendingTokenSaves()
   }
   // Why: drop cached attachment data URLs for disconnected sites so main does
   // not retain multi-MB strings after logout.

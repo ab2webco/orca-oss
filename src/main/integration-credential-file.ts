@@ -45,6 +45,13 @@ export function credentialFileHasContent(path: string): boolean {
   }
 }
 
+// Why: a disconnect mid-encrypt must fail the connect, not list an account with no token.
+export class CredentialSaveSupersededError extends Error {
+  constructor() {
+    super('Disconnected before the token was saved.')
+  }
+}
+
 // Falls back to plaintext bytes when the OS keyring is unavailable, matching the
 // Linear/Jira token writers so a keyring-less box still connects.
 export async function encryptCredentialForFile(

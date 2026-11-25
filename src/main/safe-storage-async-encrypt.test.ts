@@ -232,7 +232,7 @@ describe('a save that awaits the encryptor', () => {
     await vi.waitFor(() => expect(safeStorageMock.encryptStringAsync).toHaveBeenCalled())
     store.deleteWorkspaceToken('ws')
     pending.resolve(Buffer.from('v10:plane-key'))
-    await save
+    await expect(save).rejects.toThrow('Disconnected before the token was saved.')
     expect(store.hasStoredWorkspaceToken('ws')).toBe(false)
   })
 

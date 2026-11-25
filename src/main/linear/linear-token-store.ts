@@ -27,6 +27,7 @@ import {
 } from './linear-workspace-registry'
 import {
   CredentialDecryptionError,
+  CredentialSaveSupersededError,
   encryptCredentialForFile,
   readIntegrationCredentialFileSync,
   readStoredCredentialTokenAsync
@@ -42,7 +43,7 @@ export async function saveWorkspaceToken(workspaceId: string, apiKey: string): P
   const isLatest = latestWrites.begin(workspaceId)
   const tokenBytes = await encryptCredentialForFile('Linear', apiKey)
   if (!isLatest()) {
-    return
+    throw new CredentialSaveSupersededError()
   }
   ensureOrcaDir()
   if (workspaceId !== LEGACY_WORKSPACE_ID) {

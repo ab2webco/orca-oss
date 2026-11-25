@@ -17,6 +17,7 @@ const { closeAllConnectionsMock, netFetchMock, resolveProxyMock, setProxyMock } 
 type SafeStorageMockOptions = {
   encryptionAvailable?: boolean
   decryptString?: (value: Buffer) => string
+  encryptStringAsync?: (value: string) => Promise<Buffer>
 }
 
 let tempHome = ''
@@ -97,6 +98,7 @@ async function loadClientModule(options: SafeStorageMockOptions = {}) {
     safeStorage: {
       isEncryptionAvailable: () => options.encryptionAvailable ?? false,
       encryptString: (value: string) => Buffer.from(value),
+      encryptStringAsync: options.encryptStringAsync,
       decryptString,
       isAsyncEncryptionAvailable: async () => options.encryptionAvailable ?? false,
       decryptStringAsync: async (value: Buffer) => ({
@@ -713,5 +715,47 @@ describe('Jira client credential storage', () => {
     const headers = netFetchMock.mock.calls[0]?.[1]?.headers as Headers
     expect(headers.get('User-Agent')).toBe('Orca')
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('Jira connect racing a disconnect', () => {
+  const originalPlatform = process.platform
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  })
+
+  it.each([
+    ['all sites', undefined],
+    ['that site', 'https://example.atlassian.net']
+  ])('adds no site when a disconnect of %s lands while its token encrypts', async (_, siteUrl) => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    let release = (): void => {}
+    const encryptStringAsync = vi.fn(
+      (value: string) =>
+        new Promise<Buffer>((resolve) => {
+          release = () => resolve(Buffer.from(value))
+        })
+    )
+    netFetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ accountId: 'account-alpha', displayName: 'Ada' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    )
+    const jira = await loadClientModule({ encryptionAvailable: true, encryptStringAsync })
+    const connecting = jira.connect({
+      siteUrl: 'example.atlassian.net',
+      email: 'ada@example.com',
+      apiToken: 'token-alpha'
+    })
+    await vi.waitFor(() => expect(encryptStringAsync).toHaveBeenCalled())
+    const { getSiteId } = await import('./site-identity')
+    jira.disconnect(siteUrl && getSiteId(siteUrl, 'ada@example.com'))
+    release()
+
+    await expect(connecting).resolves.toMatchObject({ ok: false })
+    expect(jira.getStatus()).toMatchObject({ connected: false, sites: [] })
+    const siteFile = JSON.parse(readFileSync(join(tempHome, '.orca', 'jira-sites.json'), 'utf-8'))
+    expect(siteFile.sites).toEqual([])
   })
 })

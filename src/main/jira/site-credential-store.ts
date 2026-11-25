@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
   CredentialDecryptionError,
+  CredentialSaveSupersededError,
   credentialFileHasContent,
   readIntegrationCredentialFileSync,
   readStoredCredentialTokenAsync,
@@ -194,7 +195,7 @@ export async function saveToken(siteId: string, apiToken: string): Promise<void>
   const isLatest = latestWrites.begin(siteId)
   const tokenBytes = await encryptCredentialForFile('Jira', apiToken)
   if (!isLatest()) {
-    return
+    throw new CredentialSaveSupersededError()
   }
   ensureOrcaDir()
   ensureTokenDir()
@@ -202,6 +203,10 @@ export async function saveToken(siteId: string, apiToken: string): Promise<void>
   pendingReads.forget(siteId)
   cachedTokens.set(siteId, apiToken)
   credentialErrors.delete(siteId)
+}
+
+export function supersedePendingTokenSaves(): void {
+  latestWrites.supersedeAll()
 }
 
 export function deleteToken(siteId: string): void {
