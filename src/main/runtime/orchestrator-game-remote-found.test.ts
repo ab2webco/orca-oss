@@ -52,10 +52,11 @@ const m1 = (worktrees: RuntimeWorktreePsSummary[], readAt = 0) => ({
 // Why: agents an earlier lead run started on m1 were in no Panel or fleet; m1 showed 0/5 (ORCA-943).
 describe('project sessions running on a paired host that no lead lists (ORCA-943)', () => {
   it('lists a project agent on the host as a found member with its host, ticket worktree and state', () => {
-    const found = remoteFoundSessionsOf([m1([worktree('orca-915', [agentRow()])])], {
-      repoName: 'orca-oss',
-      listed: new Set()
-    })
+    const found = remoteFoundSessionsOf(
+      [m1([worktree('orca-915', [agentRow()])])],
+      { repoName: 'orca-oss', listed: new Set() },
+      30_000
+    )
 
     expect(found).toEqual([
       {
@@ -69,7 +70,8 @@ describe('project sessions running on a paired host that no lead lists (ORCA-943
         found: true,
         remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true },
         worktree: { id: 'orca-915', branch: 'fabolivark/orca-915', displayName: 'orca-915' },
-        stateSince: 1_000
+        stateSince: 1_000,
+        hookAt: 2_000
       }
     ])
   })
@@ -105,6 +107,20 @@ describe('project sessions running on a paired host that no lead lists (ORCA-943
     )
 
     expect(found.map((one) => [one.displayName, one.state])).toEqual([['orca-329', 'done']])
+  })
+
+  // Why (ORCA-1395): every found row claimed a known state, even from a read its host stopped refreshing.
+  it('is state-known only while its host read is current, and carries its hook age either way', () => {
+    const rowsAt = (now: number) =>
+      remoteFoundSessionsOf(
+        [m1([worktree('orca-915', [agentRow({ updatedAt: 4_000 })])], 10_000)],
+        { repoName: 'orca-oss', listed: new Set() },
+        now
+      ).map((one) => [one.remote?.stateKnown, one.hookAt])
+
+    expect(rowsAt(40_000)).toEqual([[true, 4_000]])
+    expect(rowsAt(100_000)).toEqual([[true, 4_000]])
+    expect(rowsAt(100_001)).toEqual([[false, 4_000]])
   })
 })
 

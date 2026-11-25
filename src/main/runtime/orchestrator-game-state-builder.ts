@@ -177,6 +177,7 @@ export async function buildOrchestratorGameState(
     advisorOf: input.advisorOf,
     stewardOf: input.stewardOf,
     launchOf: input.launchOf,
+    asleepHandleOf: input.asleepHandleOf,
     leadWorktreeId: input.worktree?.id ?? null
   })
   const agents =

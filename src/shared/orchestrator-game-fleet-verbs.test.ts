@@ -220,7 +220,15 @@ describe('gameFleetReportOf', () => {
       ['CIN-3', 'idle'],
       ['CIN-9', 'finished']
     ])
-    expect(fleet.counts).toEqual({ 'needs-you': 1, limited: 0, working: 1, idle: 1, finished: 1 })
+    expect(fleet.counts).toEqual({
+      'needs-you': 1,
+      limited: 0,
+      unknown: 0,
+      working: 1,
+      asleep: 0,
+      idle: 1,
+      finished: 1
+    })
     expect({ cap: fleet.cap, running: fleet.running, free: fleet.free }).toEqual({
       cap: 4,
       running: 3,

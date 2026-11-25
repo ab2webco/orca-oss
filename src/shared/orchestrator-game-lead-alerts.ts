@@ -60,7 +60,7 @@ function startFailedAlertsOf(state: GameLeadAlertInput): GameLeadAlert[] {
 }
 
 function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, now: number) {
-  const fleet = gameFleetReportOf(state)
+  const fleet = gameFleetReportOf(state, now)
   const alerts: GameLeadAlert[] = []
   const add = (who: string, kind: string, line: string): void => {
     alerts.push({ key: `${kind}:${who}`, line: `${who} ${line}` })

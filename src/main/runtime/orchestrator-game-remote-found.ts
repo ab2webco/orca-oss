@@ -56,9 +56,12 @@ export function listedRemoteWorktreesOf(
  */
 export function remoteFoundSessionsOf(
   hosts: readonly RemoteHostSessions[],
-  project: { repoName: string; listed: ReadonlySet<string> }
+  project: { repoName: string; listed: ReadonlySet<string> },
+  now = Date.now()
 ): GameAgent[] {
-  return hosts.flatMap(({ environmentId, host, worktrees }) => {
+  return hosts.flatMap(({ environmentId, host, worktrees, readAt }) => {
+    // Why (ORCA-1395): a host whose reread hangs keeps serving its last read, which proves nothing now.
+    const stateKnown = now - readAt <= FOUND_STATE_KNOWN_MS
     const rows = worktrees.flatMap((one) => one.agents)
     const present = new Set(rows.map((row) => row.paneKey))
     const parents = new Set(rows.flatMap((row) => (row.parentPaneKey ? [row.parentPaneKey] : [])))
@@ -86,14 +89,15 @@ export function remoteFoundSessionsOf(
               displayName: row.displayName ?? row.taskTitle ?? one.displayName,
               isMember: true,
               found: true,
-              remote: { host, environmentId, stateKnown: true },
+              remote: { host, environmentId, stateKnown },
               worktree: {
                 id: one.worktreeId,
                 branch: one.branch.replace(/^refs\/heads\//, ''),
                 displayName: one.displayName
               },
               ...(row.lastActivityAt ? { lastActivityAt: row.lastActivityAt } : {}),
-              stateSince: row.stateStartedAt
+              stateSince: row.stateStartedAt,
+              hookAt: row.updatedAt
             })
           )
       )
@@ -102,6 +106,8 @@ export function remoteFoundSessionsOf(
 
 // Why 30 s: each read is a `worktree.ps` sweep on the host, and the band polls every 30 s.
 const FRESH_MS = 30_000
+// Why 3 reads: the reader serves its last read while it rereads, so one a poll old is still current.
+const FOUND_STATE_KNOWN_MS = 3 * FRESH_MS
 
 type CachedSessions = { at: number; worktrees: RuntimeWorktreePsSummary[]; refresh?: Promise<void> }
 

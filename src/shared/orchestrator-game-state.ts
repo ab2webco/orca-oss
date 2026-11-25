@@ -83,6 +83,12 @@ export type GameAgent = {
   lastActivityAt?: string
   /** When the member's current agent state began, on its host's clock (ms); absent from an older host. */
   stateSince?: number
+  /** When its host last got a hook event from the member's pane (ms, host clock); absent from an older host (ORCA-1395). */
+  hookAt?: number
+  /** Its hook row came back from disk and no hook confirmed it since, so `state` reads idle unproven (ORCA-1395). */
+  restored?: true
+  /** The handle `orca terminal wake` takes while a restart left this local member's pane asleep (ORCA-1395). */
+  asleepHandle?: string
   /** Failed for silence yet still working, not reopened because something replaced it (ORCA-658). */
   orphaned?: true
   /** A member running on a paired remote host; `stateKnown` is false while that host does not answer (ORCA-824). */
