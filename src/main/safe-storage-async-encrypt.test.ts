@@ -21,7 +21,8 @@ const { safeStorageMock } = vi.hoisted(() => ({
     decryptString: vi.fn((value: Buffer) => value.toString('utf8').replace(/^v10:/, '')),
     isAsyncEncryptionAvailable: vi.fn(async () => true),
     encryptStringAsync: vi.fn(async (value: string) => Buffer.from(`v10:${value}`)),
-    decryptStringAsync: vi.fn()
+    decryptStringAsync: vi.fn(),
+    getSelectedStorageBackend: vi.fn(() => 'gnome_libsecret')
   }
 }))
 
@@ -66,6 +67,7 @@ beforeEach(() => {
     Buffer.from(`v10:${value}`)
   )
   safeStorageMock.isEncryptionAvailable.mockReturnValue(true)
+  safeStorageMock.getSelectedStorageBackend.mockReturnValue('gnome_libsecret')
 })
 
 afterEach(() => {
@@ -82,10 +84,44 @@ describe('encryptSecretOffMainThread', () => {
     expectNoSyncEncryption()
   })
 
-  it.each(['linux', 'win32'] as const)('keeps the sync pair on %s', async (platform) => {
-    setPlatform(platform)
+  it('uses the async encryptor on Linux with GNOME libsecret', async () => {
+    setPlatform('linux')
+    safeStorageMock.encryptStringAsync.mockImplementation(async (value: string) =>
+      Buffer.from(`v11:${value}`)
+    )
     const { encryptSecretOffMainThread } = await load<Helper>('./safe-storage-async-encrypt')
+    expect((await encryptSecretOffMainThread('s'))?.toString()).toBe('v11:s')
+    expectNoSyncEncryption()
+  })
+
+  // Why: measured live on Electron 43.8.6 with no keyring reachable: async reports available and
+  // writes v10 blobs that the sync decryptString refuses, so the secret would be lost.
+  it('keeps the sync pair on Linux when the async blob is not keyring-backed', async () => {
+    setPlatform('linux')
+    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+    const { encryptSecretOffMainThread } = await load<Helper>('./safe-storage-async-encrypt')
+    expect(await encryptSecretOffMainThread('s')).toBeNull()
+    safeStorageMock.isEncryptionAvailable.mockReturnValue(true)
     expect((await encryptSecretOffMainThread('s'))?.toString()).toBe('sync:s')
+  })
+
+  it.each(['basic_text', 'kwallet5', 'kwallet6', 'unknown'])(
+    'keeps the sync pair on Linux with the %s backend',
+    async (backend) => {
+      setPlatform('linux')
+      safeStorageMock.getSelectedStorageBackend.mockReturnValue(backend)
+      const helper = await load<Helper>('./safe-storage-async-encrypt')
+      expect(helper.canEncryptOffMainThread()).toBe(false)
+      expect((await helper.encryptSecretOffMainThread('s'))?.toString()).toBe('sync:s')
+      expect(safeStorageMock.encryptStringAsync).not.toHaveBeenCalled()
+    }
+  )
+
+  it('keeps the sync pair on Windows', async () => {
+    setPlatform('win32')
+    const helper = await load<Helper>('./safe-storage-async-encrypt')
+    expect(helper.canEncryptOffMainThread()).toBe(false)
+    expect((await helper.encryptSecretOffMainThread('s'))?.toString()).toBe('sync:s')
     expect(safeStorageMock.encryptStringAsync).not.toHaveBeenCalled()
   })
 
