@@ -99,9 +99,10 @@ describe('found sessions in the fleet (ORCA-914)', () => {
     expect(observedGameEventsOf([foundDone])).toEqual([])
   })
 
-  it("loads the host it runs on, though not the lead's own count (ORCA-888)", () => {
+  it("a working one loads its host, though not the lead's own count; a leftover does not (ORCA-888, ORCA-1424)", () => {
     const hosts = [{ host: 'local', cap: 2, status: 'ok' as const }]
-    const fleet = gameFleetReportOf({ ...state, lead: { ...DEFAULT_GAME_LEAD, cap: 5 }, hosts })
+    const agents = [launched, { ...found, state: 'working' as const }, foundDone]
+    const fleet = gameFleetReportOf({ agents, lead: { ...DEFAULT_GAME_LEAD, cap: 5 }, hosts })
 
     expect(fleet.hosts).toEqual([{ ...hosts[0], running: 2, free: 0 }])
     expect(fleet).toMatchObject({ running: 1, free: 0 })

@@ -1,6 +1,7 @@
 import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch-result'
 import { GAME_GLOBAL_LOGIN_LABEL } from './orchestrator-game-launch-account'
 import { formatStop, type GameStopResult } from './orchestrator-game-stop'
+import { leftoverCountOf } from '../../shared/orchestrator-game-member-leftover'
 import type { GameHold } from './orchestrator-game-hold'
 import { formatSetupQueue } from './orchestrator-game-setup-queue'
 import {
@@ -201,7 +202,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     .filter((phase) => counts[phase] > 0)
     .map((phase) => `, ${phase} ${counts[phase]}`)
     .join('')
-  const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}${unproven}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
+  const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}${unproven}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free${leftoverCountOf(fleet.rows)}`
   const hosts = fleet.hostCapacity
     ? formatGameHostCapacity(fleet.hostCapacity)
     : fleet.hosts
@@ -227,7 +228,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     row.account ?? (row.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : '-'),
     row.model ?? '-',
     row.next,
-    row.found ? `${row.name} (found)` : row.name
+    row.found ? `${row.name} (${row.leftover ? 'leftover' : 'found'})` : row.name
   ])
   const header = [
     'PHASE',

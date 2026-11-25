@@ -1,4 +1,5 @@
 import { isFinishedMember } from './orchestrator-game-member-finished'
+import { isLeftoverMember } from './orchestrator-game-member-leftover'
 import type { GameAgent } from './orchestrator-game-state'
 import {
   defaultGameMemberCapOf,
@@ -193,7 +194,8 @@ export function gameFleetHostLoadsOf(
   otherProjects: readonly GameHostProjectLoad[] = []
 ): GameHostLoad[] {
   const runningOn = members
-    .filter((agent) => !isFinishedMember(agent) && !agent.remote?.gone)
+    // Why not leftovers: an earlier lead's idle session filled a paired host, so wave fell back to local (ORCA-1424).
+    .filter((agent) => !isFinishedMember(agent) && !agent.remote?.gone && !isLeftoverMember(agent))
     .map((agent) => agent.remote?.host ?? LOCAL_GAME_HOST)
   const loads = gameHostLoadsOf(hosts, [
     ...runningOn,
