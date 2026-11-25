@@ -191,6 +191,14 @@ describe('addOrcaWslInteropEnv', () => {
     expect(env.WSLENV).toBe('ORCA_TERMINAL_HANDLE/u')
   })
 
+  it("path-translates a member pane's gh PR-cap wrapper dir into the guest (ORCA-1388)", () => {
+    const env: Record<string, string> = { ORCA_GH_PR_CAP_SHIM_DIR: 'C:\\u\\orca-gh-pr-cap\\posix' }
+
+    addOrcaWslInteropEnv(env)
+
+    expect(env.WSLENV).toBe('ORCA_GH_PR_CAP_SHIM_DIR/p')
+  })
+
   it('marks the WSL hook relay version for import on relay spawn envs', () => {
     const env: Record<string, string> = {
       ORCA_WSL_HOOK_RELAY_VERSION: '0.1.0+abc'

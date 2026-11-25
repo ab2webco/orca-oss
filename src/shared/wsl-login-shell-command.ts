@@ -45,6 +45,10 @@ export function buildWslInteractiveLoginShellCommand(): string {
     'if [ -z "$_orca_wsl_shell" ] || [ ! -x "$_orca_wsl_shell" ]; then',
     '  _orca_wsl_shell=/bin/sh',
     'fi',
+    // Why here too: sh, dash and fish get no shell-ready rc to put the gh PR-cap wrapper first.
+    'if [ -n "${ORCA_GH_PR_CAP_SHIM_DIR:-}" ]; then',
+    '  export PATH="${ORCA_GH_PR_CAP_SHIM_DIR}:$PATH"',
+    'fi',
     '_orca_shell_ready_root=""',
     'if [ -n "${ORCA_USER_DATA_PATH:-}" ]; then',
     '  _orca_shell_ready_root="${ORCA_USER_DATA_PATH%/}/shell-ready"',

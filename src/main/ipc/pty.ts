@@ -154,7 +154,7 @@ import {
   resolveAttributionShellFamily
 } from '../attribution/terminal-attribution'
 import { ensureLinuxTerminalOrcaCliShimDir } from '../cli/linux-terminal-orca-cli-shim'
-import { applyGhPrCapShimEnv } from '../pty/gh-pr-cap-shim'
+import { applyGhPrCapShimEnv, applyWslGhPrCapShimEnv } from '../pty/gh-pr-cap-shim'
 import { registerPty, unregisterPty } from '../memory/pty-registry'
 import { advertisedUrlWatcher } from '../ports/advertised-url-watcher'
 import { track } from '../telemetry/client'
@@ -2102,8 +2102,10 @@ export function buildPtyHostEnv(
     delete baseEnv.ORCA_CLI_COMMAND
   }
   // Why before Orca's CLI and attribution dirs: those hold no real gh, and attribution hands off to this one.
-  // Why not WSL: its pane runs Linux gh, which a host-side wrapper cannot reach.
-  if (!opts.isWsl) {
+  // Why apart for WSL: its pane runs Linux gh, so the wrapper reaches it through WSLENV, not PATH.
+  if (opts.isWsl) {
+    applyWslGhPrCapShimEnv(baseEnv, { userDataPath: opts.userDataPath })
+  } else {
     applyGhPrCapShimEnv(baseEnv, {
       userDataPath: opts.userDataPath,
       shellFamily: resolveAttributionShellFamily({ shellPath: opts.shellPath, isWsl: false })

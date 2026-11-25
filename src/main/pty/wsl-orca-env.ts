@@ -97,6 +97,7 @@ export function addOrcaWslInteropEnv(env: Record<string, string>): void {
     'ORCA_WSL_HOOK_INSTANCE/u',
     'ORCA_OMP_SOURCE_AGENT_DIR/p',
     'ORCA_OMP_STATUS_EXTENSION/p',
+    'ORCA_GH_PR_CAP_SHIM_DIR/p',
     ...worktreeSetupWslenvEntries(env)
   ]
   applyWslenvPassthrough(env, passthroughEntries)

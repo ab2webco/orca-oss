@@ -5,6 +5,9 @@ import { resolvePathEnvKey } from './windows-path-segment-merge'
 
 const ROOT_DIR = 'orca-gh-pr-cap'
 
+// Why: a WSL pane has no bare orca, only the orca-ide its ORCA_CLI_COMMAND names (ORCA-1388).
+const ORCA_CLI_IN_SH = '"${ORCA_CLI_COMMAND:-orca}"'
+
 // Why sh, not bash: every other gh call pays this script's start, so it stays minimal and
 // only `gh pr create` runs Orca's CLI (ORCA-1301).
 export const POSIX_GH_PR_CAP_WRAPPER = String.raw`#!/bin/sh
@@ -36,7 +39,7 @@ is_pr_create() {
   return 1
 }
 if is_pr_create "$@"; then
-  orca game pr-cap-check
+  ${ORCA_CLI_IN_SH} game pr-cap-check
   code=$?
   [ $code -eq 3 ] && exit 1
   if [ $code -ne 0 ] && [ $code -ne 4 ]; then
@@ -68,6 +71,12 @@ exit /b %ERRORLEVEL%
 echo Orca's gh wrapper could not find gh on PATH. 1>&2
 exit /b 127
 `
+
+/** Runtime marks every game member's pane, whatever its agent, since only Claude's carries ORCA_GAME_ROLE. */
+export const GH_PR_CAP_MEMBER_ENV = 'ORCA_GH_PR_CAP_MEMBER'
+
+const isGameMemberPane = (env: Record<string, string>): boolean =>
+  env.ORCA_GAME_ROLE === 'member' || env[GH_PR_CAP_MEMBER_ENV] === '1'
 
 const written = new Set<string>()
 
@@ -116,7 +125,7 @@ export function applyGhPrCapShimEnv(
   }
   const nativeWindows = platform === 'win32' && options.shellFamily !== 'posix'
   // Why members only: cmd re-parses %* on every call, so the .cmd never sits in front of other users' gh.
-  if (nativeWindows && baseEnv.ORCA_GAME_ROLE !== 'member') {
+  if (nativeWindows && !isGameMemberPane(baseEnv)) {
     return false
   }
   const dir = nativeWindows ? dirs.win32Dir : dirs.posixDir
@@ -141,4 +150,32 @@ export function applyGhPrCapShimEnv(
     baseEnv.ORCA_GH_PR_CAP_SHIM_DIR = dir
   }
   return true
+}
+
+/**
+ * Hands a WSL member pane the POSIX wrapper's Windows dir; WSLENV /p translates it and the WSL
+ * launch and shell-ready rc put it first on the Linux PATH (ORCA-1388).
+ */
+export function applyWslGhPrCapShimEnv(
+  baseEnv: Record<string, string>,
+  options: { userDataPath: string; ensure?: typeof ensureGhPrCapShims }
+): boolean {
+  // Why members only: a plain WSL pane's gh pr create would pay a Windows interop round trip.
+  if (!isGameMemberPane(baseEnv)) {
+    delete baseEnv.ORCA_GH_PR_CAP_SHIM_DIR
+    return false
+  }
+  try {
+    baseEnv.ORCA_GH_PR_CAP_SHIM_DIR = (options.ensure ?? ensureGhPrCapShims)(
+      options.userDataPath
+    ).posixDir
+    return true
+  } catch (error) {
+    console.warn(
+      "[gh-pr-cap] WSL gh wrapper not installed; only the lead's watch alert covers the PR cap",
+      error
+    )
+    delete baseEnv.ORCA_GH_PR_CAP_SHIM_DIR
+    return false
+  }
 }

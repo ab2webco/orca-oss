@@ -13917,6 +13917,55 @@ describe('registerPtyHandlers', () => {
     expect(env.ORCA_USER_DATA_PATH).toBe('/tmp/orca-user-data')
   })
 
+  it("hands only a member's WSL pane the gh PR-cap wrapper dir, translated into the guest (ORCA-1388)", async () => {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'win32'
+    })
+    const runtime = {
+      setPtyController: vi.fn(),
+      preAllocateHandleForPty: vi.fn(() => 'term_wsl'),
+      onPtySpawned: vi.fn(),
+      onPtyExit: vi.fn(),
+      onPtyData: vi.fn()
+    }
+    const spawnWsl = async (env: Record<string, string>) => {
+      await handlers.get('pty:spawn')!(null, { cols: 80, rows: 24, shellOverride: 'wsl.exe', env })
+      return spawnMock.mock.calls.at(-1)![2].env as Record<string, string>
+    }
+
+    // Why: a run inside a member pane would otherwise mark every spawn here a member.
+    const inheritedRole = process.env.ORCA_GAME_ROLE
+    const inheritedMarker = process.env.ORCA_GH_PR_CAP_MEMBER
+    delete process.env.ORCA_GAME_ROLE
+    delete process.env.ORCA_GH_PR_CAP_MEMBER
+    let member: Record<string, string>
+    let plain: Record<string, string>
+    try {
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      member = await spawnWsl({ ORCA_GH_PR_CAP_MEMBER: '1' })
+      plain = await spawnWsl({ ORCA_GH_PR_CAP_SHIM_DIR: 'C:\\inherited' })
+    } finally {
+      if (platform) {
+        Object.defineProperty(process, 'platform', platform)
+      }
+      if (inheritedRole !== undefined) {
+        process.env.ORCA_GAME_ROLE = inheritedRole
+      }
+      if (inheritedMarker !== undefined) {
+        process.env.ORCA_GH_PR_CAP_MEMBER = inheritedMarker
+      }
+    }
+
+    expect(member.ORCA_GH_PR_CAP_SHIM_DIR).toBe(
+      join('/tmp/orca-user-data', 'orca-gh-pr-cap', 'posix')
+    )
+    expect(member.WSLENV?.split(':')).toContain('ORCA_GH_PR_CAP_SHIM_DIR/p')
+    expect(plain.ORCA_GH_PR_CAP_SHIM_DIR).toBeUndefined()
+    expect(plain.WSLENV?.split(':')).not.toContain('ORCA_GH_PR_CAP_SHIM_DIR/p')
+  })
+
   describe('Windows UTF-8 code page', () => {
     let originalPlatform: string
     let originalComspec: string | undefined
