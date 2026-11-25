@@ -363,7 +363,7 @@ describe('buildPluginList declared settings', () => {
         }
       ])
 
-      writePluginSetting({
+      await writePluginSetting({
         pluginsDataDir: getPluginsDataDir(userDataPath),
         pluginKey: 'orca-samples.webhook',
         declared: settingsManifest.contributes.settings,

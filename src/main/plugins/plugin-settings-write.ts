@@ -13,13 +13,13 @@ export type PluginSettingWriteResult = { ok: true } | { ok: false; error: string
  * manifest is the allowlist: an undeclared key never reaches disk, so the
  * renderer cannot use this path to write arbitrary plugin storage.
  */
-export function writePluginSetting(args: {
+export async function writePluginSetting(args: {
   pluginsDataDir: string
   pluginKey: string
   declared: readonly PluginSettingContribution[]
   key: string
   value: unknown
-}): PluginSettingWriteResult {
+}): Promise<PluginSettingWriteResult> {
   const setting = args.declared.find((candidate) => candidate.key === args.key)
   if (!setting) {
     return { ok: false, error: `plugin ${args.pluginKey} does not declare setting ${args.key}` }
@@ -35,7 +35,7 @@ export function writePluginSetting(args: {
       vault.delete(setting.key)
       return { ok: true }
     }
-    const stored = vault.set(setting.key, String(coerced.value))
+    const stored = await vault.set(setting.key, String(coerced.value))
     return stored.ok ? { ok: true } : { ok: false, error: stored.error }
   }
   return new PluginKvStore(args.pluginsDataDir, args.pluginKey, 'settings.json').set(

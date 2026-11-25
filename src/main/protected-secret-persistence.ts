@@ -5,6 +5,7 @@ import {
   CREDENTIAL_KEYCHAIN_WAIT_MS,
   decryptOffMainThread
 } from './integration-credential-file'
+import { canEncryptOffMainThread, encryptSecretOffMainThread } from './safe-storage-async-encrypt'
 
 export const PROTECTED_SECRET_SLOT = {
   opencodeSessionCookie: 'settings.opencodeSessionCookie',
@@ -28,6 +29,8 @@ export type ProtectedSecretRetentionUpdate = {
 
 export type LegacyPlaintextValidator = (value: string) => boolean
 
+type AsyncEncryption = { plaintext: string; blob?: string | null; done: Promise<void> }
+
 type ProtectedSecretEncryption = {
   blob: string
   degraded: boolean
@@ -45,8 +48,12 @@ export class ProtectedSecretPersistence {
   private readonly keychainDeferredSlots = new Set<string>()
   // Slots whose async read outlived the bound and may still unseal them.
   private readonly pendingKeychainSlots = new Set<string>()
+  // blob undefined while encrypting, null when encryption was unavailable or failed.
+  private readonly asyncEncryptions = new Map<string, AsyncEncryption>()
+  private onAsyncEncrypted: (() => void) | null = null
 
   removeRetainedBlob(slot: string): void {
+    this.asyncEncryptions.delete(slot)
     this.retainedBlobs.delete(slot)
     this.sealedSlots.delete(slot)
     this.asyncDecryptedPlaintexts.delete(slot)
@@ -102,6 +109,9 @@ export class ProtectedSecretPersistence {
     if (plaintext && this.asyncDecryptedPlaintexts.get(slot) === plaintext) {
       return { blob: retained, degraded: false }
     }
+    if (canEncryptOffMainThread()) {
+      return this.encryptOffMainThread(slot, plaintext, retained, sealedUnchanged)
+    }
     if (!this.encryptionAvailable()) {
       return {
         blob: retained,
@@ -130,6 +140,65 @@ export class ProtectedSecretPersistence {
       console.error('[persistence] Encryption failed; retaining the prior protected value:', err)
       return { blob: retained, degraded: true }
     }
+  }
+
+  // Runs after an off-main-thread encryption lands, so the caller can save it.
+  setAsyncEncryptionListener(listener: () => void): void {
+    this.onAsyncEncrypted = listener
+  }
+
+  // Settles once every encryption in flight has landed or failed.
+  pendingEncryptions(): Promise<unknown> {
+    return Promise.all([...this.asyncEncryptions.values()].map((entry) => entry.done))
+  }
+
+  // Why (ORCA-1391): the payload is built synchronously, so a changed secret is encrypted off the
+  // main thread and lands on the next save; until then the prior blob is kept, as on a failure.
+  private encryptOffMainThread(
+    slot: string,
+    plaintext: string,
+    retained: string,
+    sealedUnchanged: boolean
+  ): ProtectedSecretEncryption {
+    if (sealedUnchanged) {
+      return { blob: retained, degraded: false, hashValue: retained }
+    }
+    if (!plaintext) {
+      return { blob: '', degraded: false, retentionUpdate: { slot, blob: null } }
+    }
+    const known = this.asyncEncryptions.get(slot)
+    if (known?.plaintext === plaintext && known.blob) {
+      return { blob: known.blob, degraded: false, retentionUpdate: { slot, blob: known.blob } }
+    }
+    if (known?.plaintext !== plaintext) {
+      this.startAsyncEncryption(slot, plaintext)
+    }
+    return { blob: retained, degraded: true }
+  }
+
+  private startAsyncEncryption(slot: string, plaintext: string): void {
+    const entry: AsyncEncryption = {
+      plaintext,
+      done: encryptSecretOffMainThread(plaintext).then(
+        (encrypted) => {
+          if (this.asyncEncryptions.get(slot) !== entry) {
+            return
+          }
+          entry.blob = encrypted ? encrypted.toString('base64') : null
+          if (entry.blob) {
+            this.onAsyncEncrypted?.()
+          }
+        },
+        (err: unknown) => {
+          console.error(
+            '[persistence] Encryption failed; retaining the prior protected value:',
+            err
+          )
+          entry.blob = null
+        }
+      )
+    }
+    this.asyncEncryptions.set(slot, entry)
   }
 
   decrypt(slot: string, ciphertext: string, isLegacyPlaintext?: LegacyPlaintextValidator): string {

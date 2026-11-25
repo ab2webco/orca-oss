@@ -200,6 +200,7 @@ import {
   type ProtectedSecretDecryption,
   type ProtectedSecretRetentionUpdate
 } from '../../protected-secret-persistence'
+import { canEncryptOffMainThread } from '../../safe-storage-async-encrypt'
 import {
   applyProtectedSecretReads,
   holdsSealedPlaceholder,
@@ -587,6 +588,7 @@ export class Store {
       snapshotRoot: profileSnapshotRoot,
       fallbackSnapshotRoot: legacySnapshotRoot === profileSnapshotRoot ? null : legacySnapshotRoot
     }
+    this.protectedSecrets.setAsyncEncryptionListener(() => this.scheduleSave())
     const loaded = this.load()
     const normalized = normalizePersistedPaneIdentityState(loaded)
     this.state = normalized.state
@@ -1793,6 +1795,9 @@ export class Store {
   // Why 1s trailing + 5s max-wait (was 300ms unbounded): coalesce mutation bursts; max-wait bounds crash staleness at 5s.
   private static SAVE_DEBOUNCE_MS = 1_000
   private static SAVE_MAX_WAIT_MS = 5_000
+  // Why: a secret changed just before quit should reach the final write, but an open Keychain
+  // prompt must not hold the quit.
+  private static QUIT_SECRET_ENCRYPT_WAIT_MS = 2_000
 
   private scheduleSave(): void {
     // Why: once the quit flush has snapshotted, a newly debounced write would fire during
@@ -3855,8 +3860,24 @@ export class Store {
       return this.quitFlushPromise
     }
     this.quitFlushStarted = true
-    this.quitFlushPromise = this.flushCurrentStateAsync(true).catch(() => {})
+    this.quitFlushPromise = this.settleProtectedSecretEncryptions()
+      .then(() => this.flushCurrentStateAsync(true))
+      .catch(() => {})
     return this.quitFlushPromise
+  }
+
+  private async settleProtectedSecretEncryptions(): Promise<void> {
+    if (!canEncryptOffMainThread()) {
+      return
+    }
+    // Why: encryption starts while the payload is built, so a just-changed secret starts here.
+    this.buildStateToSave()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timedOut = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, Store.QUIT_SECRET_ENCRYPT_WAIT_MS)
+    })
+    await Promise.race([this.protectedSecrets.pendingEncryptions(), timedOut])
+    clearTimeout(timer)
   }
 
   flushPendingAsync(): Promise<void> {

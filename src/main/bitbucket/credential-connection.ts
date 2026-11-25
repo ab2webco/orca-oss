@@ -64,7 +64,7 @@ export async function connectBitbucket(
     }
   }
   const account = accountNameFromUser(result.user)
-  saveBitbucketCredential({
+  await saveBitbucketCredential({
     authMode: input.authMode,
     email: config.email,
     baseUrl: normalize(input.baseUrl),

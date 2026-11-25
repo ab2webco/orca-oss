@@ -4,14 +4,15 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { safeStorage } from 'electron'
 import {
   CredentialDecryptionError,
   credentialFileHasContent,
+  encryptCredentialForFile,
   readIntegrationCredentialFileSync,
   readStoredCredentialTokenAsync
 } from '../integration-credential-file'
 import { PendingCredentialReads } from '../integration-credential-pending-reads'
+import { LatestSecretWrites } from '../safe-storage-async-encrypt'
 import {
   assertIntegrationCredentialBytes,
   assertIntegrationStringBytes,
@@ -26,6 +27,7 @@ const cachedTokens = new Map<string, string>()
 // failing reads without re-touching the keychain on every status poll.
 const credentialErrors = new Map<string, string>()
 const pendingReads = new PendingCredentialReads<string>('Plane')
+const latestWrites = new LatestSecretWrites()
 
 function cacheToken(workspaceId: string, apiKey: string): void {
   if (!cachedTokens.has(workspaceId) && cachedTokens.size >= MAX_INTEGRATION_ACCOUNTS) {
@@ -62,20 +64,15 @@ export function hasStoredWorkspaceToken(workspaceId: string): boolean {
   return cachedTokens.has(workspaceId) || credentialFileHasContent(getTokenPath(workspaceId))
 }
 
-function writeEncryptedToken(path: string, apiKey: string): void {
+async function encryptToken(apiKey: string): Promise<Buffer> {
   assertIntegrationCredentialBytes('Plane', apiKey)
-  if (safeStorage.isEncryptionAvailable()) {
-    const encrypted = safeStorage.encryptString(apiKey)
-    if (encrypted.length > MAX_INTEGRATION_ACCOUNT_FILE_BYTES) {
-      throw new IntegrationAccountPersistenceLimitError(
-        `Plane encrypted credential exceeds ${MAX_INTEGRATION_ACCOUNT_FILE_BYTES} bytes.`
-      )
-    }
-    writeFileSync(path, encrypted, { mode: 0o600 })
-    return
+  const encrypted = await encryptCredentialForFile('Plane', apiKey)
+  if (encrypted.length > MAX_INTEGRATION_ACCOUNT_FILE_BYTES) {
+    throw new IntegrationAccountPersistenceLimitError(
+      `Plane encrypted credential exceeds ${MAX_INTEGRATION_ACCOUNT_FILE_BYTES} bytes.`
+    )
   }
-  console.warn('[plane] safeStorage encryption unavailable — storing token in plaintext')
-  writeFileSync(path, apiKey, { encoding: 'utf-8', mode: 0o600 })
+  return encrypted
 }
 
 export async function readWorkspaceToken(workspaceId: string): Promise<string | null> {
@@ -118,15 +115,22 @@ export async function readWorkspaceToken(workspaceId: string): Promise<string | 
   })
 }
 
-export function saveWorkspaceToken(workspaceId: string, apiKey: string): void {
+export async function saveWorkspaceToken(workspaceId: string, apiKey: string): Promise<void> {
+  const path = getTokenPath(workspaceId)
+  const isLatest = latestWrites.begin(workspaceId)
+  const encrypted = await encryptToken(apiKey)
+  if (!isLatest()) {
+    return
+  }
   ensureTokenDir()
-  writeEncryptedToken(getTokenPath(workspaceId), apiKey)
+  writeFileSync(path, encrypted, { mode: 0o600 })
   pendingReads.forget(workspaceId)
   cacheToken(workspaceId, apiKey)
   credentialErrors.delete(workspaceId)
 }
 
 export function deleteWorkspaceToken(workspaceId: string): void {
+  latestWrites.supersede(workspaceId)
   pendingReads.forget(workspaceId)
   cachedTokens.delete(workspaceId)
   credentialErrors.delete(workspaceId)

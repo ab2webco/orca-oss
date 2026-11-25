@@ -54,7 +54,7 @@ afterEach(async () => {
 describe('writePluginSetting', () => {
   it('makes the value readable through the settings:own path the plugin already uses', async () => {
     const dataDir = await tempDataDir()
-    const write = writePluginSetting({
+    const write = await writePluginSetting({
       pluginsDataDir: dataDir,
       pluginKey: PLUGIN_KEY,
       declared,
@@ -70,7 +70,7 @@ describe('writePluginSetting', () => {
 
   it('keeps a secret out of plaintext settings.json and readable from the vault', async () => {
     const dataDir = await tempDataDir()
-    const write = writePluginSetting({
+    const write = await writePluginSetting({
       pluginsDataDir: dataDir,
       pluginKey: PLUGIN_KEY,
       declared,
@@ -91,7 +91,7 @@ describe('writePluginSetting', () => {
 
   it('clears a secret rather than storing an empty ciphertext', async () => {
     const dataDir = await tempDataDir()
-    writePluginSetting({
+    await writePluginSetting({
       pluginsDataDir: dataDir,
       pluginKey: PLUGIN_KEY,
       declared,
@@ -100,7 +100,7 @@ describe('writePluginSetting', () => {
     })
 
     expect(
-      writePluginSetting({
+      await writePluginSetting({
         pluginsDataDir: dataDir,
         pluginKey: PLUGIN_KEY,
         declared,
@@ -117,7 +117,7 @@ describe('writePluginSetting', () => {
   it('refuses a key the manifest never declared and a value of the wrong type', async () => {
     const dataDir = await tempDataDir()
     expect(
-      writePluginSetting({
+      await writePluginSetting({
         pluginsDataDir: dataDir,
         pluginKey: PLUGIN_KEY,
         declared,
@@ -126,7 +126,7 @@ describe('writePluginSetting', () => {
       })
     ).toEqual({ ok: false, error: expect.stringContaining('does not declare setting') })
     expect(
-      writePluginSetting({
+      await writePluginSetting({
         pluginsDataDir: dataDir,
         pluginKey: PLUGIN_KEY,
         declared,
@@ -146,14 +146,14 @@ describe('projectPluginSettings', () => {
       'token'
     ])
 
-    writePluginSetting({
+    await writePluginSetting({
       pluginsDataDir: dataDir,
       pluginKey: PLUGIN_KEY,
       declared,
       key: 'webhookUrl',
       value: 'https://hooks.example.test/abc'
     })
-    writePluginSetting({
+    await writePluginSetting({
       pluginsDataDir: dataDir,
       pluginKey: PLUGIN_KEY,
       declared,

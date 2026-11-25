@@ -23,33 +23,33 @@ type DevMutationResult =
     }
   | { status: 'reconnect-required' }
 
-export function connectDevOrcaCloudProfile(
+export async function connectDevOrcaCloudProfile(
   active: ActiveOrcaProfileState,
   userDataPath: string
-): DevProfileListResult {
+): Promise<DevProfileListResult> {
   const session = createDevOrcaCloudSession({ localProfileId: active.profile.id })
-  saveOrcaCloudSessionExchange(active.profile.id, userDataPath, session)
+  await saveOrcaCloudSessionExchange(active.profile.id, userDataPath, session)
   return linkOrcaProfileToCloud(active.profile.id, session.cloud, userDataPath)
 }
 
-export function createDevCloudLinkedOrcaProfile(
+export async function createDevCloudLinkedOrcaProfile(
   active: ActiveOrcaProfileState,
   userDataPath: string,
   args: CreateCloudLinkedOrcaProfileArgs
-): DevCreateProfileResult {
+): Promise<DevCreateProfileResult> {
   if (readOrcaCloudSession(active.profile.id, userDataPath).status !== 'found') {
     return { status: 'reconnect-required' }
   }
   const session = createDevOrcaCloudSession({ orgId: args.orgId })
   const list = createCloudLinkedOrcaProfileRecord(session.cloud, { name: args.name }, userDataPath)
-  saveOrcaCloudSessionExchange(list.profile.id, userDataPath, session)
+  await saveOrcaCloudSessionExchange(list.profile.id, userDataPath, session)
   return { status: 'created', list }
 }
 
-export function refreshDevOrcaCloudProfile(
+export async function refreshDevOrcaCloudProfile(
   active: ActiveOrcaProfileState,
   userDataPath: string
-): DevMutationResult {
+): Promise<DevMutationResult> {
   if (
     !active.profile.cloud ||
     readOrcaCloudSession(active.profile.id, userDataPath).status !== 'found'
@@ -61,18 +61,18 @@ export function refreshDevOrcaCloudProfile(
     cloudProfileId: active.profile.cloud.cloudProfileId,
     orgId: active.profile.cloud.activeOrgId
   })
-  saveOrcaCloudSessionExchange(active.profile.id, userDataPath, session)
+  await saveOrcaCloudSessionExchange(active.profile.id, userDataPath, session)
   return {
     status: 'updated',
     list: linkOrcaProfileToCloud(active.profile.id, session.cloud, userDataPath)
   }
 }
 
-export function selectDevOrcaCloudOrg(
+export async function selectDevOrcaCloudOrg(
   active: ActiveOrcaProfileState,
   userDataPath: string,
   orgId: string
-): DevMutationResult {
+): Promise<DevMutationResult> {
   if (
     !active.profile.cloud ||
     readOrcaCloudSession(active.profile.id, userDataPath).status !== 'found'
@@ -84,7 +84,7 @@ export function selectDevOrcaCloudOrg(
     cloudProfileId: active.profile.cloud.cloudProfileId,
     orgId
   })
-  saveOrcaCloudSessionExchange(active.profile.id, userDataPath, session)
+  await saveOrcaCloudSessionExchange(active.profile.id, userDataPath, session)
   return {
     status: 'updated',
     list: linkOrcaProfileToCloud(active.profile.id, session.cloud, userDataPath)

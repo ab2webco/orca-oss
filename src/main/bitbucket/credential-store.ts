@@ -7,9 +7,10 @@ import {
   readIntegrationCredentialFileSync,
   readStoredCredentialTokenAsync,
   writeCredentialFileAtomic,
-  writeEncryptedCredential
+  encryptCredentialForFile
 } from '../integration-credential-file'
 import { PendingCredentialReads } from '../integration-credential-pending-reads'
+import { LatestSecretWrites } from '../safe-storage-async-encrypt'
 import type { BitbucketAuthMode } from '../../shared/bitbucket-credentials'
 
 // Why: the secret stays encrypted via safeStorage while this metadata stays
@@ -52,6 +53,8 @@ let credentialError: string | null = null
 // One saved Bitbucket credential, so one pending read.
 const SECRET_READ_KEY = 'bitbucket'
 const pendingReads = new PendingCredentialReads<BitbucketStoredSecret>('Bitbucket')
+const BITBUCKET_WRITE_KEY = 'bitbucket'
+const latestWrites = new LatestSecretWrites()
 
 function getOrcaDir(): string {
   return join(homedir(), '.orca')
@@ -174,8 +177,8 @@ function parseStoredSecret(token: string): BitbucketStoredSecret {
   }
 }
 
-export function saveBitbucketCredential(input: BitbucketCredentialSaveInput): void {
-  ensureOrcaDir()
+export async function saveBitbucketCredential(input: BitbucketCredentialSaveInput): Promise<void> {
+  const isLatest = latestWrites.begin(BITBUCKET_WRITE_KEY)
   const secret: BitbucketStoredSecret = {
     accessToken: input.accessToken,
     apiToken: input.apiToken,
@@ -183,7 +186,12 @@ export function saveBitbucketCredential(input: BitbucketCredentialSaveInput): vo
     email: input.email,
     baseUrl: input.baseUrl
   }
-  writeEncryptedCredential('Bitbucket', getSecretPath(), JSON.stringify(secret))
+  const secretBytes = await encryptCredentialForFile('Bitbucket', JSON.stringify(secret))
+  if (!isLatest()) {
+    return
+  }
+  ensureOrcaDir()
+  writeCredentialFileAtomic(getSecretPath(), secretBytes)
   const metadata: BitbucketStoredMetadata = {
     version: 1,
     authMode: input.authMode,
@@ -206,6 +214,7 @@ export function saveBitbucketCredential(input: BitbucketCredentialSaveInput): vo
 // Why: swallowing a non-ENOENT unlink failure would clear memory while the
 // files survive, so the credential silently returns on the next launch.
 export function clearStoredBitbucketCredential(): void {
+  latestWrites.supersede(BITBUCKET_WRITE_KEY)
   try {
     for (const path of [getSecretPath(), getMetadataPath()]) {
       try {

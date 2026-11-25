@@ -3,11 +3,13 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { hardenExistingSecureFile, writeSecureFile } from '../../shared/secure-file'
+import { encryptSecretOffMainThread, LatestSecretWrites } from '../safe-storage-async-encrypt'
 
 const MINIMAX_COOKIE_FILE = 'minimax-session-cookie.enc'
 const COOKIE_ENVELOPE_PREFIX = 'orca-minimax-cookie:v1:'
 let cachedMiniMaxCookie: string | null = null
 let warnedMiniMaxCookieStatusHardenFailure = false
+const latestWrites = new LatestSecretWrites()
 
 type MiniMaxCookieEnvelope = {
   kind: 'encrypted' | 'plaintext'
@@ -112,23 +114,26 @@ export function hasMiniMaxSessionCookie(): boolean {
   return true
 }
 
-export function saveMiniMaxSessionCookie(cookie: string): void {
+export async function saveMiniMaxSessionCookie(cookie: string): Promise<void> {
   const trimmed = cookie.trim()
   if (!trimmed) {
     throw new Error('MiniMax session cookie is required')
   }
-  if (safeStorage.isEncryptionAvailable()) {
-    writeSecureFile(
-      getMiniMaxCookiePath(),
-      encodeCookieEnvelope('encrypted', safeStorage.encryptString(trimmed))
-    )
-    cachedMiniMaxCookie = trimmed
+  const isLatest = latestWrites.begin(MINIMAX_COOKIE_FILE)
+  const encrypted = await encryptSecretOffMainThread(trimmed)
+  if (!isLatest()) {
     return
   }
-  console.warn('[minimax] safeStorage encryption unavailable — storing MiniMax cookie in plaintext')
+  if (!encrypted) {
+    console.warn(
+      '[minimax] safeStorage encryption unavailable — storing MiniMax cookie in plaintext'
+    )
+  }
   writeSecureFile(
     getMiniMaxCookiePath(),
-    encodeCookieEnvelope('plaintext', Buffer.from(trimmed, 'utf8'))
+    encrypted
+      ? encodeCookieEnvelope('encrypted', encrypted)
+      : encodeCookieEnvelope('plaintext', Buffer.from(trimmed, 'utf8'))
   )
   cachedMiniMaxCookie = trimmed
 }
@@ -160,6 +165,7 @@ export function readMiniMaxSessionCookie(): string | null {
 }
 
 export function clearMiniMaxSessionCookie(): void {
+  latestWrites.supersede(MINIMAX_COOKIE_FILE)
   cachedMiniMaxCookie = null
   rmSync(getMiniMaxCookiePath(), { force: true })
 }

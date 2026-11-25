@@ -78,7 +78,7 @@ describe('Bitbucket status reads never decrypt the stored secret', () => {
     const { store, client, connection } = await loadModules()
     const fetchSpy = vi.fn()
     globalThis.fetch = fetchSpy as unknown as typeof fetch
-    store.saveBitbucketCredential(STORED_BASIC_CREDENTIAL)
+    await store.saveBitbucketCredential(STORED_BASIC_CREDENTIAL)
 
     // Simulate relaunch: secret is on disk but the memory cache is cold, so a
     // decrypt here would surface to the user as a keychain prompt.
@@ -97,7 +97,7 @@ describe('Bitbucket status reads never decrypt the stored secret', () => {
 
   it('stays cold across repeated status reads, then decrypts once for a real API call', async () => {
     const { store, client, connection } = await loadModules()
-    store.saveBitbucketCredential(STORED_BASIC_CREDENTIAL)
+    await store.saveBitbucketCredential(STORED_BASIC_CREDENTIAL)
     store._resetBitbucketCredentialCache()
     decryptSpy.mockClear()
 
@@ -114,7 +114,7 @@ describe('Bitbucket status reads never decrypt the stored secret', () => {
 
   it('revalidates a stored credential once its secret is already warm in memory', async () => {
     const { store, client } = await loadModules()
-    store.saveBitbucketCredential(STORED_BASIC_CREDENTIAL)
+    await store.saveBitbucketCredential(STORED_BASIC_CREDENTIAL)
     decryptSpy.mockClear()
 
     // Saving leaves the secret cached, so status can check /user for free.

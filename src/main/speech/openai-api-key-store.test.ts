@@ -72,7 +72,7 @@ describe('OpenAI speech API key store', () => {
   it('uses the in-memory key after save without decrypting from safeStorage', async () => {
     const store = await loadStoreModule()
 
-    store.saveOpenAiSpeechApiKey('saved-key')
+    await store.saveOpenAiSpeechApiKey('saved-key')
 
     expect(store.readOpenAiSpeechApiKey()).toBe('saved-key')
     expect(safeStorageMock.decryptString).not.toHaveBeenCalled()

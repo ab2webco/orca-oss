@@ -74,12 +74,12 @@ export async function selectCloudOrgWithMutationFence(input: {
       capabilities: selected.capabilities
     }
     if (
-      saveOrcaCloudSessionIfCurrent(
+      (await saveOrcaCloudSessionIfCurrent(
         input.active.profile.id,
         input.userDataPath,
         nextSession,
         snapshot
-      ) === null
+      )) === null
     ) {
       throw new Error('stale_cloud_session_mutation')
     }
