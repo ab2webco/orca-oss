@@ -6,6 +6,8 @@ import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { RpcContext } from '../core'
 import { ORCHESTRATION_METHODS } from './orchestration'
 import { ORCHESTRATOR_GAME_METHODS } from './orchestrator-game'
+import { ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import { gameFleetReportOf } from '../../../../shared/orchestrator-game-fleet-verbs'
 
 const COORD_PANE = 'tab_coord:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const WORKER_PANE = 'tab_worker:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
@@ -17,6 +19,20 @@ const merged = {
   url: 'https://github.com/o/r/pull/41',
   state: 'merged' as const,
   ci: 'success' as const
+}
+
+const queuedPr = { ...merged, state: 'open' as const }
+
+// Why: the project's merge queue lists the member's PR, as the lead's state publishes it.
+const queuedProject = {
+  reviews: null,
+  todo: null,
+  queue: {
+    provider: 'github' as const,
+    entries: [
+      { id: 'q1', title: 'x', url: merged.url, position: 1, state: 'checks' as const, since: null }
+    ]
+  }
 }
 
 const lead: GameAgent = {
@@ -147,11 +163,15 @@ describe('a lead game state releases a local member whose work landed (ORCA-864)
     return dispatchId
   }
 
-  async function leadReads(member: GameAgent): Promise<OrchestratorGameState> {
+  async function leadReads(
+    member: GameAgent,
+    extra: Partial<OrchestratorGameState> = {}
+  ): Promise<OrchestratorGameState> {
     vi.spyOn(runtime, 'getOrchestratorGameState').mockResolvedValue({
       role: 'lead',
       agents: [lead, member],
-      config: { scene: 'quest' }
+      config: { scene: 'quest' },
+      ...extra
     } as OrchestratorGameState)
     return (await call(ORCHESTRATOR_GAME_METHODS, 'game.state', {
       worktreeId: 'wt-lead',
@@ -236,6 +256,23 @@ describe('a lead game state releases a local member whose work landed (ORCA-864)
     expect(state.agents).toHaveLength(2)
     expect(request).not.toHaveBeenCalled()
     expect(runtime.closeTerminal).not.toHaveBeenCalled()
+  })
+
+  // Why (ORCA-1424): a finished member's recurring wake kept it working on a queued PR, holding its slot.
+  it('closes a reported member whose PR is in the merge queue, though a wake keeps it working (ORCA-1427)', async () => {
+    const dispatchId = await startMember(true)
+
+    const state = await leadReads(memberOf({ state: 'working', review: queuedPr }), {
+      project: queuedProject
+    })
+
+    expect(state.agents.map((agent) => agent.paneKey)).toEqual([COORD_PANE])
+    await vi.waitFor(() => expect(postEvent).toHaveBeenCalledTimes(1))
+    expect(runtime.closeTerminal).toHaveBeenCalledWith('term_worker')
+    expect(db.getWorkerTerminalResourceByOwner(dispatchId)?.release_state).toBe('released')
+    expect(postEvent.mock.calls[0]?.[0].text).toBe(
+      'Released automatically: PR #41 in the merge queue after worker_done; its terminal closed.'
+    )
   })
 
   it('leaves a member whose PR merged but that never sent worker_done', async () => {
@@ -353,11 +390,15 @@ describe('a lead game state settles a remote member its host has nothing left of
       remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true, gone: true }
     })
 
-  async function leadReads(member: GameAgent): Promise<OrchestratorGameState> {
+  async function leadReads(
+    member: GameAgent,
+    extra: Partial<OrchestratorGameState> = {}
+  ): Promise<OrchestratorGameState> {
     vi.spyOn(runtime, 'getOrchestratorGameState').mockResolvedValue({
       role: 'lead',
       agents: [lead, member],
-      config: { scene: 'quest' }
+      config: { scene: 'quest' },
+      ...extra
     } as OrchestratorGameState)
     const method = ORCHESTRATOR_GAME_METHODS.find((one) => one.name === 'game.state')!
     return (await method.handler(
@@ -406,5 +447,48 @@ describe('a lead game state settles a remote member its host has nothing left of
     expect(db.getWorkerDispatch(kept)?.stage).not.toBe('released')
     expect(db.getWorkerDispatch(unreported)?.stage).not.toBe('released')
     expect(postEvent).not.toHaveBeenCalled()
+  })
+
+  // Why (ORCA-1424): a finished member on m1 kept its slot and re-ran suites on its queued PR.
+  it('releases a reported member on its paired host once its PR is in the merge queue, freeing its slot (ORCA-1427)', async () => {
+    const dispatchId = remoteMember(true)
+    vi.spyOn(runtime, 'resolveOrchestrationWorkerServer').mockReturnValue({
+      environmentId: 'env_m1',
+      name: 'm1',
+      peerFingerprint: 'fp_m1'
+    } as never)
+    const call = vi
+      .spyOn(runtime, 'callOrchestrationWorkerServer')
+      .mockImplementation(async (_env, method) =>
+        method === 'status.get'
+          ? { capabilities: [ORCHESTRATION_FEDERATION_RELEASE_RUNTIME_CAPABILITY] }
+          : { dispatchId, state: 'released', closedTerminals: ['term_m1'], removedWorktree: null }
+      )
+    const onHost = memberOf({
+      paneKey: `remote:${dispatchId}`,
+      displayName: 'ORCA-41',
+      terminalHandle: undefined,
+      state: 'working',
+      review: queuedPr,
+      remote: { host: 'm1', environmentId: 'env_m1', stateKnown: true, ticketDone: true }
+    })
+    const hosts = [
+      { host: 'local', cap: 2, status: 'ok' as const },
+      { host: 'm1', id: 'env_m1', cap: 1, status: 'ok' as const }
+    ]
+
+    const state = await leadReads(onHost, { project: queuedProject, hosts })
+
+    await vi.waitFor(() => expect(db.getWorkerDispatch(dispatchId)?.stage).toBe('released'))
+    expect(call).toHaveBeenCalledWith(
+      'env_m1',
+      'orchestration.federationRelease',
+      { dispatchId },
+      expect.anything(),
+      undefined
+    )
+    expect(state.agents.map((agent) => agent.paneKey)).toEqual([COORD_PANE])
+    const m1 = gameFleetReportOf(state).hosts?.find((one) => one.host === 'm1')
+    expect(m1).toMatchObject({ running: 0, free: 1 })
   })
 })

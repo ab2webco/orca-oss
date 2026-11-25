@@ -5,7 +5,7 @@ import {
   type GameMemberReport
 } from '../../../../shared/orchestrator-game-auto-release'
 import { GAME_EVENT_TEXT_MAX } from '../../../../shared/orchestrator-game-events'
-import { ticketOfMember } from '../../../../shared/orchestrator-game-fleet-verbs'
+import { mergeQueuedOf, ticketOfMember } from '../../../../shared/orchestrator-game-fleet-verbs'
 import type { GameAgent, OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { OrchestrationDb } from '../../orchestration/db'
@@ -27,8 +27,9 @@ const attemptsByRuntime = new WeakMap<OrcaRuntimeService, Map<string, Attempt>>(
 const GONE_CHECK_INTERVAL_MS = 5 * 60_000
 const goneChecksByRuntime = new WeakMap<OrcaRuntimeService, Map<string, number>>()
 /**
- * Releases, in the background, each member whose work landed after its worker_done, and returns
- * the lead's state without them, so its row and slot go at once (ORCA-864).
+ * Releases, in the background, each member whose work landed or whose PR is in the merge queue
+ * after its worker_done, and returns the lead's state without them, so its row and slot go at once
+ * (ORCA-864, ORCA-1427).
  */
 export function withGameAutoRelease(
   runtime: OrcaRuntimeService,
@@ -46,7 +47,7 @@ export function withGameAutoRelease(
   }
   const attempts = attemptsByRuntime.get(runtime) ?? new Map<string, Attempt>()
   attemptsByRuntime.set(runtime, attempts)
-  const candidates = gameAutoReleaseCandidatesOf(state.agents, reportOf(db))
+  const candidates = gameAutoReleaseCandidatesOf(state.agents, reportOf(db), mergeQueuedOf(state))
   for (const candidate of candidates) {
     if (!attempts.has(candidate.dispatchId)) {
       attempts.set(candidate.dispatchId, 'releasing')
