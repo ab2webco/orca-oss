@@ -9,11 +9,23 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test, expect } from './helpers/orca-app'
-import { setTheme, setWindowWidth, THEMES, WIDTHS } from './helpers/settings-window'
+import { setTheme, setWindowWidth, THEMES } from './helpers/settings-window'
+import {
+  RIGHT_SIDEBAR_MIN_NON_SIDEBAR_AREA,
+  RIGHT_SIDEBAR_MIN_WIDTH
+} from '../../src/renderer/src/components/right-sidebar/right-sidebar-width'
+import { getDefaultUIState } from '../../src/shared/constants'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+
+// The right sidebar's minimum, default and maximum at a 1440 window with the activity bar on top.
+const SIDEBAR_WIDTHS = [
+  ['min', RIGHT_SIDEBAR_MIN_WIDTH],
+  ['default', getDefaultUIState().rightSidebarWidth],
+  ['max', 1440 - RIGHT_SIDEBAR_MIN_NON_SIDEBAR_AREA]
+] as const
 
 const sidebarOf = (page: Page) =>
   page.evaluate(() => {
@@ -69,17 +81,23 @@ test('a lead start opens Team once, keeps terminal focus, and respects a later t
   await expect(orcaPage.getByTestId('team-panel')).toBeVisible()
   expect(await focusInTerminal(orcaPage), 'the open stole the terminal focus').toBe(true)
 
-  for (const width of WIDTHS) {
-    await setWindowWidth(electronApp, orcaPage, width)
+  // Why the sidebar's widths: on desktop the window stays put and the person drags the sidebar.
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  for (const [name, width] of SIDEBAR_WIDTHS) {
+    await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), width)
+    // Why the panel's left edge: the clip keeps the tab strip, so Team's place in it shows too.
+    const left = async () => (await orcaPage.getByTestId('team-panel').boundingBox())?.x ?? 0
+    await expect.poll(async () => Math.abs(1440 - (await left()) - width) <= 2).toBe(true)
     for (const theme of THEMES) {
       await setTheme(orcaPage, theme)
+      const x = await left()
       await orcaPage.screenshot({
         animations: 'disabled',
-        path: testInfo.outputPath(`lead-start-team-${width}-${theme}.png`)
+        clip: { x, y: 0, width: 1440 - x, height: await orcaPage.evaluate(() => innerHeight) },
+        path: testInfo.outputPath(`lead-start-team-sidebar-${name}-${width}-${theme}.png`)
       })
     }
   }
-  await setWindowWidth(electronApp, orcaPage, 1440)
 
   // The person picks another tab: a repeat `game lead`, as a hook and the skill both run, keeps it.
   await orcaPage
