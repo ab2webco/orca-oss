@@ -51,6 +51,8 @@ type CachedOrcaCloudSession = {
 }
 
 const memorySessions = new Map<string, CachedOrcaCloudSession>()
+const pendingSessions = new Map<string, CachedOrcaCloudSession & { isCurrent: () => boolean }>()
+const saveQueues = new Map<string, Promise<unknown>>()
 const latestWrites = new LatestSecretWrites()
 
 function sessionCacheKey(profileId: string, userDataPath: string): string {
@@ -109,11 +111,30 @@ export async function saveOrcaCloudSession(
   isCurrent: () => boolean = () => true
 ): Promise<OrcaCloudSessionPersistence | null> {
   const cacheKey = sessionCacheKey(profileId, userDataPath)
-  const isLatest = latestWrites.begin(cacheKey)
-  const encrypted = await encryptSecretOffMainThread(JSON.stringify(session))
+  const isLatest = latestWrites.capture(cacheKey)
+  // Why: a reader that merges and saves during this encrypt must build on this session and land
+  // after it, or a rotated refresh token is rolled back. Saves run in order; a clear cancels them.
+  const pending = {
+    session,
+    persistence: memorySessions.get(cacheKey)?.persistence ?? ('memory-only' as const),
+    isCurrent: () => isLatest() && isCurrent()
+  }
+  pendingSessions.set(cacheKey, pending)
+  const encrypting = (saveQueues.get(cacheKey) ?? Promise.resolve())
+    .catch(() => null)
+    .then(() => encryptSecretOffMainThread(JSON.stringify(session)))
+  saveQueues.set(cacheKey, encrypting)
+  let encrypted: Buffer | null
+  try {
+    encrypted = await encrypting
+  } finally {
+    if (pendingSessions.get(cacheKey) === pending) {
+      pendingSessions.delete(cacheKey)
+    }
+  }
   // Why: checked in the write's own turn, so a refresh captured before sign-out/org-switch
   // or a save superseded during the encrypt cannot resurrect the session.
-  if (!isLatest() || !isCurrent()) {
+  if (!pending.isCurrent()) {
     return null
   }
   if (encrypted) {
@@ -176,7 +197,8 @@ export function readOrcaCloudSession(
   userDataPath: string
 ): OrcaCloudSessionReadResult {
   const cacheKey = sessionCacheKey(profileId, userDataPath)
-  const memorySession = memorySessions.get(cacheKey)
+  const pending = pendingSessions.get(cacheKey)
+  const memorySession = pending?.isCurrent() ? pending : memorySessions.get(cacheKey)
   if (memorySession) {
     return {
       status: 'found',

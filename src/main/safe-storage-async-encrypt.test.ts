@@ -277,3 +277,57 @@ describe('a save that awaits the encryptor', () => {
     expect(existsSync(store.getOrcaCloudSessionPath('p', tempHome))).toBe(false)
   })
 })
+
+describe('a cloud session merge during a refresh save', () => {
+  it('keeps the rotated refresh token', async () => {
+    const store = await load<typeof ProfileCloudSessionStoreModule>(
+      './orca-profiles/profile-cloud-session-store'
+    )
+    const s0 = {
+      accessToken: 'a0',
+      refreshToken: 'r0',
+      expiresAt: 1,
+      capabilities: { flags: {}, refreshedAt: 1 }
+    }
+    await store.saveOrcaCloudSession('p', tempHome, s0)
+    const held = deferred<Buffer<ArrayBuffer>>()
+    safeStorageMock.encryptStringAsync.mockImplementationOnce(() => held.promise)
+    const refreshSave = store.saveOrcaCloudSession('p', tempHome, {
+      ...s0,
+      accessToken: 'a1',
+      refreshToken: 'r1'
+    })
+    await vi.waitFor(() => expect(safeStorageMock.encryptStringAsync).toHaveBeenCalledTimes(2))
+    const read = store.readOrcaCloudSession('p', tempHome)
+    if (read.status !== 'found') {
+      throw new Error('expected a session')
+    }
+    const mergeSave = store.saveOrcaCloudSession('p', tempHome, {
+      ...read.session,
+      capabilities: { flags: { merged: true }, refreshedAt: 2 }
+    })
+    // Why: give an unqueued merge time to land first, so the refresh would overwrite it.
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    held.resolve(
+      Buffer.from(`v10:${JSON.stringify({ ...s0, accessToken: 'a1', refreshToken: 'r1' })}`)
+    )
+
+    expect(await refreshSave).toBe('encrypted')
+    expect(await mergeSave).toBe('encrypted')
+    const persisted = JSON.parse(readFileSync(store.getOrcaCloudSessionPath('p', tempHome), 'utf8'))
+    const onDisk = JSON.parse(
+      Buffer.from(persisted.ciphertext, 'base64').toString().replace(/^v10:/, '')
+    )
+    expect(onDisk).toMatchObject({
+      refreshToken: 'r1',
+      capabilities: { flags: { merged: true } }
+    })
+    expect(store.readOrcaCloudSession('p', tempHome)).toMatchObject({
+      status: 'found',
+      session: {
+        refreshToken: 'r1',
+        capabilities: { flags: { merged: true } }
+      }
+    })
+  })
+})

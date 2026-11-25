@@ -21,10 +21,7 @@ export function canEncryptOffMainThread(): boolean {
 }
 
 async function asyncEncryptionAvailable(): Promise<boolean> {
-  if (!canEncryptOffMainThread()) {
-    return false
-  }
-  return safeStorage.isAsyncEncryptionAvailable().catch(() => false)
+  return canEncryptOffMainThread() && safeStorage.isAsyncEncryptionAvailable().catch(() => false)
 }
 
 // Why: a save now awaits the encryptor, so a later save or delete of the same key must win.
@@ -33,7 +30,13 @@ export class LatestSecretWrites {
   private epoch = 0
 
   begin(key: string): () => boolean {
-    const generation = this.supersede(key)
+    this.supersede(key)
+    return this.capture(key)
+  }
+
+  // Why: a save that runs in order behind earlier ones is cancelled only by a delete.
+  capture(key: string): () => boolean {
+    const generation = this.generations.get(key)
     const epoch = this.epoch
     return () => this.generations.get(key) === generation && this.epoch === epoch
   }
