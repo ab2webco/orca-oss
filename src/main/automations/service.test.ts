@@ -8,6 +8,10 @@ import { AutomationService } from './service'
 
 const testState = { dir: '' }
 
+vi.mock('node:fs', async (importOriginal) =>
+  (await import('../persistence-test-fs-without-fsync')).fsWithoutFsync(await importOriginal())
+)
+
 vi.mock('electron', () => ({
   app: {
     getPath: () => testState.dir

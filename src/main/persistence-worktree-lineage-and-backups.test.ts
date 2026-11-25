@@ -30,6 +30,10 @@ const { trackMock, getCohortAtEmitMock } = vi.hoisted(() => ({
   getCohortAtEmitMock: vi.fn()
 }))
 
+vi.mock('node:fs', async (importOriginal) =>
+  (await import('./persistence-test-fs-without-fsync')).fsWithoutFsync(await importOriginal())
+)
+
 vi.mock('electron', () => ({
   app: {
     getPath: () => testState.dir

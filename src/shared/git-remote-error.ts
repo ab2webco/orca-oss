@@ -42,11 +42,14 @@ export function formatSubmodulePushFailureDetail(message: string): string | null
   return `${subject} could not be pushed. Resolve the submodule push error, then try again.`
 }
 
+// Why: git prints this hint after "fatal: not a git repository" when discovery meets a mount point.
+const DISCOVERY_BOUNDARY_HINT = 'Stopping at filesystem boundary'
+
 function extractTailLine(message: string): string {
   // Why: last non-empty stderr line is the diagnostic; the full blob risks leaking local paths/env to the UI.
   for (const rawLine of iterateLinesFromEnd(message)) {
     const line = rawLine.trim()
-    if (line.length > 0) {
+    if (line.length > 0 && !line.startsWith(DISCOVERY_BOUNDARY_HINT)) {
       return line
     }
   }

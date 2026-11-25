@@ -25,7 +25,10 @@ function createTempDb(): { db: Database.Database; path: string } {
   const dir = mkdtempSync(join(tmpdir(), 'orca-opencode-bounds-'))
   tempDirs.push(dir)
   const path = join(dir, 'opencode.db')
-  return { db: new Database(path), path }
+  const db = new Database(path)
+  // Why: each fixture insert commits alone; with fsync that took 30 s on a spinning disk (ORCA-1407).
+  db.exec('PRAGMA synchronous = OFF')
+  return { db, path }
 }
 
 function applySchema(db: Database.Database): void {
