@@ -57,6 +57,10 @@ export async function inspectManagedClaudeRefreshChainAliases(
       join(homedir(), '.orca', 'claude-refresh-chain-leases', 'managed-aliases')
     const profilePath = dependencies.profilePath ?? app.getPath('userData')
     const accounts = dependencies.accounts ?? getManagedClaudeRefreshAccounts()
+    const account = accounts.find((candidate) => candidate.id === accountId)
+    if (account && launchesOnLongLivedToken(account)) {
+      return { status: 'unique' }
+    }
     const readManagedCredentials =
       dependencies.readManagedCredentials ?? readManagedClaudeRefreshCredentials
     await reconcileProfileAliases(rootPath, profilePath, accounts, readManagedCredentials, true)
@@ -183,14 +187,14 @@ async function reconcileProfileAliases(
   readManagedCredentials: (accountId: string) => Promise<string | null>,
   prune: boolean
 ): Promise<void> {
-  const eligibleAccounts = accounts.filter((account) => account.authMethod === 'subscription-oauth')
-  if (eligibleAccounts.length === 0) {
-    return
-  }
-  mkdirSync(rootPath, { recursive: true, mode: 0o700 })
+  const eligibleAccounts = accounts.filter(
+    (account) => account.authMethod === 'subscription-oauth' && !launchesOnLongLivedToken(account)
+  )
   const profileKey = stableKey(profilePath)
   const profileDirectory = join(rootPath, profileKey)
-  mkdirSync(profileDirectory, { recursive: true, mode: 0o700 })
+  if (eligibleAccounts.length > 0) {
+    mkdirSync(profileDirectory, { recursive: true, mode: 0o700 })
+  }
   const expectedFiles = new Set<string>()
   for (const account of eligibleAccounts) {
     const credentialsJson = await readManagedCredentials(account.id)
@@ -207,13 +211,20 @@ async function reconcileProfileAliases(
       chainKey
     })
   }
-  if (prune) {
-    for (const filename of readdirSync(profileDirectory)) {
+  // Why prune with none eligible: accounts that gained a token keep no stale conflict behind.
+  if (prune && accounts.length > 0) {
+    for (const filename of safeReadDirectory(profileDirectory)) {
       if (filename.endsWith('.json') && !expectedFiles.has(filename)) {
         rmSync(join(profileDirectory, filename), { force: true })
       }
     }
   }
+}
+
+// Why: the CLI ranks the vault's token above the stored login, so no launch rotates that chain;
+// a shared stored login there is no alias to pause rotation for (ORCA-1430).
+function launchesOnLongLivedToken(account: ClaudeManagedAccount): boolean {
+  return account.tokenOnly === true || account.longLivedTokenSetAt != null
 }
 
 function writeAliasRecord(path: string, record: AliasRecord): void {

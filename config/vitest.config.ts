@@ -24,6 +24,7 @@ export default defineConfig({
       // Why in setupFiles and not a separate script: a guard nobody remembers to
       // run is not a guard. This one runs in the same command as the tests.
       resolve('config/scripts/vitest-non-loopback-fetch-guard.ts'),
+      resolve('config/scripts/vitest-pane-state-isolation.ts'),
       // Only under the hang watchdog: it costs every worker a signal handler and
       // is read exactly once, when the run is already declared wedged.
       ...(process.env.ORCA_VITEST_HANG_JOURNAL
