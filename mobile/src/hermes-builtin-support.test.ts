@@ -182,5 +182,6 @@ describe('Hermes built-in support', () => {
       missingHermesBuiltinCalls(relative(mobileRoot, path), readFileSync(path, 'utf8'))
     )
     expect(found).toEqual([])
-  })
+    // Why 30 s: it parses every production file; a green CI run took 3.4 s of the default 5 s.
+  }, 30_000)
 })

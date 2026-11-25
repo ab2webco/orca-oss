@@ -133,11 +133,22 @@ describe('the Team sheet scene band', () => {
       />
     )
     const page = new DOMParser().parseFromString(webview.props!.source.html, 'text/html')
+    // Why the style text: happy-dom 21's CSSOM drops every -webkit- property, so the rule never reads as clamped.
+    const clampedSelectors = [...page.querySelectorAll('style')]
+      .flatMap((style) => [
+        ...(style.textContent ?? '')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .matchAll(/([^{}]+)\{([^{}]*)\}/g)
+      ])
+      .filter(([, , body]) => /(^|[;\s])-webkit-line-clamp\s*:/.test(body!))
+      .map(([, selector]) => selector!.trim())
+    expect(clampedSelectors).not.toHaveLength(0)
     const clamped = [...page.styleSheets]
       .flatMap((sheet) => [...sheet.cssRules])
-      .flatMap((rule) => ('style' in rule ? [rule.style as CSSStyleDeclaration] : []))
-      .filter((style) => style.getPropertyValue('-webkit-line-clamp') !== '')
-    expect(clamped).not.toHaveLength(0)
+      .filter((rule): rule is CSSStyleRule => 'selectorText' in rule)
+      .filter((rule) => clampedSelectors.includes(rule.selectorText))
+      .map((rule) => rule.style)
+    expect(clamped).toHaveLength(clampedSelectors.length)
     // Why: overflow clips at the padding box, so a bottom padding shows the top of the next line.
     for (const style of clamped) {
       expect([
