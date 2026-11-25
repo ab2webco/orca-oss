@@ -38,6 +38,7 @@ import {
 import { gameStopRefusal } from '../../shared/orchestrator-game-stop-state'
 import {
   closeFinished,
+  sweepFreed,
   sweptDispatchOf,
   type SweepWorkerRow
 } from './orchestrator-game-sweep-close'
@@ -154,29 +155,30 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     await postGameEvents(client, observedGameEventsOf(response.result.agents))
     const entries = gameSweepOf(response.result)
     const sweep: GameSweepResult = { closed: close, finished: entries }
-    if (close && entries.some((entry) => entry.row.terminalHandle)) {
+    if (close && entries.some((entry) => entry.row.terminalHandle || entry.foundOnHost)) {
       const { result } = await client.call<{ workers: SweepWorkerRow[] }>(
         'orchestration.workerList',
         {}
       )
       sweep.finished = []
       for (const entry of entries) {
-        const member = agentOfRow(response.result, entry.row)
+        const member = entry.foundOnHost
+          ? response.result.agents.find((agent) => agent.paneKey === entry.foundOnHost?.paneKey)
+          : agentOfRow(response.result, entry.row)
         const dispatch = sweptDispatchOf(entry, member, result.workers)
-        const history = member
-          ? await recordFreedMember({
-              client,
-              member,
-              workers: result.workers,
-              dispatch,
-              roster: memberRosterOf(response.result)
-            })
-          : null
-        sweep.finished.push({
-          ...entry,
-          ...(history ? { history } : {}),
-          closed: await closeFinished(client, entry, dispatch)
-        })
+        const closed = await closeFinished(client, entry, dispatch)
+        // Why after: a member its close or release kept is still there, so it was never freed (ORCA-1396).
+        const history =
+          member && sweepFreed(closed)
+            ? await recordFreedMember({
+                client,
+                member,
+                workers: result.workers,
+                dispatch,
+                roster: memberRosterOf(response.result)
+              })
+            : null
+        sweep.finished.push({ ...entry, ...(history ? { history } : {}), closed })
       }
     }
     printResult({ ...response, result: sweep }, json, formatSweep)

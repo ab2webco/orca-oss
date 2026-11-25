@@ -43,7 +43,7 @@ export function landedSignalOf(agent: GameAgent): string | null {
 }
 
 /** A remote member's home dispatch, read from its pane key. */
-export const remoteDispatchIdOf = (agent: GameAgent): string | null =>
+export const remoteDispatchIdOf = (agent: Pick<GameAgent, 'remote' | 'paneKey'>): string | null =>
   agent.remote && agent.paneKey.startsWith('remote:') ? agent.paneKey.slice('remote:'.length) : null
 
 /**

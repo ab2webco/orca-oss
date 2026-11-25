@@ -12,6 +12,17 @@ import type { GameStatePausedMember } from '../../shared/orchestrator-game-adopt
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
 import type { RuntimeTerminalSummary, RuntimeWorktreePsResult } from '../../shared/runtime-types'
+import {
+  foundHostPaneOf,
+  samePane,
+  type FoundHostPane
+} from '../../shared/orchestrator-game-found-host-pane'
+import {
+  HOST_PS_LIMIT,
+  MID_TURN,
+  hostAgentStateOf,
+  hostTerminalOf
+} from './orchestrator-game-found-host-close'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -28,27 +39,9 @@ export type GameAdoptResult = {
   refusal?: string
 }
 
-const FOUND_PREFIX = 'remote-found:'
-// Why past the default 200: the agent's worktree may sort after the most recent ones.
-const PS_LIMIT = 10_000
-// Why: the attach brief must never land in a running turn.
-const MID_TURN = new Set(['working', 'blocked', 'waiting'])
-
 export const isGameAgentNamed = (agent: GameAgent, name: string): boolean =>
   ticketOfMember(agent) === name.toUpperCase() ||
   agent.displayName?.toLowerCase() === name.toLowerCase()
-
-// Why the leaf: one pane keeps its leaf id while its tab key form differs between readers.
-const samePane = (a: string, b: string): boolean =>
-  a === b || (a.includes(':') && a.slice(a.indexOf(':')) === b.slice(b.indexOf(':')))
-
-function hostPaneOf(agent: GameAgent): string | null {
-  const environmentId = agent.remote?.environmentId
-  const prefix = `${FOUND_PREFIX}${environmentId}:`
-  return environmentId && agent.paneKey.startsWith(prefix)
-    ? agent.paneKey.slice(prefix.length)
-    : null
-}
 
 type Seat = { terminal: string; environmentId?: string; host?: string }
 
@@ -73,12 +66,7 @@ export const isOurGameAgentNamed = (
 
 /** The found agent's terminal on its paired host, read there, or why it cannot be adopted. */
 async function hostSeatOf(
-  found: {
-    hostPane: string
-    environmentId: string
-    host: string
-    worktreeId: string
-  },
+  found: FoundHostPane,
   name: string,
   force: boolean
 ): Promise<Seat | GameAdoptResult> {
@@ -88,7 +76,7 @@ async function hostSeatOf(
     where.call<{ terminals: RuntimeTerminalSummary[] }>('terminal.list', {
       worktree: `id:${worktreeId}`
     }),
-    where.call<RuntimeWorktreePsResult>('worktree.ps', { limit: PS_LIMIT }),
+    where.call<RuntimeWorktreePsResult>('worktree.ps', { limit: HOST_PS_LIMIT }),
     where.call<{ runs: { coordinator_pane_key: string | null }[] }>('orchestration.runList', {})
   ])
   const refuse = (refusal: string): GameAdoptResult => ({
@@ -104,18 +92,11 @@ async function hostSeatOf(
   ) {
     return refuse(`it leads a Run on ${host}; a lead is never adopted as a member`)
   }
-  const terminal = terminals.result.terminals.find(
-    (one) =>
-      one.connected &&
-      one.liveness === 'running' &&
-      samePane(`${one.tabId}:${one.leafId}`, hostPane)
-  )
-  if (!terminal) {
+  const terminal = hostTerminalOf(terminals.result.terminals, hostPane)
+  if (!terminal?.connected || terminal.liveness !== 'running') {
     return refuse(`its terminal no longer runs on ${host}`)
   }
-  const agentState = ps.result.worktrees
-    .find((one) => one.worktreeId === worktreeId)
-    ?.agents.find((row) => samePane(row.paneKey, hostPane))?.state
+  const agentState = hostAgentStateOf(ps.result, found)
   if (!force && agentState && MID_TURN.has(agentState)) {
     return refuse(MID_TURN_REFUSAL)
   }
@@ -176,7 +157,7 @@ async function adoptAgent(
   const local = agents.find((agent) => agent.found && agent.terminalHandle && ours(agent))
   const found =
     local ??
-    agents.find((agent) => agent.found && hostPaneOf(agent) && isGameAgentNamed(agent, name))
+    agents.find((agent) => agent.found && foundHostPaneOf(agent) && isGameAgentNamed(agent, name))
   // Why found first: a member named like it must not hide another agent of that name (ORCA-1141).
   if (
     !found &&
@@ -185,9 +166,8 @@ async function adoptAgent(
     return { name, adopted: true, reused: true }
   }
   const worktreeId = found?.worktree?.id
-  const hostPane = found ? hostPaneOf(found) : null
-  const environmentId = found?.remote?.environmentId
-  if (!found || !worktreeId || (!local && (!hostPane || !environmentId))) {
+  const onHost = found ? foundHostPaneOf(found) : null
+  if (!found || !worktreeId || (!local && !onHost)) {
     throw new RuntimeClientError(
       'invalid_argument',
       `No agent named ${name} runs on this machine or this project's paired hosts; see \`orca game fleet\`. Another project's agents are never listed, so never adopted.`
@@ -197,16 +177,7 @@ async function adoptAgent(
     ? !args.force && MID_TURN.has(local.state)
       ? { name, adopted: false, refusal: MID_TURN_REFUSAL }
       : { terminal: local.terminalHandle }
-    : await hostSeatOf(
-        {
-          hostPane: hostPane!,
-          environmentId: environmentId!,
-          host: found.remote?.host ?? environmentId!,
-          worktreeId
-        },
-        name,
-        args.force
-      )
+    : await hostSeatOf(onHost!, name, args.force)
   if ('adopted' in seat) {
     return seat
   }
