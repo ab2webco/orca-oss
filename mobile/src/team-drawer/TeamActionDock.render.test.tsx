@@ -317,11 +317,8 @@ describe('TeamActionDock', () => {
     )
     const clipped = [...container.querySelectorAll<HTMLElement>('*')].filter((one) => {
       const style = getComputedStyle(one)
-      return (
-        style.whiteSpace === 'nowrap' ||
-        style.textOverflow === 'ellipsis' ||
-        style.getPropertyValue('-webkit-line-clamp') !== ''
-      )
+      // Why no -webkit-line-clamp check: happy-dom 21 drops it; numberOfLines > 1 also sets the ellipsis.
+      return style.whiteSpace === 'nowrap' || style.textOverflow === 'ellipsis'
     })
     expect(clipped.map((one) => one.textContent)).toEqual([])
   })

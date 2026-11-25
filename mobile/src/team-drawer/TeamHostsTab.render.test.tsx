@@ -141,12 +141,8 @@ describe('TeamHostsTab board (ORCA-1252)', () => {
         ['Busy · 2 of 3 agents', words.notRegisteredNote('lab')].includes(one.textContent ?? '')
       )
       .map((one) => getComputedStyle(one))
-      .filter(
-        (style) =>
-          style.textOverflow === 'ellipsis' ||
-          (style.getPropertyValue('-webkit-line-clamp') !== '' &&
-            style.getPropertyValue('-webkit-line-clamp') !== 'none')
-      )
+      // Why no -webkit-line-clamp check: happy-dom 21 drops it; numberOfLines > 1 also sets the ellipsis.
+      .filter((style) => style.textOverflow === 'ellipsis')
 
     expect(cut).toHaveLength(0)
   })
