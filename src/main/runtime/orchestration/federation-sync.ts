@@ -15,6 +15,7 @@ import {
   recordFederationAckCheckpoint
 } from './federation-ack-checkpoints'
 import { parseFederatedWorkerReportPayload } from './federation-worker-report-payload'
+import { importWorkerRelay } from './federation-import-refusal'
 
 const MESSAGE_TYPE_SET = new Set<MessageType>(MESSAGE_TYPES)
 const FEDERATION_PULL_PAGE_SIZE = 50
@@ -184,20 +185,7 @@ async function syncFederatedDispatchPages(
   if (toWorker.length > 0) {
     // Why first: a relayed owner answer must be checkable when the member reads it (ORCA-1281).
     await runtime.shareGameOwnerAnswersWithRemoteMember(dispatchId)
-    const delivered = (await runtime.callOrchestrationWorkerServer(
-      federated.environment_id,
-      'orchestration.federationImport',
-      { dispatchId, items: toWorker },
-      15_000,
-      {
-        orchestrationRequestId: `relay_import_${dispatchId}_${toWorker.at(-1)?.sequence ?? 0}`
-      }
-    )) as { acknowledgedThrough: number }
-    db.acknowledgeFederationRelay({
-      dispatchId,
-      direction: 'to_worker',
-      throughSequence: delivered.acknowledgedThrough
-    })
+    await importWorkerRelay(runtime, db, federated.environment_id, dispatchId, toWorker)
   }
   if (pulled.items.length === FEDERATION_PULL_PAGE_SIZE && remainingPages > 1) {
     const next = await syncFederatedDispatchPages(runtime, dispatchId, remainingPages - 1)

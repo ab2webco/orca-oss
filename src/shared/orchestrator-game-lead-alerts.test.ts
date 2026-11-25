@@ -341,6 +341,17 @@ describe('gameLeadAlertsOf: lead mail a remote member never received (ORCA-1301)
     ])
   })
 
+  it("names the host's refusal when the home recorded one (ORCA-1439)", () => {
+    const refused = onM1(11)
+    refused.remote = {
+      ...refused.remote!,
+      undeliveredReason: 'question_not_found: Remote Question relay_q was not found.'
+    }
+    expect(linesOf(stateOf([refused]))).toEqual([
+      'ORCA-9 has not received lead mail for 11+ min: m1 did not take it (question_not_found: Remote Question relay_q was not found.), so the member has not seen it. Reach the pane: orca terminal send --environment m1 --terminal term_ORCA-9'
+    ])
+  })
+
   it('stays quiet inside the budget and for a finished member', () => {
     expect(linesOf(stateOf([onM1(5)]))).toEqual([])
     expect(linesOf(stateOf([onM1(30, { state: 'done' })]))).not.toContainEqual(

@@ -192,6 +192,7 @@ import {
   releaseFederationAckCheckpoint
 } from './orchestration/federation-ack-checkpoints'
 import { syncFederatedDispatch } from './orchestration/federation-sync'
+import { federationImportRefusalOf } from './orchestration/federation-import-refusal'
 import { formatMessagePointer } from './orchestration/formatter'
 import {
   listEarlierLeadRemoteMemberSources,
@@ -33273,7 +33274,10 @@ export class OrcaRuntimeService {
           )
         : null
     const sources = [
-      ...listRemoteGameMemberSources(this._orchestrationDb, run.id),
+      ...listRemoteGameMemberSources(this._orchestrationDb, run.id).map((source) => {
+        const undeliveredReason = federationImportRefusalOf(this, source.dispatchId)
+        return undeliveredReason ? { ...source, undeliveredReason } : source
+      }),
       // Why: a new lead opens a new Run, so its predecessor's members are only found here.
       ...listEarlierLeadRemoteMemberSources(
         this._orchestrationDb,
@@ -38258,8 +38262,11 @@ export class OrcaRuntimeService {
   private scheduleRestoredMessageRepoints(): void {
     const handles = this._orchestrationDb?.getUndeliveredUnreadMailboxHandles?.() ?? []
     for (const handle of handles) {
-      if (!handle.startsWith('dispatch:')) {
-        this.mailPointerRepointScheduler.schedule(handle)
+      const target = handle.startsWith('dispatch:')
+        ? this.remoteAttachmentTerminalOf(handle.slice('dispatch:'.length))
+        : handle
+      if (target) {
+        this.mailPointerRepointScheduler.schedule(target)
       }
     }
   }
@@ -38308,12 +38315,16 @@ export class OrcaRuntimeService {
     const dispatchTarget = handle.startsWith('dispatch:')
       ? this._orchestrationDb?.getDispatchContextById?.(handle.slice('dispatch:'.length))
       : undefined
+    const remoteTerminal =
+      handle.startsWith('dispatch:') && !dispatchTarget
+        ? this.remoteAttachmentTerminalOf(handle.slice('dispatch:'.length))
+        : null
     const mailboxHandle = run
       ? `run:${run.id}`
       : dispatchTarget?.assignee_handle &&
           (dispatchTarget.status === 'pending' || dispatchTarget.status === 'dispatched')
         ? dispatchTarget.assignee_handle
-        : handle
+        : (remoteTerminal ?? handle)
     const waiterHandle = handle.startsWith('dispatch:')
       ? handle
       : dispatch?.assignee_handle === handle
@@ -38369,6 +38380,21 @@ export class OrcaRuntimeService {
     for (const waiter of consumers) {
       this.resolveMessageWaiter(waiter, 'notified')
     }
+  }
+
+  // Why (ORCA-1434): a member's host has no Dispatch row for a remote Dispatch, so mail its
+  // relay imports for it is pushed to the attached pane, or an idle member never sees it.
+  private remoteAttachmentTerminalOf(dispatchId: string): string | null {
+    const attachment = this._orchestrationDb?.getRemoteDispatchAttachment?.(dispatchId)
+    if (
+      !attachment?.pane_key ||
+      (attachment.state !== 'starting' && attachment.state !== 'ready')
+    ) {
+      return null
+    }
+    return attachment.terminal_handle && this.handles.has(attachment.terminal_handle)
+      ? attachment.terminal_handle
+      : this.getTerminalHandleForPaneKey(attachment.pane_key)
   }
 
   waitForMessage(
