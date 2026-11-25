@@ -19,7 +19,11 @@ function decodeHtmlEntities(value: string): string {
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function stripTags(value: string): string {
@@ -71,20 +75,21 @@ export function planeHtmlToMarkdown(html: string): string {
   )
   work = work.replace(/<br\s*\/?>/gi, '\n')
 
+  // Why: these blocks are stashed before the global entity decode, so they decode their own text.
   work = work.replace(/<ul\b[^>]*>([\s\S]*?)<\/ul>/gi, (_match, inner: string) => {
     const items = [...inner.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map(
-      (item) => `- ${item[1].trim()}`
+      (item) => `- ${decodeHtmlEntities(item[1].trim())}`
     )
     return stash(`\n\n${items.join('\n')}\n\n`)
   })
   work = work.replace(/<ol\b[^>]*>([\s\S]*?)<\/ol>/gi, (_match, inner: string) => {
     const items = [...inner.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map(
-      (item, index) => `${index + 1}. ${item[1].trim()}`
+      (item, index) => `${index + 1}. ${decodeHtmlEntities(item[1].trim())}`
     )
     return stash(`\n\n${items.join('\n')}\n\n`)
   })
   work = work.replace(/<blockquote\b[^>]*>([\s\S]*?)<\/blockquote>/gi, (_match, inner: string) => {
-    const text = inner.replace(/<\/?p\b[^>]*>/gi, '').trim()
+    const text = decodeHtmlEntities(inner.replace(/<\/?p\b[^>]*>/gi, '').trim())
     const quoted = text
       .split('\n')
       .map((line) => `> ${line}`.trimEnd())
@@ -94,7 +99,7 @@ export function planeHtmlToMarkdown(html: string): string {
   work = work.replace(
     /<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi,
     (_match, level: string, inner: string) =>
-      stash(`\n\n${'#'.repeat(Number(level))} ${inner.trim()}\n\n`)
+      stash(`\n\n${'#'.repeat(Number(level))} ${decodeHtmlEntities(inner.trim())}\n\n`)
   )
   work = work.replace(
     /<p\b[^>]*>([\s\S]*?)<\/p>/gi,
