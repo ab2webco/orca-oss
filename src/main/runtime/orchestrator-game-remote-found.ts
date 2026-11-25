@@ -2,12 +2,13 @@ import { gameAgentOf, type GameAgent } from '../../shared/orchestrator-game-stat
 import type { RuntimeWorktreePsSummary } from '../../shared/runtime-types'
 import type { RemoteMemberWorktree } from './orchestrator-game-remote-member-worktrees'
 
-/** One paired host's `worktree.ps` worktrees, as read at `readAt` (ms). */
+/** One paired host's `worktree.ps` worktrees, as read at `readAt` (ms); `answering` is its last reread's outcome. */
 export type RemoteHostSessions = {
   environmentId: string
   host: string
   worktrees: readonly RuntimeWorktreePsSummary[]
   readAt: number
+  answering: boolean
 }
 
 /** Key of a host worktree a lead already lists, as `remoteFoundSessionsOf` matches it. */
@@ -56,12 +57,9 @@ export function listedRemoteWorktreesOf(
  */
 export function remoteFoundSessionsOf(
   hosts: readonly RemoteHostSessions[],
-  project: { repoName: string; listed: ReadonlySet<string> },
-  now = Date.now()
+  project: { repoName: string; listed: ReadonlySet<string> }
 ): GameAgent[] {
-  return hosts.flatMap(({ environmentId, host, worktrees, readAt }) => {
-    // Why (ORCA-1395): a host whose reread hangs keeps serving its last read, which proves nothing now.
-    const stateKnown = now - readAt <= FOUND_STATE_KNOWN_MS
+  return hosts.flatMap(({ environmentId, host, worktrees, answering }) => {
     const rows = worktrees.flatMap((one) => one.agents)
     const present = new Set(rows.map((row) => row.paneKey))
     const parents = new Set(rows.flatMap((row) => (row.parentPaneKey ? [row.parentPaneKey] : [])))
@@ -89,7 +87,7 @@ export function remoteFoundSessionsOf(
               displayName: row.displayName ?? row.taskTitle ?? one.displayName,
               isMember: true,
               found: true,
-              remote: { host, environmentId, stateKnown },
+              remote: { host, environmentId, stateKnown: answering },
               worktree: {
                 id: one.worktreeId,
                 branch: one.branch.replace(/^refs\/heads\//, ''),
@@ -106,12 +104,22 @@ export function remoteFoundSessionsOf(
 
 // Why 30 s: each read is a `worktree.ps` sweep on the host, and the band polls every 30 s.
 const FRESH_MS = 30_000
-// Why 3 reads: the reader serves its last read while it rereads, so one a poll old is still current.
-const FOUND_STATE_KNOWN_MS = 3 * FRESH_MS
 
-type CachedSessions = { at: number; worktrees: RuntimeWorktreePsSummary[]; refresh?: Promise<void> }
+type CachedSessions = {
+  /** When the last reread started, answered or not. */
+  at: number
+  /** When the read `worktrees` came from started. */
+  readAt: number
+  worktrees: RuntimeWorktreePsSummary[]
+  answered: boolean
+  /** When the reread in flight started. */
+  refreshSince?: number
+}
 
-/** Each paired host's worktrees; a stale read serves while it rereads, and a silent host lists none. */
+/**
+ * Each paired host's worktrees; a stale read serves while it rereads. Why (ORCA-1395): a host whose
+ * reread failed, or hangs past a poll, keeps its last worktrees as not answering instead of none.
+ */
 export class RemoteHostSessionsReader {
   private readonly cache = new Map<string, CachedSessions>()
 
@@ -142,28 +150,33 @@ export class RemoteHostSessionsReader {
 
   private async worktreesOf(
     environmentId: string
-  ): Promise<{ worktrees: RuntimeWorktreePsSummary[]; readAt: number }> {
-    const cached = this.cache.get(environmentId)
-    if (cached && this.now() - cached.at < FRESH_MS) {
-      return { worktrees: cached.worktrees, readAt: cached.at }
+  ): Promise<{ worktrees: RuntimeWorktreePsSummary[]; readAt: number; answering: boolean }> {
+    const cached = this.cache.get(environmentId) ?? (await this.reread(environmentId))
+    if (this.now() - cached.at >= FRESH_MS && cached.refreshSince === undefined) {
+      cached.refreshSince = this.now()
+      void this.reread(environmentId)
     }
-    if (cached) {
-      cached.refresh ??= this.reread(environmentId)
-      return { worktrees: cached.worktrees, readAt: cached.at }
+    const hung = cached.refreshSince !== undefined && this.now() - cached.refreshSince >= FRESH_MS
+    return {
+      worktrees: cached.worktrees,
+      readAt: cached.readAt,
+      answering: cached.answered && !hung
     }
-    await this.reread(environmentId)
-    const read = this.cache.get(environmentId)
-    return { worktrees: read?.worktrees ?? [], readAt: read?.at ?? this.now() }
   }
 
-  private async reread(environmentId: string): Promise<void> {
+  private async reread(environmentId: string): Promise<CachedSessions> {
     // Why the start: a worktree released while the host answers may still be in what it lists.
     const at = this.now()
-    const worktrees = await this.deps
-      .readPs(environmentId)
-      .then((ps) => ps.worktrees ?? [])
-      .catch(() => [])
-    this.cache.set(environmentId, { at, worktrees })
+    const read = await this.deps.readPs(environmentId).then(
+      (ps) => ps.worktrees ?? [],
+      () => null
+    )
+    const last = this.cache.get(environmentId)
+    const entry: CachedSessions = read
+      ? { at, readAt: at, worktrees: read, answered: true }
+      : { at, readAt: last?.readAt ?? at, worktrees: last?.worktrees ?? [], answered: false }
+    this.cache.set(environmentId, entry)
+    return entry
   }
 
   private now(): number {

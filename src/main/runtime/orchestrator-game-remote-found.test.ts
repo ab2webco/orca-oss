@@ -42,21 +42,21 @@ const worktree = (
     ...overrides
   }) as RuntimeWorktreePsSummary
 
-const m1 = (worktrees: RuntimeWorktreePsSummary[], readAt = 0) => ({
+const m1 = (worktrees: RuntimeWorktreePsSummary[], readAt = 0, answering = true) => ({
   environmentId: 'env_m1',
   host: 'm1',
   worktrees,
-  readAt
+  readAt,
+  answering
 })
 
 // Why: agents an earlier lead run started on m1 were in no Panel or fleet; m1 showed 0/5 (ORCA-943).
 describe('project sessions running on a paired host that no lead lists (ORCA-943)', () => {
   it('lists a project agent on the host as a found member with its host, ticket worktree and state', () => {
-    const found = remoteFoundSessionsOf(
-      [m1([worktree('orca-915', [agentRow()])])],
-      { repoName: 'orca-oss', listed: new Set() },
-      30_000
-    )
+    const found = remoteFoundSessionsOf([m1([worktree('orca-915', [agentRow()])])], {
+      repoName: 'orca-oss',
+      listed: new Set()
+    })
 
     expect(found).toEqual([
       {
@@ -110,17 +110,15 @@ describe('project sessions running on a paired host that no lead lists (ORCA-943
   })
 
   // Why (ORCA-1395): every found row claimed a known state, even from a read its host stopped refreshing.
-  it('is state-known only while its host read is current, and carries its hook age either way', () => {
-    const rowsAt = (now: number) =>
+  it('is state-known only while its host answers, and carries its hook age either way', () => {
+    const rowsOf = (answering: boolean) =>
       remoteFoundSessionsOf(
-        [m1([worktree('orca-915', [agentRow({ updatedAt: 4_000 })])], 10_000)],
-        { repoName: 'orca-oss', listed: new Set() },
-        now
+        [m1([worktree('orca-915', [agentRow({ updatedAt: 4_000 })])], 10_000, answering)],
+        { repoName: 'orca-oss', listed: new Set() }
       ).map((one) => [one.remote?.stateKnown, one.hookAt])
 
-    expect(rowsAt(40_000)).toEqual([[true, 4_000]])
-    expect(rowsAt(100_000)).toEqual([[true, 4_000]])
-    expect(rowsAt(100_001)).toEqual([[false, 4_000]])
+    expect(rowsOf(true)).toEqual([[true, 4_000]])
+    expect(rowsOf(false)).toEqual([[false, 4_000]])
   })
 })
 
@@ -152,6 +150,80 @@ describe('reading paired hosts for sessions (ORCA-943)', () => {
       ['imac', 0]
     ])
     expect(reads).toEqual(['env_m1', 'env_imac'])
+  })
+})
+
+// Why (ORCA-1395 review): read age said "not answering" after any lead read gap, and a silent host's rows vanished.
+describe("a host read's answer, not its age, says whether its found rows are known", () => {
+  const foundOf = (hosts: Awaited<ReturnType<RemoteHostSessionsReader['read']>>) =>
+    remoteFoundSessionsOf(hosts, { repoName: 'orca-oss', listed: new Set() }).map(
+      (one) => one.remote?.stateKnown
+    )
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it('keeps a host that answers every read known after a long gap between lead reads', async () => {
+    let now = 0
+    const reader = new RemoteHostSessionsReader({
+      list: () => [{ id: 'env_m1', name: 'm1' }],
+      readPs: async () => ({ worktrees: [worktree('orca-915', [agentRow()])] }),
+      now: () => now
+    })
+
+    await reader.read()
+    now = 120_000
+
+    expect(foundOf(await reader.read())).toEqual([true])
+  })
+
+  it("keeps a silent host's last rows, marked unknown, until it answers again", async () => {
+    let now = 0
+    let answers = true
+    const reader = new RemoteHostSessionsReader({
+      list: () => [{ id: 'env_m1', name: 'm1' }],
+      readPs: async () => {
+        if (!answers) {
+          throw new Error('timed out')
+        }
+        return { worktrees: [worktree('orca-915', [agentRow()])] }
+      },
+      now: () => now
+    })
+
+    await reader.read()
+    answers = false
+    now = 40_000
+    await reader.read()
+    await settle()
+    const silent = await reader.read()
+
+    expect(foundOf(silent)).toEqual([false])
+    expect(silent[0]?.readAt).toBe(0)
+    answers = true
+    now = 80_000
+    await reader.read()
+    await settle()
+    expect(foundOf(await reader.read())).toEqual([true])
+  })
+
+  it('marks a host unknown once its reread hangs past a poll', async () => {
+    let now = 0
+    let hang = false
+    const reader = new RemoteHostSessionsReader({
+      list: () => [{ id: 'env_m1', name: 'm1' }],
+      readPs: async () =>
+        hang
+          ? await new Promise<never>(() => {})
+          : { worktrees: [worktree('orca-915', [agentRow()])] },
+      now: () => now
+    })
+
+    await reader.read()
+    hang = true
+    now = 40_000
+
+    expect(foundOf(await reader.read())).toEqual([true])
+    now = 70_001
+    expect(foundOf(await reader.read())).toEqual([false])
   })
 })
 
