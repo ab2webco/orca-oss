@@ -129,6 +129,36 @@ describe('gameAutoReleaseCandidatesOf (ORCA-864)', () => {
     expect(gameAutoReleaseCandidatesOf([{ ...gone, workItem: undefined }], reported)).toEqual([])
   })
 
+  // Why (ORCA-1424): a finished member's recurring wake re-ran suites on its queued PR and held its host slot.
+  describe('a reported member whose PR is in the merge queue (ORCA-1427)', () => {
+    const queuedPr = { ...merged, state: 'open' as const }
+    const queue = new Set([merged.url])
+
+    it('is picked while a scheduled wake keeps it working, or after a wake turn ended', () => {
+      const woken = [
+        member({ review: queuedPr, state: 'working' }),
+        member({ paneKey: 'pane-2', review: queuedPr, stateSince: REPORTED_AT + 25 * 60_000 })
+      ]
+      expect(gameAutoReleaseCandidatesOf(woken, reported, queue).map((one) => one.why)).toEqual([
+        'PR #41 in the merge queue',
+        'PR #41 in the merge queue'
+      ])
+    })
+
+    it('is kept while it waits on a question, or when it never sent worker_done', () => {
+      const asking = member({ review: queuedPr, state: 'waiting' })
+      expect(gameAutoReleaseCandidatesOf([asking], reported, queue)).toEqual([])
+      expect(
+        gameAutoReleaseCandidatesOf([member({ review: queuedPr })], () => null, queue)
+      ).toEqual([])
+    })
+
+    it('is kept when its open PR is not in the queue', () => {
+      const open = member({ review: queuedPr, state: 'working' })
+      expect(gameAutoReleaseCandidatesOf([open], reported, new Set())).toEqual([])
+    })
+  })
+
   it('never picks the lead', () => {
     expect(gameAutoReleaseCandidatesOf([member({ isLeader: true })], reported)).toEqual([])
   })

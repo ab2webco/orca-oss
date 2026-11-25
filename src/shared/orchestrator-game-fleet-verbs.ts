@@ -106,7 +106,7 @@ export type GameFleetInput = Pick<
   >
 
 /** The PR urls the project's merge queue lists; empty while it is unread. */
-const mergeQueuedOf = (state: Pick<OrchestratorGameState, 'project'>): ReadonlySet<string> =>
+export const mergeQueuedOf = (state: Pick<OrchestratorGameState, 'project'>): ReadonlySet<string> =>
   new Set(state.project?.queue?.entries?.map((entry) => entry.url))
 
 export function gameFleetRowOf(

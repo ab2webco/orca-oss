@@ -16,6 +16,8 @@ export type GameMemberReport = { dispatchId: string; at: number }
 // Why (ORCA-862): a merge does not stop the agent (ORCA-837), so a member still at work is never touched.
 const BUSY: ReadonlySet<GameAgent['state']> = new Set(['working', 'waiting'])
 
+const NONE_QUEUED: ReadonlySet<string> = new Set()
+
 // Why: the turn that sent worker_done ends just after it; a turn ending later is new work.
 export const REPORT_TURN_TAIL_MS = 2 * 60_000
 
@@ -46,16 +48,35 @@ export function landedSignalOf(agent: GameAgent): string | null {
 export const remoteDispatchIdOf = (agent: Pick<GameAgent, 'remote' | 'paneKey'>): string | null =>
   agent.remote && agent.paneKey.startsWith('remote:') ? agent.paneKey.slice('remote:'.length) : null
 
+/** `PR #41 in the merge queue` when the member's PR is one the project's queue lists, else null. */
+const mergeQueueSignalOf = (agent: GameAgent, queued: ReadonlySet<string>): string | null =>
+  agent.review && queued.has(agent.review.url)
+    ? `PR #${agent.review.number} in the merge queue`
+    : null
+
 /**
  * Members whose work landed, that are not at work, and whose dispatch took a worker_done they
- * have not worked past. `reportOf` answers that report, or null when the member never reported.
+ * have not worked past, plus reported members whose PR is in the merge queue (`queued`, its PR
+ * urls). `reportOf` answers that report, or null when the member never reported.
  */
 export function gameAutoReleaseCandidatesOf(
   agents: readonly GameAgent[],
-  reportOf: (agent: GameAgent) => GameMemberReport | null
+  reportOf: (agent: GameAgent) => GameMemberReport | null,
+  queued: ReadonlySet<string> = NONE_QUEUED
 ): GameAutoReleaseCandidate[] {
   return agents.flatMap((agent) => {
-    if (!agent.isMember || agent.isLeader || BUSY.has(agent.state)) {
+    if (!agent.isMember || agent.isLeader || agent.state === 'waiting') {
+      return []
+    }
+    // Why (ORCA-1427): a recurring wake kept a queued member working and re-running suites; a push only drops its PR.
+    const inQueue = mergeQueueSignalOf(agent, queued)
+    if (inQueue) {
+      const report = reportOf(agent)
+      return report
+        ? [{ agent, ticket: ticketOfMember(agent), dispatchId: report.dispatchId, why: inQueue }]
+        : []
+    }
+    if (BUSY.has(agent.state)) {
       return []
     }
     const why = landedSignalOf(agent)
