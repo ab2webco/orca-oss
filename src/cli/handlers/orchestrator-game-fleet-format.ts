@@ -183,9 +183,10 @@ function phaseCellOf(row: GameFleetRow, now: number): string {
     return row.phase
   }
   const age = ageOf(row.hookAt, now)
-  const evidence = [row.restored ? 'restored' : null, age === null ? null : `hook ${age} old`]
-  const said = evidence.filter((one) => one !== null).join(', ')
-  return said ? `unknown (${said})` : 'unknown'
+  const host = row.stateKnown ? null : `${row.host ?? 'its host'} not answering`
+  const hook = age === null ? null : `hook ${age} old`
+  const said = [host, row.restored ? 'restored' : null, hook].filter((one) => one !== null)
+  return said.length > 0 ? `unknown (${said.join(', ')})` : 'unknown'
 }
 
 export type GameFleetWithBudget = GameFleet & {

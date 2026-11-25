@@ -134,6 +134,51 @@ describe('a found remote row whose host read is old', () => {
       stateKnown: false,
       next: 'found on m1, which is not answering now: orca game adopt ORCA-915 once it answers'
     })
-    expect(formatFleet(fleet, NOW)).toMatch(/^working\s+ORCA-915\s+-\s+unknown\s/m)
+    expect(fleet.rows[0]?.phase).toBe('unknown')
+    expect(formatFleet(fleet, NOW)).toMatch(
+      /^unknown \(m1 not answering, hook 1m old\)\s+ORCA-915\s+-\s+unknown\s/m
+    )
+  })
+})
+
+// Why (ORCA-1395 review): a launched member whose host is silent printed and counted as idle.
+describe('a launched remote member whose host does not answer', () => {
+  const silent = member('CIN-7', {
+    paneKey: 'remote:ctx_7',
+    state: 'idle',
+    remote: { host: 'm1', environmentId: 'env_m1', stateKnown: false }
+  })
+
+  it('reads unknown, says its host is silent, and is never pushed', () => {
+    const fleet = fleetOf([silent])
+
+    expect(fleet.counts).toMatchObject({ unknown: 1, idle: 0 })
+    expect(fleet.rows[0]).toMatchObject({
+      phase: 'unknown',
+      next: 'm1 does not answer: orca orchestration worker-show --dispatch ctx_7'
+    })
+    expect(formatFleet(fleet, NOW)).toMatch(/^unknown \(m1 not answering\)\s+CIN-7\s/m)
+    expect(
+      gamePushPlanOf({ lead: DEFAULT_GAME_LEAD, agents: [silent] }).map((one) => one.action)
+    ).toEqual(['leave'])
+  })
+
+  it('keeps the watch alert that its host does not answer, without calling it idle', () => {
+    const alerts = gameLeadAlertsOf(
+      {
+        agents: [silent],
+        lead: { ...DEFAULT_GAME_LEAD, cap: 6 },
+        project: { reviews: null, todo: null }
+      },
+      emptyGameLeadAlertMemory(),
+      NOW
+    )
+
+    expect(alerts).toEqual([
+      {
+        key: 'silent-host:CIN-7',
+        line: 'CIN-7 m1 does not answer: orca orchestration worker-show --dispatch ctx_7'
+      }
+    ])
   })
 })

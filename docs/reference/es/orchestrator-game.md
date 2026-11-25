@@ -1,5 +1,5 @@
 ---
-sourceHash: 63da931a441e427c
+sourceHash: 680f2013e1231211
 ---
 
 # El juego orquestador de Agent Teams
@@ -948,12 +948,17 @@ launch` se niega antes de iniciar nada, salvo que el PR del propio ticket sea un
   (`needs-you`, `limited`, `unknown`, `working`, `asleep`, `idle`, `finished`) y siguiente paso de cada miembro, con los huecos libres.
   Un miembro está **unknown** cuando ningún hook reciente prueba su estado: un hook `working` más
   viejo que el umbral de frescura de 30 minutos de la barra lateral, o una fila que Orca restauró
-  del disco tras un reinicio y que ningún hook confirmó desde entonces. PHASE muestra la evidencia,
-  como en `unknown (hook 45m old)` o `unknown (restored, hook 3h old)`. Un miembro está **asleep**
-  cuando un reinicio durmió su panel, en esta máquina o en un host emparejado. La vigilancia no
-  lanza la alerta "idle with no PR" para ninguno de los dos, y `push` los deja quietos. Una fila
-  encontrada en un host emparejado conoce su estado sólo mientras la última lectura de ese host
-  tenga menos de 90 s (ORCA-1395). Un miembro está **finished** cuando su PR
+  del disco tras un reinicio y que ningún hook confirmó desde entonces, o un miembro remoto cuyo
+  host emparejado no responde. PHASE muestra la evidencia, como en `unknown (hook 45m old)`,
+  `unknown (restored, hook 3h old)` o `unknown (m1 not answering)`. Tras un reinicio que vuelve a
+  conectar los paneles, un miembro inactivo no manda ningún hook hasta que algo escribe en él, así
+  que una flota de filas `unknown (restored, …)` en ese momento es lo esperado, no una falla. Un
+  miembro está **asleep** cuando un reinicio durmió su panel, en esta máquina o en un host
+  emparejado. La vigilancia no lanza la alerta "idle with no PR" para ninguno de los dos; un miembro
+  cuyo host no responde tiene su propia alerta, y `push` los deja quietos a todos. Una fila
+  encontrada en un host emparejado conoce su estado sólo mientras ese host respondió su última
+  lectura; si una lectura falla, o tarda más de 30 s, la fila sigue listada como unknown
+  (ORCA-1395). Un miembro está **finished** cuando su PR
   tiene merge o está cerrado y su ticket está en revisión o hecho (o no tiene ninguno); un miembro
   remoto lanzado como audit, review o captures también lo está cuando su Run de origen se completó
   sin PR abierto. El tipo es el que eligió el líder en `game launch` o, si el lanzamiento no trae

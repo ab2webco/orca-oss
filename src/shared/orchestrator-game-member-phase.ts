@@ -39,6 +39,10 @@ export function memberPhaseOf(agent: GameAgent, now = Date.now()): GameMemberPha
   if (agent.limit) {
     return 'limited'
   }
+  // Why before asleep and waiting: a host that does not answer proves neither (ORCA-1395).
+  if (agent.remote?.stateKnown === false) {
+    return 'unknown'
+  }
   if (agent.remote?.asleep || agent.asleepHandle) {
     return 'asleep'
   }

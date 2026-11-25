@@ -86,10 +86,11 @@ describe('formatFleet with remote members (ORCA-824)', () => {
       })
     )
 
-    const [header, local, remote] = text.split('\n').slice(1)
+    // Why remote first: a silent host's member is unknown, which sorts ahead of working (ORCA-1395).
+    const [header, remote, local] = text.split('\n').slice(1)
     expect(header).toMatch(/BRANCH +HOST +AGENT/)
     expect(local).toMatch(/ORCA-900 .* working .* local /)
-    expect(remote).toMatch(/ORCA-805 .* unknown .* imac /)
+    expect(remote).toMatch(/^unknown \(imac not answering\) +ORCA-805 .* unknown .* imac /)
   })
 })
 

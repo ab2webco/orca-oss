@@ -82,6 +82,9 @@ function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, 
       add(who, row.phase, `${row.phase === 'limited' ? 'limited' : 'needs you'}: ${row.next}`)
     } else if (row.orphaned) {
       add(who, 'orphaned', row.next)
+    } else if (!row.stateKnown && row.phase === 'unknown') {
+      // Why: these rows left idle, whose alert was the only one that named the silent host (ORCA-1395).
+      add(who, 'silent-host', row.next)
     } else if (row.phase === 'idle' && row.review === null) {
       add(who, 'idle-no-pr', `idle with no PR: ${row.next}`)
     }
