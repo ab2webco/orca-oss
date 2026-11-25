@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import type * as Os from 'node:os'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 type ViewerFixture = {
   displayName: string
@@ -19,6 +19,7 @@ let linearClientMock: ReturnType<typeof vi.fn>
 type SafeStorageMockOptions = {
   encryptionAvailable?: boolean
   decryptString?: (value: Buffer) => string
+  encryptStringAsync?: (value: string) => Promise<Buffer>
 }
 
 function writeLegacyLinearFiles(token: string, viewer: Record<string, unknown>): void {
@@ -95,6 +96,7 @@ async function loadClientModule(options: SafeStorageMockOptions = {}) {
     safeStorage: {
       isEncryptionAvailable: () => options.encryptionAvailable ?? false,
       encryptString: (value: string) => Buffer.from(value),
+      encryptStringAsync: options.encryptStringAsync,
       decryptString,
       isAsyncEncryptionAvailable: async () => options.encryptionAvailable ?? false,
       decryptStringAsync: async (value: Buffer) => ({
@@ -394,5 +396,64 @@ describe('Linear client workspace storage', () => {
     })
 
     await expect(linear.getClients('bad')).rejects.toThrow('Could not decrypt')
+  })
+})
+
+describe('Linear connect racing a disconnect', () => {
+  const originalPlatform = process.platform
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  })
+
+  function holdEncrypt(): {
+    encryptStringAsync: Mock<(value: string) => Promise<Buffer>>
+    release: () => void
+  } {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    let resolveHeld = (): void => {}
+    const encryptStringAsync = vi.fn(
+      (value: string) =>
+        new Promise<Buffer>((resolve) => {
+          resolveHeld = () => resolve(Buffer.from(value))
+        })
+    )
+    return { encryptStringAsync, release: () => resolveHeld() }
+  }
+
+  it.each([
+    ['all workspaces', undefined],
+    ['that workspace', 'org-alpha']
+  ])(
+    'adds no workspace when a disconnect of %s lands while its key encrypts',
+    async (_, workspaceId) => {
+      const held = holdEncrypt()
+      const linear = await loadClientModule({
+        encryptionAvailable: true,
+        encryptStringAsync: held.encryptStringAsync
+      })
+      const connecting = linear.connect('token-alpha')
+      await vi.waitFor(() => expect(held.encryptStringAsync).toHaveBeenCalled())
+      linear.disconnect(workspaceId)
+      held.release()
+
+      await expect(connecting).resolves.toMatchObject({ ok: false })
+      expect(linear.getStatus()).toMatchObject({ connected: false, workspaces: [] })
+    }
+  )
+
+  it('keeps a workspace disconnected while its test re-saved the key', async () => {
+    writeMultiWorkspaceFiles([{ id: 'org-alpha', token: 'token-alpha' }], 'org-alpha')
+    const held = holdEncrypt()
+    const linear = await loadClientModule({
+      encryptionAvailable: true,
+      encryptStringAsync: held.encryptStringAsync
+    })
+    const testing = linear.testConnection('org-alpha')
+    await vi.waitFor(() => expect(held.encryptStringAsync).toHaveBeenCalled())
+    linear.disconnect('org-alpha')
+    held.release()
+
+    await expect(testing).resolves.toMatchObject({ ok: false })
+    expect(linear.getStatus()).toMatchObject({ connected: false, workspaces: [] })
   })
 })

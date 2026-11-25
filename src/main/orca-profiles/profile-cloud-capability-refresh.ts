@@ -22,7 +22,7 @@ export async function refreshCurrentOrcaProfileAuth(
     return { status: 'local', auth: auth() }
   }
   if (isOrcaCloudDevAuthEnabled()) {
-    const result = refreshDevOrcaCloudProfile(active, userDataPath)
+    const result = await refreshDevOrcaCloudProfile(active, userDataPath)
     if (result.status !== 'updated') {
       return { status: 'reconnect-required', auth: auth() }
     }
@@ -75,7 +75,7 @@ export async function refreshCurrentOrcaProfileAuth(
       return { status: 'reconnect-required', auth: auth() }
     }
     if (
-      saveOrcaCloudSessionIfCurrent(
+      (await saveOrcaCloudSessionIfCurrent(
         active.profile.id,
         userDataPath,
         {
@@ -84,7 +84,7 @@ export async function refreshCurrentOrcaProfileAuth(
           capabilities: refresh.capabilities
         },
         mutationSnapshot
-      ) === null
+      )) === null
     ) {
       return { status: 'reconnect-required', auth: auth() }
     }

@@ -39,7 +39,11 @@ export type PluginHostServices = {
       pluginId: string,
       key: string
     ): { ok: true; value: string | null } | { ok: false; error: string }
-    set(pluginId: string, key: string, value: string): { ok: true } | { ok: false; error: string }
+    set(
+      pluginId: string,
+      key: string,
+      value: string
+    ): Promise<{ ok: true } | { ok: false; error: string }>
     delete(pluginId: string, key: string): void
   }
   settings: {
@@ -142,7 +146,7 @@ const HANDLERS = new Map<string, BoundPluginHostMethod>([
   }),
   definePluginMethod('secrets.set', async (params, { pluginId, services }) => {
     const { key, value } = params as { key: string; value: string }
-    const result = services.secrets.set(pluginId, key, value)
+    const result = await services.secrets.set(pluginId, key, value)
     if (!result.ok) {
       throw new Error(result.error)
     }

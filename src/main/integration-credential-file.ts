@@ -17,6 +17,7 @@ import {
   credentialDecryptionMessage,
   type IntegrationCredentialService
 } from '../shared/integration-credential-errors'
+import { encryptSecretOffMainThread } from './safe-storage-async-encrypt'
 
 export const MAX_INTEGRATION_CREDENTIAL_FILE_BYTES = 1024 * 1024
 
@@ -44,21 +45,27 @@ export function credentialFileHasContent(path: string): boolean {
   }
 }
 
-// Falls back to 0600 plaintext when the OS keyring is unavailable, matching the
+// Why: a disconnect mid-encrypt must fail the connect, not list an account with no token.
+export class CredentialSaveSupersededError extends Error {
+  constructor() {
+    super('Disconnected before the token was saved.')
+  }
+}
+
+// Falls back to plaintext bytes when the OS keyring is unavailable, matching the
 // Linear/Jira token writers so a keyring-less box still connects.
-export function writeEncryptedCredential(
+export async function encryptCredentialForFile(
   service: IntegrationCredentialService,
-  path: string,
   value: string
-): void {
-  if (safeStorage.isEncryptionAvailable()) {
-    writeCredentialFileAtomic(path, safeStorage.encryptString(value))
-    return
+): Promise<Buffer> {
+  const encrypted = await encryptSecretOffMainThread(value)
+  if (encrypted) {
+    return encrypted
   }
   console.warn(
     `[${service.toLowerCase()}] safeStorage encryption unavailable — storing credential in plaintext`
   )
-  writeCredentialFileAtomic(path, Buffer.from(value, 'utf-8'))
+  return Buffer.from(value, 'utf-8')
 }
 
 // Why (STA-3941): a direct write can truncate the previous credential if it

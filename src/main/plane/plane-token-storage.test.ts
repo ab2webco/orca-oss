@@ -141,7 +141,7 @@ describe('readWorkspaceToken', () => {
     const { read, saveWorkspaceToken } = await loadStore()
 
     const stale = read('ws-a')
-    saveWorkspaceToken('ws-a', 'token-new')
+    await saveWorkspaceToken('ws-a', 'token-new')
     prompt.resolve({ result: 'token-old', shouldReEncrypt: false })
 
     await expect(stale).resolves.toBe('token-new')

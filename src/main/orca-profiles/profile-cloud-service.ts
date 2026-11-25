@@ -56,7 +56,7 @@ export async function connectCurrentOrcaProfile(
 ): Promise<ConnectCurrentOrcaProfileResult> {
   const active = ensureActiveOrcaProfile(userDataPath)
   if (isOrcaCloudDevAuthEnabled()) {
-    const list = connectDevOrcaCloudProfile(active, userDataPath)
+    const list = await connectDevOrcaCloudProfile(active, userDataPath)
     return {
       status: 'connected',
       auth: getCurrentOrcaProfileAuthStatus(userDataPath),
@@ -79,7 +79,7 @@ export async function connectCurrentOrcaProfile(
       ...code,
       localProfileId: active.profile.id
     })
-    saveOrcaCloudSessionExchange(active.profile.id, userDataPath, exchange)
+    await saveOrcaCloudSessionExchange(active.profile.id, userDataPath, exchange)
     const list = linkOrcaProfileToCloud(active.profile.id, exchange.cloud, userDataPath)
     return {
       status: 'connected',
@@ -136,7 +136,7 @@ export async function createCloudLinkedOrcaProfile(
 ): Promise<CreateCloudLinkedOrcaProfileResult> {
   const active = ensureActiveOrcaProfile(userDataPath)
   if (isOrcaCloudDevAuthEnabled()) {
-    const result = createDevCloudLinkedOrcaProfile(active, userDataPath, args)
+    const result = await createDevCloudLinkedOrcaProfile(active, userDataPath, args)
     if (result.status !== 'created') {
       return { status: 'reconnect-required', auth: activeAuth(active, userDataPath) }
     }
@@ -169,7 +169,7 @@ export async function createCloudLinkedOrcaProfile(
       { name: args.name },
       userDataPath
     )
-    saveOrcaCloudSessionExchange(list.profile.id, userDataPath, created)
+    await saveOrcaCloudSessionExchange(list.profile.id, userDataPath, created)
     return {
       status: 'created',
       auth: getCurrentOrcaProfileAuthStatus(userDataPath),
@@ -192,7 +192,7 @@ export async function selectCurrentOrcaProfileOrg(
 ): Promise<SelectOrcaProfileOrgResult> {
   const active = ensureActiveOrcaProfile(userDataPath)
   if (isOrcaCloudDevAuthEnabled()) {
-    const result = selectDevOrcaCloudOrg(active, userDataPath, orgId)
+    const result = await selectDevOrcaCloudOrg(active, userDataPath, orgId)
     if (result.status !== 'updated') {
       return { status: 'reconnect-required', auth: activeAuth(active, userDataPath) }
     }

@@ -84,7 +84,7 @@ beforeEach(() => {
 describe('Bitbucket credential store', () => {
   it('persists plaintext metadata and an encrypted secret, then reads them back', async () => {
     const store = await loadStore()
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'basic',
       email: 'ada@example.com',
       baseUrl: null,
@@ -111,7 +111,7 @@ describe('Bitbucket credential store', () => {
 
   it('writes both credential files 0600', async () => {
     const store = await loadStore()
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'token',
       email: null,
       baseUrl: null,
@@ -127,7 +127,7 @@ describe('Bitbucket credential store', () => {
 
   it('re-tightens permissions when overwriting an existing credential', async () => {
     const store = await loadStore()
-    const save = (account: string): void =>
+    const save = (account: string): Promise<void> =>
       store.saveBitbucketCredential({
         authMode: 'token',
         email: null,
@@ -136,14 +136,14 @@ describe('Bitbucket credential store', () => {
         accessToken: 'access-secret',
         apiToken: null
       })
-    save('first')
+    await save('first')
     // Why: writeFileSync's mode is ignored for an existing file, so a loosened
     // credential would stay world-readable across a reconnect.
     const { chmodSync } = await import('node:fs')
     for (const file of ['bitbucket-credential.enc', 'bitbucket-credential.json']) {
       chmodSync(join(tempHome, '.orca', file), 0o644)
     }
-    save('second')
+    await save('second')
 
     for (const file of ['bitbucket-credential.enc', 'bitbucket-credential.json']) {
       expect(statSync(join(tempHome, '.orca', file)).mode & 0o777).toBe(0o600)
@@ -152,7 +152,7 @@ describe('Bitbucket credential store', () => {
 
   it('does not decrypt for metadata/status reads — only on a forced secret load', async () => {
     const store = await loadStore()
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'token',
       email: null,
       baseUrl: 'https://api.bitbucket.org/2.0',
@@ -186,7 +186,7 @@ describe('Bitbucket credential store', () => {
   it('rejects non-string fields from hand-edited metadata and secret files', async () => {
     const store = await loadStore()
     const { writeFileSync } = await import('node:fs')
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'basic',
       email: 'ada@example.com',
       baseUrl: null,
@@ -214,7 +214,7 @@ describe('Bitbucket credential store', () => {
 
   it('keeps the previous credential intact when the secret write fails (STA-3941)', async () => {
     const store = await loadStore()
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'basic',
       email: 'ada@example.com',
       baseUrl: null,
@@ -228,7 +228,7 @@ describe('Bitbucket credential store', () => {
     // Why: a direct write truncates in place, so a failure mid-write used to
     // destroy the only working credential. The temp+rename path cannot.
     const failing = await loadStore({ writeError: new Error('disk full') })
-    expect(() =>
+    await expect(
       failing.saveBitbucketCredential({
         authMode: 'basic',
         email: 'grace@example.com',
@@ -237,7 +237,7 @@ describe('Bitbucket credential store', () => {
         accessToken: null,
         apiToken: 'second-token'
       })
-    ).toThrow(/disk full/)
+    ).rejects.toThrow(/disk full/)
 
     expect(readFileSync(join(tempHome, '.orca', 'bitbucket-credential.enc'))).toEqual(before)
     expect(existsSync(join(tempHome, '.orca', 'bitbucket-credential.enc.tmp'))).toBe(false)
@@ -245,7 +245,7 @@ describe('Bitbucket credential store', () => {
 
   it('authenticates from the envelope when metadata is stale (STA-3941)', async () => {
     const store = await loadStore()
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'basic',
       email: 'grace@example.com',
       baseUrl: null,
@@ -281,7 +281,7 @@ describe('Bitbucket credential store', () => {
 
   it('still authenticates a credential saved before the envelope carried auth fields', async () => {
     const store = await loadStore()
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'basic',
       email: 'ada@example.com',
       baseUrl: null,
@@ -306,7 +306,7 @@ describe('Bitbucket credential store', () => {
 
   it('writes the whole credential even when the filesystem short-writes (STA-3941)', async () => {
     const store = await loadStore({ shortWrites: true })
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'basic',
       email: 'ada@example.com',
       baseUrl: null,
@@ -325,7 +325,7 @@ describe('Bitbucket credential store', () => {
 
   it('clears both files and in-memory state on disconnect', async () => {
     const store = await loadStore()
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'basic',
       email: 'ada@example.com',
       baseUrl: null,
@@ -347,7 +347,7 @@ describe('Bitbucket credential store', () => {
       code: 'EACCES'
     })
     const store = await loadStore({ unlinkError: denied })
-    store.saveBitbucketCredential({
+    await store.saveBitbucketCredential({
       authMode: 'basic',
       email: 'ada@example.com',
       baseUrl: null,

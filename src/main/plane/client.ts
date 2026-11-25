@@ -321,16 +321,16 @@ export async function connect(
     // a different slug is a second, independent row (never rejected).
     const id = getPlaneWorkspaceId(baseUrl, workspaceSlug)
     const workspace: PlaneWorkspace = { id, baseUrl, workspaceSlug }
-    const file = getWorkspaceFile()
-    const nextFile: PlaneWorkspaceFile = {
+    // Why: rebuilt after the save's await so a connect that finished meanwhile is kept.
+    const nextFile = (): PlaneWorkspaceFile => ({
       version: 1,
       activeWorkspaceId: id,
       selectedWorkspaceId: id,
-      workspaces: [workspace, ...file.workspaces.filter((entry) => entry.id !== id)]
-    }
-    assertWorkspaceFileBounds(nextFile)
-    saveWorkspaceToken(id, apiKey)
-    writeWorkspaceFile(nextFile)
+      workspaces: [workspace, ...getWorkspaceFile().workspaces.filter((entry) => entry.id !== id)]
+    })
+    assertWorkspaceFileBounds(nextFile())
+    await saveWorkspaceToken(id, apiKey)
+    writeWorkspaceFile(nextFile())
     setCachedViewer(id, viewer)
     return { ok: true, viewer }
   } catch (error) {

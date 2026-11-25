@@ -18,6 +18,7 @@ const { closeAllConnectionsMock, netFetchMock, resolveProxyMock, setProxyMock } 
 type SafeStorageMockOptions = {
   encryptionAvailable?: boolean
   decryptString?: (value: Buffer) => string
+  encryptStringAsync?: (value: string) => Promise<Buffer>
 }
 
 let tempHome = ''
@@ -86,7 +87,9 @@ async function loadClientModule(options: SafeStorageMockOptions = {}) {
     safeStorage: {
       isEncryptionAvailable: () => options.encryptionAvailable ?? false,
       encryptString: (value: string) => Buffer.from(value),
-      decryptString: options.decryptString ?? ((value: Buffer) => value.toString('utf-8'))
+      decryptString: options.decryptString ?? ((value: Buffer) => value.toString('utf-8')),
+      isAsyncEncryptionAvailable: async () => options.encryptionAvailable ?? false,
+      encryptStringAsync: options.encryptStringAsync
     },
     session: {
       defaultSession: {
@@ -450,4 +453,45 @@ describe('readPlaneError', () => {
     )
     expect(await readPlaneError(jsonResponse({}, 400))).toBe('Plane request failed (400)')
   })
+})
+
+describe('connect racing a disconnect', () => {
+  const originalPlatform = process.platform
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  })
+
+  it.each([
+    ['all workspaces', undefined],
+    ['that workspace', expectedWorkspaceId('https://api.plane.so', 'acme')]
+  ])(
+    'adds no workspace when a disconnect of %s lands while its key encrypts',
+    async (_, workspaceId) => {
+      Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+      let release = (): void => {}
+      const encryptStringAsync = vi.fn(
+        (value: string) =>
+          new Promise<Buffer>((resolve) => {
+            release = () => resolve(Buffer.from(value))
+          })
+      )
+      const { connect, disconnect, status } = await loadClientModule({
+        encryptionAvailable: true,
+        encryptStringAsync
+      })
+      mockConnectSuccess()
+      const connecting = connect({
+        baseUrl: 'https://api.plane.so',
+        workspaceSlug: 'acme',
+        apiKey: 'secret-key'
+      })
+      await vi.waitFor(() => expect(encryptStringAsync).toHaveBeenCalled())
+      disconnect(workspaceId ? { workspaceId } : undefined)
+      release()
+
+      await expect(connecting).resolves.toMatchObject({ ok: false })
+      expect(status()).toMatchObject({ connected: false, workspaces: [] })
+      expect(JSON.parse(readFileSync(workspaceFilePath(), 'utf-8')).workspaces).toEqual([])
+    }
+  )
 })

@@ -110,7 +110,12 @@ async function refreshStoredCloudSession(
       capabilities: refreshed.capabilities
     }
     if (
-      saveOrcaCloudSessionIfCurrent(active.profile.id, userDataPath, nextSession, snapshot) === null
+      (await saveOrcaCloudSessionIfCurrent(
+        active.profile.id,
+        userDataPath,
+        nextSession,
+        snapshot
+      )) === null
     ) {
       throw new StaleCloudSessionMutationError()
     }

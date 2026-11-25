@@ -7,6 +7,10 @@ import {
   PLUGIN_STORAGE_TOTAL_MAX_BYTES
 } from '../../shared/plugins/plugin-host-api'
 import { pluginDataDir } from './plugin-storage-store'
+import { encryptSecretOffMainThread, LatestSecretWrites } from '../safe-storage-async-encrypt'
+
+// Shared across instances: each plugin call builds a fresh store for the same vault.
+const latestWrites = new LatestSecretWrites()
 
 /**
  * Per-plugin secret vault, following the repo's safeStorage-backed
@@ -78,10 +82,16 @@ export class PluginSecretsStore {
     }
   }
 
-  set(key: string, value: string): PluginSecretsResult<true> {
-    if (!safeStorage.isEncryptionAvailable()) {
+  async set(key: string, value: string): Promise<PluginSecretsResult<true>> {
+    const isLatest = latestWrites.begin(this.writeKey(key))
+    const encrypted = await encryptSecretOffMainThread(value)
+    if (!encrypted) {
       return { ok: false, error: 'OS-backed encryption is unavailable; secret not stored' }
     }
+    if (!isLatest()) {
+      return { ok: true, value: true }
+    }
+    // Why: read after the await so a concurrent set of another key is not overwritten.
     const file = this.read()
     if (
       !Object.hasOwn(file.ciphertexts, key) &&
@@ -89,7 +99,7 @@ export class PluginSecretsStore {
     ) {
       return { ok: false, error: `secret vault exceeds the ${PLUGIN_STORAGE_KEY_LIMIT}-key limit` }
     }
-    file.ciphertexts[key] = safeStorage.encryptString(value).toString('base64')
+    file.ciphertexts[key] = encrypted.toString('base64')
     const nextFile = JSON.stringify(file, null, 2)
     if (Buffer.byteLength(nextFile, 'utf8') > PLUGIN_STORAGE_TOTAL_MAX_BYTES) {
       return { ok: false, error: `secret vault exceeds ${PLUGIN_STORAGE_TOTAL_MAX_BYTES} bytes` }
@@ -98,7 +108,12 @@ export class PluginSecretsStore {
     return { ok: true, value: true }
   }
 
+  private writeKey(key: string): string {
+    return `${this.filePath}\0${key}`
+  }
+
   delete(key: string): void {
+    latestWrites.supersede(this.writeKey(key))
     const file = this.read()
     if (Object.hasOwn(file.ciphertexts, key)) {
       delete file.ciphertexts[key]

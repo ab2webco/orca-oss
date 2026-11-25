@@ -278,7 +278,7 @@ export function registerPluginHandlers(
       .find((candidate) => candidate.pluginKey === parsed.pluginKey)
     const declared =
       plugin && !isInvalidDiscoveredPlugin(plugin) ? plugin.manifest.contributes.settings : []
-    const result = writePluginSetting({
+    const result = await writePluginSetting({
       pluginsDataDir: getPluginsDataDir(pluginService.options.userDataPath),
       pluginKey: parsed.pluginKey,
       declared,

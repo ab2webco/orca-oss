@@ -78,7 +78,7 @@ describe('Orca Lab cloud session store', () => {
     const store = await loadSessionStore()
     const session = makeSession()
 
-    expect(store.saveOrcaCloudSession('profile-1', userDataPath, session)).toBe('encrypted')
+    expect(await store.saveOrcaCloudSession('profile-1', userDataPath, session)).toBe('encrypted')
     expect(store.readOrcaCloudSession('profile-1', userDataPath)).toEqual({
       status: 'found',
       session,
@@ -98,7 +98,7 @@ describe('Orca Lab cloud session store', () => {
     const store = await loadSessionStore()
     const session = makeSession()
 
-    expect(store.saveOrcaCloudSession('profile-1', userDataPath, session)).toBe('memory-only')
+    expect(await store.saveOrcaCloudSession('profile-1', userDataPath, session)).toBe('memory-only')
     expect(store.readOrcaCloudSession('profile-1', userDataPath)).toEqual({
       status: 'found',
       session,
@@ -120,8 +120,8 @@ describe('Orca Lab cloud session store', () => {
     const otherSession = { ...session, accessToken: 'other-access-token' }
 
     try {
-      store.saveOrcaCloudSession('local-default', userDataPath, session)
-      store.saveOrcaCloudSession('local-default', otherUserDataPath, otherSession)
+      await store.saveOrcaCloudSession('local-default', userDataPath, session)
+      await store.saveOrcaCloudSession('local-default', otherUserDataPath, otherSession)
 
       expect(store.readOrcaCloudSession('local-default', userDataPath)).toMatchObject({
         status: 'found',
@@ -143,7 +143,9 @@ describe('Orca Lab cloud session store', () => {
     const store = await loadSessionStore()
     const session = makeSession()
 
-    expect(store.saveOrcaCloudSession('profile-1', userDataPath, session)).toBe('dev-plaintext')
+    expect(await store.saveOrcaCloudSession('profile-1', userDataPath, session)).toBe(
+      'dev-plaintext'
+    )
 
     const saved = JSON.parse(
       readFileSync(store.getOrcaCloudSessionPath('profile-1', userDataPath), 'utf-8')

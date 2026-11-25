@@ -120,6 +120,7 @@ describe('protected secrets at startup when the Keychain prompts', () => {
     keychain.syncAllowed = true
     delete safeStorageMock.isAsyncEncryptionAvailable
     delete safeStorageMock.decryptStringAsync
+    delete safeStorageMock.encryptStringAsync
     setPlatform('darwin')
     vi.useFakeTimers()
   })
@@ -334,5 +335,45 @@ describe('protected secrets at startup when the Keychain prompts', () => {
     expect(decryptStringAsync).toHaveBeenCalled()
     expect(store.getSettings().opencodeSessionCookie).toBe(ORIGINAL.cookie)
     expect(store.getSettings().httpProxyUrl).toBe(ORIGINAL.proxy)
+  })
+  // Why (ORCA-1391): re-entering a secret after the startup timeout used to encrypt it with the
+  // sync API, reading the Keychain on the main thread the prompt was holding.
+  it('a secret re-entered after the bound is encrypted off the main thread and saved', async () => {
+    await seedEncryptedProfile()
+    useAsyncKeychain(() => new Promise(() => {}))
+    safeStorageMock.encryptStringAsync = async (plaintext: string) =>
+      Buffer.from(`enc:${crypto.randomUUID()}:${plaintext}`, 'utf-8')
+
+    const store = await createStore()
+    const unseal = store.unsealProtectedSecrets()
+    await vi.advanceTimersByTimeAsync(KEYCHAIN_WAIT_MS)
+    await unseal
+    store.updateSettings({ httpProxyUrl: 'http://re-entered.test:3128' })
+    await settleSave(store)
+    await settleSave(store)
+
+    const proxy = Buffer.from(persistedBlobs().proxy, 'base64')
+    expect(decode(proxy)).toBe('http://re-entered.test:3128')
+    expect(keychain.syncCalls).toBe(0)
+  })
+
+  it('the quit flush waits for a secret still encrypting', async () => {
+    await seedEncryptedProfile()
+    useAsyncKeychain(async (ciphertext) => ({ result: decode(ciphertext), shouldReEncrypt: false }))
+    // Why: lands after 1 s, inside the 2 s bound, so a flush that does not wait misses it.
+    safeStorageMock.encryptStringAsync = (plaintext: string) =>
+      new Promise<Buffer>((resolve) =>
+        setTimeout(() => resolve(Buffer.from(`enc:${crypto.randomUUID()}:${plaintext}`)), 1000)
+      )
+
+    const store = await createStore()
+    await store.unsealProtectedSecrets()
+    store.updateSettings({ opencodeSessionCookie: 'cookie-set-before-quit' })
+    const flushing = store.flushAsync()
+    await vi.advanceTimersByTimeAsync(2500)
+    await flushing
+
+    expect(decode(Buffer.from(persistedBlobs().cookie, 'base64'))).toBe('cookie-set-before-quit')
+    expect(keychain.syncCalls).toBe(0)
   })
 })

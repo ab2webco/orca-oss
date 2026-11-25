@@ -2,6 +2,7 @@ import { safeStorage } from 'electron'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { encryptSecretOffMainThread, LatestSecretWrites } from '../safe-storage-async-encrypt'
 
 type StoredOpenAiKey = {
   encryptedKeyBase64: string
@@ -9,6 +10,7 @@ type StoredOpenAiKey = {
 
 const OPENAI_SPEECH_TOKEN_FILE = 'openai-speech-token.enc'
 let cachedOpenAiSpeechApiKey: string | null = null
+const latestWrites = new LatestSecretWrites()
 
 function getOrcaDir(): string {
   return join(homedir(), '.orca')
@@ -47,22 +49,25 @@ export function hasOpenAiSpeechApiKey(): boolean {
   return existsSync(getOpenAiKeyPath())
 }
 
-export function saveOpenAiSpeechApiKey(apiKey: string): void {
+export async function saveOpenAiSpeechApiKey(apiKey: string): Promise<void> {
   const trimmed = apiKey.trim()
   if (!trimmed) {
     throw new Error('OpenAI API key is required')
   }
-  ensureOrcaDir()
-  if (safeStorage.isEncryptionAvailable()) {
-    writeFileSync(getOpenAiKeyPath(), safeStorage.encryptString(trimmed), { mode: 0o600 })
-    cachedOpenAiSpeechApiKey = trimmed
+  const isLatest = latestWrites.begin(OPENAI_SPEECH_TOKEN_FILE)
+  const encrypted = await encryptSecretOffMainThread(trimmed)
+  if (!isLatest()) {
     return
   }
-
-  console.warn(
-    '[speech] safeStorage encryption unavailable — storing OpenAI speech key in plaintext'
-  )
-  writeFileSync(getOpenAiKeyPath(), trimmed, { encoding: 'utf8', mode: 0o600 })
+  ensureOrcaDir()
+  if (encrypted) {
+    writeFileSync(getOpenAiKeyPath(), encrypted, { mode: 0o600 })
+  } else {
+    console.warn(
+      '[speech] safeStorage encryption unavailable — storing OpenAI speech key in plaintext'
+    )
+    writeFileSync(getOpenAiKeyPath(), trimmed, { encoding: 'utf8', mode: 0o600 })
+  }
   cachedOpenAiSpeechApiKey = trimmed
 }
 
@@ -94,6 +99,7 @@ export function readOpenAiSpeechApiKey(): string {
 }
 
 export function clearOpenAiSpeechApiKey(): void {
+  latestWrites.supersede(OPENAI_SPEECH_TOKEN_FILE)
   cachedOpenAiSpeechApiKey = null
   rmSync(getOpenAiKeyPath(), { force: true })
 }

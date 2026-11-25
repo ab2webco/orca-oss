@@ -1,4 +1,3 @@
-import { safeStorage } from 'electron'
 import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
 import {
   LEGACY_WORKSPACE_ID,
@@ -28,40 +27,37 @@ import {
 } from './linear-workspace-registry'
 import {
   CredentialDecryptionError,
+  CredentialSaveSupersededError,
+  encryptCredentialForFile,
   readIntegrationCredentialFileSync,
   readStoredCredentialTokenAsync
 } from '../integration-credential-file'
 import { PendingCredentialReads } from '../integration-credential-pending-reads'
+import { LatestSecretWrites } from '../safe-storage-async-encrypt'
 import type { LinearWorkspace } from '../../shared/linear/workspace-types'
 
 const pendingReads = new PendingCredentialReads<string>('Linear')
+const latestWrites = new LatestSecretWrites()
 
-function writeEncryptedToken(path: string, apiKey: string): void {
-  if (safeStorage.isEncryptionAvailable()) {
-    const encrypted = safeStorage.encryptString(apiKey)
-    writeFileSync(path, encrypted, { mode: 0o600 })
-    return
+export async function saveWorkspaceToken(workspaceId: string, apiKey: string): Promise<void> {
+  const isLatest = latestWrites.begin(workspaceId)
+  const tokenBytes = await encryptCredentialForFile('Linear', apiKey)
+  if (!isLatest()) {
+    throw new CredentialSaveSupersededError()
   }
-
-  console.warn('[linear] safeStorage encryption unavailable — storing token in plaintext')
-  writeFileSync(path, apiKey, { encoding: 'utf-8', mode: 0o600 })
-}
-
-export function saveWorkspaceToken(workspaceId: string, apiKey: string): void {
   ensureOrcaDir()
   if (workspaceId !== LEGACY_WORKSPACE_ID) {
     ensureWorkspaceTokenDir()
   }
-  const tokenPath = getWorkspaceTokenPath(workspaceId)
-  writeEncryptedToken(tokenPath, apiKey)
+  writeFileSync(getWorkspaceTokenPath(workspaceId), tokenBytes, { mode: 0o600 })
   pendingReads.forget(workspaceId)
   cacheToken(workspaceId, apiKey)
   clearCredentialError(workspaceId)
 }
 
 // Backward-compatible export for the legacy single-workspace storage path.
-export function saveToken(apiKey: string): void {
-  saveWorkspaceToken(LEGACY_WORKSPACE_ID, apiKey)
+export function saveToken(apiKey: string): Promise<void> {
+  return saveWorkspaceToken(LEGACY_WORKSPACE_ID, apiKey)
 }
 
 export async function loadToken(
@@ -103,6 +99,7 @@ export async function loadToken(
 }
 
 export function clearTokenFile(workspaceId: string): void {
+  latestWrites.supersede(workspaceId)
   pendingReads.forget(workspaceId)
   forgetCachedToken(workspaceId)
   try {
@@ -118,6 +115,7 @@ export function clearToken(workspaceId?: string): void {
     for (const workspace of state.workspaces) {
       clearTokenFile(workspace.id)
     }
+    latestWrites.supersedeAll()
     pendingReads.clear()
     resetCredentialCaches()
     resetLegacyViewerCache()
@@ -148,8 +146,11 @@ export function clearToken(workspaceId?: string): void {
   })
 }
 
-export function replaceLegacyWorkspace(workspace: LinearWorkspace, token: string): void {
-  saveWorkspaceToken(workspace.id, token)
+export async function replaceLegacyWorkspace(
+  workspace: LinearWorkspace,
+  token: string
+): Promise<void> {
+  await saveWorkspaceToken(workspace.id, token)
   clearTokenFile(LEGACY_WORKSPACE_ID)
   clearLegacyViewerOnDisk()
   forgetLegacyViewer()

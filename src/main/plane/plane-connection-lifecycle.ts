@@ -27,6 +27,7 @@ import {
   setCachedViewer,
   writeWorkspaceFile
 } from './plane-workspace-store'
+import { supersedePendingTokenSaves } from './plane-token-storage'
 import type {
   PlaneConnectionStatus,
   PlaneViewer,
@@ -68,6 +69,9 @@ export function disconnect(args?: { workspaceId?: string }): void {
   for (const id of ids) {
     deleteWorkspaceToken(id)
     deleteCachedViewer(id)
+  }
+  if (!args?.workspaceId) {
+    supersedePendingTokenSaves()
   }
   writeWorkspaceFile({
     version: 1,

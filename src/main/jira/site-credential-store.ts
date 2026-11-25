@@ -1,14 +1,16 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { safeStorage } from 'electron'
 import {
   CredentialDecryptionError,
+  CredentialSaveSupersededError,
   credentialFileHasContent,
   readIntegrationCredentialFileSync,
-  readStoredCredentialTokenAsync
+  readStoredCredentialTokenAsync,
+  encryptCredentialForFile
 } from '../integration-credential-file'
 import { PendingCredentialReads } from '../integration-credential-pending-reads'
+import { LatestSecretWrites } from '../safe-storage-async-encrypt'
 import type { JiraSite, JiraSiteSelection } from '../../shared/jira-types'
 
 export type JiraSiteFile = {
@@ -22,6 +24,7 @@ let cachedSiteFile: JiraSiteFile | null = null
 let siteFileLoaded = false
 const cachedTokens = new Map<string, string>()
 const pendingReads = new PendingCredentialReads<string>('Jira')
+const latestWrites = new LatestSecretWrites()
 // Why: decrypt failures are recorded per site so getStatus can explain
 // failing reads without re-touching the keychain on every status poll.
 export const credentialErrors = new Map<string, string>()
@@ -159,15 +162,6 @@ export function writeSiteFile(file: JiraSiteFile): void {
   })
 }
 
-function writeEncryptedToken(path: string, apiToken: string): void {
-  if (safeStorage.isEncryptionAvailable()) {
-    writeFileSync(path, safeStorage.encryptString(apiToken), { mode: 0o600 })
-    return
-  }
-  console.warn('[jira] safeStorage encryption unavailable — storing token in plaintext')
-  writeFileSync(path, apiToken, { encoding: 'utf-8', mode: 0o600 })
-}
-
 export async function readToken(siteId: string): Promise<string | null> {
   const cached = cachedTokens.get(siteId)
   if (cached !== undefined) {
@@ -197,16 +191,26 @@ export async function readToken(siteId: string): Promise<string | null> {
   })
 }
 
-export function saveToken(siteId: string, apiToken: string): void {
+export async function saveToken(siteId: string, apiToken: string): Promise<void> {
+  const isLatest = latestWrites.begin(siteId)
+  const tokenBytes = await encryptCredentialForFile('Jira', apiToken)
+  if (!isLatest()) {
+    throw new CredentialSaveSupersededError()
+  }
   ensureOrcaDir()
   ensureTokenDir()
-  writeEncryptedToken(getTokenPath(siteId), apiToken)
+  writeFileSync(getTokenPath(siteId), tokenBytes, { mode: 0o600 })
   pendingReads.forget(siteId)
   cachedTokens.set(siteId, apiToken)
   credentialErrors.delete(siteId)
 }
 
+export function supersedePendingTokenSaves(): void {
+  latestWrites.supersedeAll()
+}
+
 export function deleteToken(siteId: string): void {
+  latestWrites.supersede(siteId)
   pendingReads.forget(siteId)
   cachedTokens.delete(siteId)
   credentialErrors.delete(siteId)
