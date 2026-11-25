@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ChildProcess from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const { appRelaunchMock, recordDurableCrashBreadcrumbMock, spawnMock, unrefMock, onMock } =
   vi.hoisted(() => ({
@@ -31,7 +34,7 @@ beforeEach(() => {
   spawnMock.mockReset()
   unrefMock.mockReset()
   onMock.mockReset()
-  spawnMock.mockReturnValue({ unref: unrefMock, on: onMock })
+  spawnMock.mockReturnValue({ pid: 4242, unref: unrefMock, on: onMock })
   setPlatform('darwin')
 })
 
@@ -131,6 +134,15 @@ describe('relaunchApp', () => {
         })
       }
 
+      // The fallback reads this contract: Node sets pid only once the fork succeeded, and defers the error.
+      it('a real spawn that cannot start has no pid in the same tick', async () => {
+        const failed = actual.spawn('/nonexistent/orca-relaunch-sh', [], { detached: true })
+        const error = new Promise<NodeJS.ErrnoException>((resolve) => failed.once('error', resolve))
+
+        expect(failed.pid).toBeUndefined()
+        await expect(error).resolves.toMatchObject({ code: 'ENOENT' })
+      })
+
       // Why: an early exec fails the single-instance lock and exits, leaving no Orca.
       it('execs the same arguments only after the old pid exits', async () => {
         const old = actual.spawn('sleep', ['0.8'])
@@ -168,13 +180,88 @@ describe('relaunchApp', () => {
       expect(appRelaunchMock).toHaveBeenCalledOnce()
     })
 
-    it('keeps Electron relaunch for an AppImage, whose mount vanishes with this process', () => {
-      vi.stubEnv('APPIMAGE', '/home/u/Orca.AppImage')
+    // Why: spawn reports ENOENT/EACCES/EAGAIN by an 'error' event on a later tick, and the gpu-fallback and
+    // renderer-request callers app.exit(0) in this one, so a fallback waiting for that event never runs.
+    it('falls back to Electron relaunch before returning when the shell spawn fails', () => {
+      spawnMock.mockReturnValue({ pid: undefined, unref: unrefMock, on: onMock })
 
-      relaunchApp('admin-restart')
+      relaunchApp('renderer-request')
 
       expect(appRelaunchMock).toHaveBeenCalledOnce()
-      expect(spawnMock).not.toHaveBeenCalled()
+    })
+
+    // Why: each app.relaunch() call starts one more instance.
+    it('falls back only once when the failed spawn later emits its error event', () => {
+      spawnMock.mockReturnValue({ pid: undefined, unref: unrefMock, on: onMock })
+
+      relaunchApp('renderer-request')
+      for (const [event, listener] of onMock.mock.calls) {
+        if (event === 'error') {
+          listener(new Error('spawn /bin/sh ENOENT'))
+        }
+      }
+
+      expect(onMock).toHaveBeenCalledWith('error', expect.any(Function))
+      expect(appRelaunchMock).toHaveBeenCalledOnce()
+    })
+
+    it('does not fall back when the started shell later emits an error', () => {
+      relaunchApp('admin-restart')
+      for (const [event, listener] of onMock.mock.calls) {
+        if (event === 'error') {
+          listener(new Error('kill EPERM'))
+        }
+      }
+
+      expect(appRelaunchMock).not.toHaveBeenCalled()
+    })
+
+    describe('from an AppImage', () => {
+      let appImageDir: string
+      let appImagePath: string
+
+      beforeEach(() => {
+        appImageDir = mkdtempSync(join(tmpdir(), 'orca-appimage-'))
+        appImagePath = join(appImageDir, 'Orca.AppImage')
+        writeFileSync(appImagePath, '', { mode: 0o755 })
+        vi.stubEnv('APPIMAGE', appImagePath)
+        // The running binary lives in the AppImage's FUSE mount.
+        process.argv = ['/tmp/.mount_OrcaXy/orca', '--no-sandbox', 'orca://open']
+      })
+
+      afterEach(() => {
+        rmSync(appImageDir, { recursive: true, force: true })
+      })
+
+      // Why: an app.relaunch()ed AppImage inherits no_new_privs, so the next update's new AppImage cannot
+      // run the setuid fusermount its runtime mounts with, and sudo in its terminals refuses to run.
+      it('waits, then execs the AppImage file itself, since the mount vanishes with this process', () => {
+        relaunchApp('profile-switch')
+
+        expect(appRelaunchMock).not.toHaveBeenCalled()
+        expect(spawnMock).toHaveBeenCalledOnce()
+        const [command, args] = spawnMock.mock.calls[0]
+        expect(command).toBe('/bin/sh')
+        expect(args.slice(2)).toEqual([
+          'orca-relaunch',
+          String(process.pid),
+          appImagePath,
+          '--no-sandbox',
+          'orca://open'
+        ])
+      })
+
+      it.each([
+        ['a relative path', 'Orca.AppImage'],
+        ['a file that is gone', '/nonexistent/Orca.AppImage']
+      ])('keeps Electron relaunch when APPIMAGE is %s', (_label, value) => {
+        vi.stubEnv('APPIMAGE', value)
+
+        relaunchApp('profile-switch')
+
+        expect(appRelaunchMock).toHaveBeenCalledOnce()
+        expect(spawnMock).not.toHaveBeenCalled()
+      })
     })
   })
 })
