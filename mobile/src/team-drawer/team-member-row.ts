@@ -1,5 +1,6 @@
 import type { GameAgent } from '../../../src/shared/orchestrator-game-state'
 import { ticketInText } from '../../../src/shared/orchestrator-game-ticket-id'
+import { parseGameTicketKind } from '../../../src/shared/orchestrator-game-ticket-kind'
 import { agentToolLabelOf } from '../../../src/shared/agent-tool-label'
 import { isAskUserQuestionTool } from '../../../src/shared/agent-question-answered-intent'
 import { teamFlowPhaseOf } from '../../../src/shared/team-flow-phase'
@@ -71,14 +72,15 @@ function remoteTicketStatusOf(
 ): string | null {
   const chosenBy =
     isRecord(raw.launch) && isRecord(raw.launch.chosenBy) ? raw.launch.chosenBy : null
-  const kind = chosenBy ? text(chosenBy.kind) : null
+  // Why parse: the desktop drops an unknown kind and falls back to the title.
+  const kind = chosenBy ? parseGameTicketKind(text(chosenBy.kind) ?? '') : null
   return memberTicketStatusOf(
     {
-      displayName: text(raw.displayName) ?? undefined,
+      displayName: text(raw.displayName),
       remote: { ticketDone: true },
       review: pr ? { number: pr.number, url: pr.url, state: pr.state } : undefined,
       launch: kind ? { chosenBy: { kind } } : undefined
-    } as GameAgent,
+    },
     mergeQueued
   )
 }

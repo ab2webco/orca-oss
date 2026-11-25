@@ -1,14 +1,28 @@
-import type { GameAgent } from './orchestrator-game-state'
-import { gameTicketKindOf, type GameTicketKind } from './orchestrator-game-ticket-kind'
+import type { GameAgent, GameReview, GameWorkItem } from './orchestrator-game-state'
+import type { GameRemoteHost } from './orchestrator-game-remote-host'
+import {
+  gameTicketKindOf,
+  type GameLaunchChosenBy,
+  type GameTicketKind
+} from './orchestrator-game-ticket-kind'
+
+/** What the finished rule reads of a member, so the phone's row passes it without a GameAgent cast (ORCA-1405). */
+export type MemberFinishedFacts = {
+  displayName: string | null
+  review?: Pick<GameReview, 'number' | 'url' | 'state'>
+  workItem?: Pick<GameWorkItem, 'status' | 'statusGroup'>
+  remote?: Pick<GameRemoteHost, 'ticketDone'>
+  launch?: { chosenBy?: Pick<GameLaunchChosenBy, 'kind'> }
+}
 
 // Why (ORCA-1397): these kinds end without a PR; an implementation's completed Run is not its merge.
 const NO_PR_KINDS: ReadonlySet<GameTicketKind> = new Set(['audit', 'review', 'captures'])
 
-const prOpen = (review: GameAgent['review']): boolean =>
+const prOpen = (review: MemberFinishedFacts['review']): boolean =>
   review?.state === 'open' || review?.state === 'draft'
 
 /** Why a member's work counts as finished, or null; its live state is not consulted here. */
-export function finishedSignalOf(agent: GameAgent): string | null {
+export function finishedSignalOf(agent: MemberFinishedFacts): string | null {
   const { review, workItem } = agent
   const group = workItem?.statusGroup
   // Why the gate on closed too (ORCA-1397 review): a member closes its PR to split or replace it mid-work.
@@ -27,11 +41,14 @@ export function finishedSignalOf(agent: GameAgent): string | null {
 }
 
 // Why the title fallback: --model, Codex, older hosts and a moved model leave no chosenBy; the title is what game launch reads.
-const launchKindOf = (agent: GameAgent): GameTicketKind | null =>
+const launchKindOf = (agent: MemberFinishedFacts): GameTicketKind | null =>
   agent.launch?.chosenBy?.kind ?? gameTicketKindOf(agent.displayName ?? '')
 
 /** What a member whose home Run completed still waits for; null when finished or its Run is not done. */
-export function runDoneWaitOf(agent: GameAgent, queued: ReadonlySet<string>): string | null {
+export function runDoneWaitOf(
+  agent: MemberFinishedFacts,
+  queued: ReadonlySet<string>
+): string | null {
   const { review } = agent
   if (!agent.remote?.ticketDone || finishedSignalOf(agent) !== null) {
     return null

@@ -3,7 +3,11 @@ import type { GameMemberPhase } from './orchestrator-game-fleet-verbs'
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { isAskUserQuestionTool } from './agent-question-answered-intent'
 import { agentToolLabelOf } from './agent-tool-label'
-import { finishedSignalOf, runDoneWaitOf } from './orchestrator-game-member-finished'
+import {
+  finishedSignalOf,
+  runDoneWaitOf,
+  type MemberFinishedFacts
+} from './orchestrator-game-member-finished'
 
 const NONE_QUEUED: ReadonlySet<string> = new Set()
 
@@ -73,7 +77,10 @@ export function remoteNextOf(agent: GameAgent, ticket: string | null): string | 
 }
 
 /** The linked ticket's status; once a remote member's home Run completed, `done` or what it still waits for. */
-export function memberTicketStatusOf(agent: GameAgent, queued = NONE_QUEUED): string | null {
+export function memberTicketStatusOf(
+  agent: MemberFinishedFacts,
+  queued = NONE_QUEUED
+): string | null {
   if (agent.workItem) {
     return agent.workItem.status || agent.workItem.statusGroup
   }
