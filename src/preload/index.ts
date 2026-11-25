@@ -4804,6 +4804,12 @@ const api = {
       const listener = (_event: Electron.IpcRendererEvent) => callback()
       ipcRenderer.on('runtime:gameAdvisorChanged', listener)
       return () => ipcRenderer.removeListener('runtime:gameAdvisorChanged', listener)
+    },
+    onGameLeadStarted: (callback: (worktreeId: string) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, worktreeId: string) =>
+        callback(worktreeId)
+      ipcRenderer.on('runtime:gameLeadStarted', listener)
+      return () => ipcRenderer.removeListener('runtime:gameLeadStarted', listener)
     }
   },
 

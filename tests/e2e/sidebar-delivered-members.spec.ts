@@ -12,6 +12,7 @@ import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { writeSettings } from './helpers/settings-write'
+import { closeLeadStartTeamPanel } from './helpers/team-tab-auto-open'
 import { dismissWorkspaceBoardMovedHint } from './helpers/workspace-board-moved-hint'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
@@ -171,6 +172,7 @@ test('freed members stay under their lead as Entregados, by ticket, PR and state
         return registered.result.registered
       })
       .toBe(true)
+    await closeLeadStartTeamPanel(orcaPage)
     const endpoint = await readHookEndpoint(electronApp)
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,

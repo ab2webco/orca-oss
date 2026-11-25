@@ -15,6 +15,8 @@ export type RuntimeClientEvent =
   | { type: 'gameOwnerQuestionsChanged' }
   | { type: 'gameInboxChanged' }
   | { type: 'gameAdvisorChanged' }
+  // Why: a paired desktop showing the lead's worktree opens its Team panel (ORCA-1414).
+  | { type: 'gameLeadStarted'; worktreeId: string }
   | ({ type: 'nativeChatLaunchDraftResolved' } & RuntimeNativeChatLaunchDraftResolution)
   | { type: 'terminalSideEffects'; batch: TerminalSideEffectBatch }
   // Why: SSH connections live on the runtime host; paired clients have no IPC

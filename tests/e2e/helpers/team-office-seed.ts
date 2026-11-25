@@ -3,6 +3,7 @@ import { expect } from './orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './agent-hook-endpoint'
 import { createStdinLoggingAgent } from './game-member-stdin-agent'
 import { setWindowWidth } from './settings-window'
+import { closeLeadStartTeamPanel } from './team-tab-auto-open'
 import { writeSettings } from './settings-write'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './terminal'
@@ -160,6 +161,7 @@ async function launchOfficeTeam(
       return registered.result.registered
     })
     .toBe(true)
+  await closeLeadStartTeamPanel(orcaPage)
   const endpoint = await readHookEndpoint(electronApp)
   await emitCodexHookStatus(endpoint, {
     paneKey: pane.paneKey,

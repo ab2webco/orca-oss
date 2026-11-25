@@ -2493,6 +2493,7 @@ type RuntimeNotifier = {
   gameOwnerQuestionsChanged?(): void
   gameInboxChanged?(): void
   gameAdvisorChanged?(): void
+  gameLeadStarted?(worktreeId: string): void
   activateWorktree(
     repoId: string,
     worktreeId: string,
@@ -31816,6 +31817,16 @@ export class OrcaRuntimeService {
 
   getGameLeads(): GameLeads {
     return this.gameLeads
+  }
+
+  /** The desktop and paired clients showing the lead's worktree open its Team panel (ORCA-1414). */
+  noteGameLeadStarted(handle: string, worktreeId?: string): void {
+    const paneKey = worktreeId ? null : this.getPaneKeyForTerminalHandle(handle)
+    const shown = worktreeId ?? (paneKey ? this.getTerminalWorktreeIdForPaneKey(paneKey) : null)
+    if (shown) {
+      this.notifier?.gameLeadStarted?.(shown)
+      this.emitClientEvent({ type: 'gameLeadStarted', worktreeId: shown })
+    }
   }
 
   // Why the PTY over the leaf: a pane keeps its leaf, and the renderer its ptyId, after Claude exits (ORCA-713).

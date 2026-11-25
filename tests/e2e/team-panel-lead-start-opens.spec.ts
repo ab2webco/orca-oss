@@ -1,0 +1,241 @@
+/**
+ * ORCA-1414: a lead start opens the right sidebar on Team, from the runtime's lead registration and
+ * no Claude hook, so it holds when an org plugin skips orca-game's hooks. Needs E2E: the open runs
+ * main → IPC → renderer, and the focus it must not steal is the real terminal's.
+ */
+
+import type { Page } from '@stablyai/playwright-test'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { test, expect } from './helpers/orca-app'
+import { setTheme, setWindowWidth, THEMES } from './helpers/settings-window'
+import {
+  RIGHT_SIDEBAR_MIN_NON_SIDEBAR_AREA,
+  RIGHT_SIDEBAR_MIN_WIDTH
+} from '../../src/renderer/src/components/right-sidebar/right-sidebar-width'
+import { getDefaultUIState } from '../../src/shared/constants'
+import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
+import { RuntimeClient } from '../../src/cli/runtime-client'
+import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
+
+// The right sidebar's minimum, default and maximum at a 1440 window with the activity bar on top.
+const SIDEBAR_WIDTHS = [
+  ['min', RIGHT_SIDEBAR_MIN_WIDTH],
+  ['default', getDefaultUIState().rightSidebarWidth],
+  ['max', 1440 - RIGHT_SIDEBAR_MIN_NON_SIDEBAR_AREA]
+] as const
+
+// Left sidebar 280 + right 350 + 120 of content is over 700: the sidebar would overlay.
+const OVERLAY_WINDOW = 700
+
+const sidebarOf = (page: Page) =>
+  page.evaluate(() => {
+    const state = window.__store!.getState()
+    return { open: state.rightSidebarOpen, tab: state.rightSidebarTab }
+  })
+
+const focusInTerminal = (page: Page) =>
+  page.evaluate(() => document.activeElement?.closest('.xterm') !== null)
+
+test('a lead start opens Team once, keeps terminal focus, and respects a later tab', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(240_000)
+  await waitForSessionReady(orcaPage)
+  const worktreeId = await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  await waitForActivePanePtyId(orcaPage)
+  const pane = await waitForActivePaneHookDescriptor(orcaPage)
+  const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
+  const client = new RuntimeClient(userDataDir, 30_000, null, null)
+  const lead = (
+    await client.call<{ terminal: { handle: string } }>('terminal.resolvePane', {
+      paneKey: pane.paneKey
+    })
+  ).result.terminal.handle
+  await client.call('terminal.send', {
+    terminal: lead,
+    text: 'node -e "setInterval(() => {}, 1e9)"',
+    enter: true
+  })
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setRightSidebarOpen(false)
+    state.setRightSidebarTab('source-control')
+  })
+  await orcaPage.locator('.xterm:visible .xterm-helper-textarea').first().focus()
+  expect(await focusInTerminal(orcaPage)).toBe(true)
+
+  // As `orca game lead` registers: the runtime call, with no Claude and no hook in the pane.
+  const register = (fresh = false) =>
+    client.call<{ registered: boolean }>('game.leadRegister', {
+      worktreeId,
+      terminalHandle: lead,
+      project: 'e2e',
+      label: 'Alfred',
+      claim: true,
+      ...(fresh ? { fresh: true } : {})
+    })
+  await expect.poll(async () => (await register()).result.registered).toBe(true)
+  await expect.poll(() => sidebarOf(orcaPage)).toEqual({ open: true, tab: 'team' })
+  await expect(orcaPage.getByTestId('team-panel')).toBeVisible()
+  expect(await focusInTerminal(orcaPage), 'the open stole the terminal focus').toBe(true)
+
+  // Why the sidebar's widths: on desktop the window stays put and the person drags the sidebar.
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  for (const [name, width] of SIDEBAR_WIDTHS) {
+    await orcaPage.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), width)
+    // Why the panel's left edge: the clip keeps the tab strip, so Team's place in it shows too.
+    const left = async () => (await orcaPage.getByTestId('team-panel').boundingBox())?.x ?? 0
+    await expect.poll(async () => Math.abs(1440 - (await left()) - width) <= 2).toBe(true)
+    for (const theme of THEMES) {
+      await setTheme(orcaPage, theme)
+      const x = await left()
+      await orcaPage.screenshot({
+        animations: 'disabled',
+        clip: { x, y: 0, width: 1440 - x, height: await orcaPage.evaluate(() => innerHeight) },
+        path: testInfo.outputPath(`lead-start-team-sidebar-${name}-${width}-${theme}.png`)
+      })
+    }
+  }
+
+  // The person picks another tab: a repeat `game lead`, as a hook and the skill both run, keeps it.
+  await orcaPage
+    .getByRole('button', { name: /^Source Control/ })
+    .first()
+    .click()
+  await expect.poll(() => sidebarOf(orcaPage)).toEqual({ open: true, tab: 'source-control' })
+  expect((await register()).result.registered).toBe(true)
+  // Why a pause: no event is the outcome, so give a wrong one the time IPC takes to land.
+  await orcaPage.waitForTimeout(1_500)
+  expect(await sidebarOf(orcaPage)).toEqual({ open: true, tab: 'source-control' })
+
+  // A fresh lead in the same pane is a new start.
+  expect((await register(true)).result.registered).toBe(true)
+  await expect.poll(() => sidebarOf(orcaPage)).toEqual({ open: true, tab: 'team' })
+})
+
+test('a lead start does not open Team where the sidebar would overlay the left sidebar', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(180_000)
+  await waitForSessionReady(orcaPage)
+  const worktreeId = await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  await waitForActivePanePtyId(orcaPage)
+  const pane = await waitForActivePaneHookDescriptor(orcaPage)
+  const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
+  const client = new RuntimeClient(userDataDir, 30_000, null, null)
+  const lead = (
+    await client.call<{ terminal: { handle: string } }>('terminal.resolvePane', {
+      paneKey: pane.paneKey
+    })
+  ).result.terminal.handle
+  await client.call('terminal.send', {
+    terminal: lead,
+    text: 'node -e "setInterval(() => {}, 1e9)"',
+    enter: true
+  })
+  await setWindowWidth(electronApp, orcaPage, OVERLAY_WINDOW)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSidebarOpen(true)
+    state.setRightSidebarOpen(false)
+    state.setRightSidebarTab('source-control')
+  })
+  const fit = await orcaPage.evaluate(() => {
+    const s = window.__store!.getState()
+    return { left: s.sidebarWidth, right: s.rightSidebarWidth, window: innerWidth }
+  })
+  // The layout must be one where an open sidebar would float over the content.
+  expect(fit.left + Math.min(fit.right, fit.window - 320) + 120).toBeGreaterThan(fit.window)
+
+  const register = (fresh = false) =>
+    client.call<{ registered: boolean }>('game.leadRegister', {
+      worktreeId,
+      terminalHandle: lead,
+      project: 'e2e',
+      label: 'Alfred',
+      claim: true,
+      ...(fresh ? { fresh: true } : {})
+    })
+  await expect.poll(async () => (await register()).result.registered).toBe(true)
+  // Why a pause: no open is the outcome, so give a wrong one the time IPC takes to land.
+  await orcaPage.waitForTimeout(1_500)
+  expect(await sidebarOf(orcaPage)).toEqual({ open: false, tab: 'source-control' })
+  await expect(orcaPage.locator('[data-right-sidebar-overlay]')).toHaveCount(0)
+  for (const theme of THEMES) {
+    await setTheme(orcaPage, theme)
+    // Why the left sidebar only: it is what an overlay covered; the content shows the prompt.
+    await orcaPage.screenshot({
+      animations: 'disabled',
+      clip: { x: 0, y: 0, width: fit.left, height: await orcaPage.evaluate(() => innerHeight) },
+      path: testInfo.outputPath(`lead-start-overlay-${OVERLAY_WINDOW}-${theme}.png`)
+    })
+  }
+
+  // Where the sidebar docks, the next start opens it.
+  await setWindowWidth(electronApp, orcaPage, 1440)
+  expect((await register(true)).result.registered).toBe(true)
+  await expect.poll(() => sidebarOf(orcaPage)).toEqual({ open: true, tab: 'team' })
+})
+
+test('a lead start in a folder workspace opens its Team panel', async ({
+  electronApp,
+  orcaPage
+}) => {
+  test.setTimeout(180_000)
+  const folder = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-lead-start-folder-')))
+  try {
+    await waitForSessionReady(orcaPage)
+    const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
+    const client = new RuntimeClient(userDataDir, 30_000, null, null)
+    const made = await client.call<{ group: { id: string } }>('projectGroup.create', {
+      name: 'Lead start folder',
+      parentPath: folder,
+      createdFrom: 'manual'
+    })
+    const created = await client.call<{ folderWorkspace: { id: string } }>(
+      'folderWorkspace.create',
+      { projectGroupId: made.result.group.id, folderPath: folder, name: 'Lead start ws' }
+    )
+    const worktreeId = `folder:${created.result.folderWorkspace.id}`
+    await orcaPage.evaluate(async (id) => {
+      const store = window.__store!.getState()
+      await store.fetchProjectGroups()
+      await store.fetchFolderWorkspaces()
+      window.__store!.getState().setActiveWorktree(id)
+      window.__store!.getState().setRightSidebarOpen(false)
+    }, worktreeId)
+    const lead = (
+      await client.call<{ terminal: { handle: string } }>('terminal.create', {
+        worktree: `id:${worktreeId}`,
+        command: 'node -e "setInterval(() => {}, 1e9)"'
+      })
+    ).result.terminal.handle
+    const listed = await client.call<RuntimeTerminalListResult>('terminal.list')
+    expect(listed.result.terminals.find((one) => one.handle === lead)?.worktreeId).toBe(worktreeId)
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
+
+    // Why no worktreeId: an older CLI omits it, so the host names the pane's own worktree.
+    await expect
+      .poll(
+        async () =>
+          (
+            await client.call<{ registered: boolean }>('game.leadRegister', {
+              terminalHandle: lead,
+              project: 'folder-lead-start',
+              label: 'Alfred'
+            })
+          ).result.registered
+      )
+      .toBe(true)
+    await expect.poll(() => sidebarOf(orcaPage)).toEqual({ open: true, tab: 'team' })
+  } finally {
+    rmSync(folder, { recursive: true, force: true })
+  }
+})

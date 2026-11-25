@@ -10,10 +10,12 @@ function dispatcherWith(
     storedLeadOf?: (caller: unknown) => Promise<unknown>
     reopen?: (args: unknown) => Promise<unknown>
   },
-  delivered: unknown[] = []
+  delivered: unknown[] = [],
+  started: unknown[][] = []
 ) {
   const runtime = {
     getRuntimeId: () => 'runtime',
+    noteGameLeadStarted: (...args: unknown[]) => started.push(args),
     getGameLeads: () => leads,
     getGameBoard: () => ({
       heldAnswers: {
@@ -188,6 +190,77 @@ describe('game leads RPC', () => {
     await expect(send('game.leads', undefined)).resolves.toMatchObject({
       ok: true,
       result: { leads }
+    })
+  })
+
+  describe('lead start opens the Team panel (ORCA-1414)', () => {
+    const leadsWith = (outcome: unknown, before: string[]) => ({
+      register: async () => outcome,
+      list: async () => ({ leads: before.map((handle) => ({ handle })) })
+    })
+    const caller = { worktreeId: 'wt-1', terminalHandle: 'term_b', project: 'p', label: 'L' }
+
+    it('announces a caller that just became the lead, with its worktree', async () => {
+      const started: unknown[][] = []
+      const send = dispatcherWith(leadsWith({ registered: true }, []), [], started)
+
+      await send('game.leadRegister', { ...caller, claim: true })
+
+      expect(started).toEqual([['term_b', 'wt-1']])
+    })
+
+    it('announces nothing when the caller already led the project', async () => {
+      const started: unknown[][] = []
+      const send = dispatcherWith(leadsWith({ registered: true }, ['term_b']), [], started)
+
+      await send('game.leadRegister', { ...caller, claim: true })
+
+      expect(started).toEqual([])
+    })
+
+    it('announces a fresh rotation in the same pane', async () => {
+      const started: unknown[][] = []
+      const send = dispatcherWith(leadsWith({ registered: true }, ['term_b']), [], started)
+
+      await send('game.leadRegister', { ...caller, claim: true, fresh: true })
+
+      expect(started).toEqual([['term_b', 'wt-1']])
+    })
+
+    it("announces a reopened conversation by its own pane, not the caller's worktree", async () => {
+      const started: unknown[][] = []
+      const resumed = { registered: false, resumed: { handle: 'term_c' } }
+      const send = dispatcherWith(leadsWith(resumed, []), [], started)
+
+      await send('game.leadRegister', { ...caller, claim: true })
+
+      expect(started).toEqual([['term_c', undefined]])
+    })
+
+    it.each([[{ registered: false, live: { handle: 'term_a' } }], [{ registered: false }]])(
+      'announces nothing when the caller did not start a lead: %j',
+      async (outcome) => {
+        const started: unknown[][] = []
+        const send = dispatcherWith(leadsWith(outcome, ['term_a']), [], started)
+
+        await send('game.leadRegister', { ...caller, claim: true, fresh: true })
+
+        expect(started).toEqual([])
+      }
+    )
+
+    it('announces the lead Reopen team brought back', async () => {
+      const started: unknown[][] = []
+      const resumed = { registered: false, resumed: { handle: 'term_c' } }
+      const send = dispatcherWith(
+        { ...leadsWith(null, []), reopen: async () => resumed },
+        [],
+        started
+      )
+
+      await send('game.leadReopen', { worktreeId: 'wt-1', project: 'p', label: 'L' })
+
+      expect(started).toEqual([['term_c']])
     })
   })
 })
