@@ -11,7 +11,12 @@ import {
   renderGameLaunchPrompt
 } from './orchestrator-game-lead'
 import type { GameWaitingMessage } from './orchestrator-game-inbox'
-import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orchestrator-game-state'
+import type {
+  GameAgent,
+  GameReviewMergeState,
+  GameStatusGroup,
+  OrchestratorGameState
+} from './orchestrator-game-state'
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { gameMemberModelTextOf } from './team-panel-agent-model'
 import { isFinishedMember } from './orchestrator-game-member-finished'
@@ -40,7 +45,10 @@ export type GameFleetRow = {
   state: GameAgent['state']
   /** `#41 open`, or null without a PR. */
   review: string | null
+  reviewUrl: string | null
   ci: string | null
+  /** GitHub's merge state: `unstable` or `clean` with red CI means only checks no rule requires failed. */
+  mergeState: GameReviewMergeState | null
   branch: string | null
   phase: GameMemberPhase
   next: string
@@ -124,7 +132,9 @@ export function gameFleetRowOf(
     ticketStatus: memberTicketStatusOf(agent, queued),
     state: agent.state,
     review: agent.review ? `#${agent.review.number} ${agent.review.state}` : null,
+    reviewUrl: agent.review?.url ?? null,
     ci: agent.review?.ci ?? null,
+    mergeState: agent.review?.mergeState ?? null,
     branch: agent.worktree?.branch ?? null,
     phase,
     next: leftover

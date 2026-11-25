@@ -1,9 +1,10 @@
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import type { WorkerTerminalListState } from './orchestration/worker-terminal-ownership'
-import type {
-  GameAnsweredQuestionMail,
-  GameInboxMail,
-  GameInboxSource
+import {
+  GAME_OWNER_HANDLE,
+  type GameAnsweredQuestionMail,
+  type GameInboxMail,
+  type GameInboxSource
 } from '../../shared/orchestrator-game-inbox'
 
 /** The orchestration database reads the game inbox needs; mail is never deleted when a member closes. */
@@ -77,7 +78,9 @@ export function gameInboxSourceOf(
     peerLeads,
     pendingQuestions,
     answeredQuestions,
-    releasedSenders: releasedSendersOf(db, workers)
+    releasedSenders: releasedSendersOf(db, workers),
+    // Why (ORCA-1431): a lead's reply to an owner answer goes to the owner, outside every address above.
+    ownerReplies: db.getAllMessagesForHandle(GAME_OWNER_HANDLE, MAIL_PER_ADDRESS)
   }
 }
 

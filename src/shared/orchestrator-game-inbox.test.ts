@@ -255,4 +255,33 @@ describe('gameInboxesOf: escalations and gates waiting on the lead', () => {
     expect(lead?.waiting.map((one) => one.id)).toEqual([live.id])
     expect(lead?.messages.map((one) => one.id)).toContain(escalation.id)
   })
+
+  // Why (ORCA-1431): an owner answer needs no reply; the lead acks its delivery once it recorded it.
+  it('settles an owner answer once its delivery is acked, while an acked member escalation still waits', () => {
+    sequence = 0
+    const owner = (read: number) =>
+      mail('term_lead', 'owner', { type: 'escalation', subject: 'Owner answered', read })
+    const member = mail('term_lead', 'term_1', { type: 'escalation', subject: 'Blocked', read: 1 })
+    const unread = owner(0)
+    const acked = owner(1)
+
+    const [lead] = gameInboxesOf(source([unread, acked, member]), {})
+
+    expect(lead?.waiting.map((one) => [one.id, one.from])).toEqual([
+      [member.id, 'CIN-1'],
+      [unread.id, 'owner']
+    ])
+  })
+
+  it("drops an owner answer once the lead's reply to the owner threads it", () => {
+    sequence = 0
+    const answer = mail('term_lead', 'owner', { type: 'escalation', subject: 'Owner answered' })
+    const reply = mail('owner', 'term_lead', { thread_id: answer.id })
+
+    const [before] = gameInboxesOf(source([answer]), {})
+    const [after] = gameInboxesOf({ ...source([answer]), ownerReplies: [reply] }, {})
+
+    expect(before?.waiting.map((one) => one.id)).toEqual([answer.id])
+    expect(after?.waiting).toEqual([])
+  })
 })

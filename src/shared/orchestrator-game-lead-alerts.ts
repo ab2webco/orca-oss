@@ -1,8 +1,10 @@
 import {
   gameFleetMembersOf,
   gameFleetReportOf,
+  mergeQueuedOf,
   ticketOfMember,
-  type GameFleetInput
+  type GameFleetInput,
+  type GameFleetRow
 } from './orchestrator-game-fleet-verbs'
 import { remoteNextOf } from './orchestrator-game-member-next'
 import type { GameQueueEntry } from './orchestrator-game-project-work'
@@ -59,8 +61,50 @@ function startFailedAlertsOf(state: GameLeadAlertInput): GameLeadAlert[] {
   })
 }
 
+// Why (ORCA-1431): GitHub reads these only once every required check passed; the rollup also counts optional ones.
+const REQUIRED_CHECKS_PASSED: ReadonlySet<string> = new Set(['clean', 'unstable'])
+
+/** The red-CI line, naming GitHub's merge state; null when a required check cannot be what is red. */
+function ciRedLineOf(row: GameFleetRow, queued: ReadonlySet<string>): string | null {
+  if (row.ci !== 'failure' || row.phase === 'finished') {
+    return null
+  }
+  // Why: the queue admits a PR only with its required checks green, and its own alerts cover the run.
+  if (
+    (row.reviewUrl && queued.has(row.reviewUrl)) ||
+    REQUIRED_CHECKS_PASSED.has(row.mergeState ?? '')
+  ) {
+    return null
+  }
+  return `CI red on ${row.review ?? 'no PR'}, merge state ${row.mergeState ?? 'unread'}: give it its next step now.`
+}
+
+// Why (ORCA-1431): a member's own review read misses a PR its branch does not head, or fails and reads as none.
+function hasPrNamingTicket(state: GameLeadAlertInput, ticket: string | null): boolean {
+  if (!ticket) {
+    return false
+  }
+  const named = new RegExp(`(?:^|[^A-Z0-9])${ticket.replace(/[^A-Z0-9_-]/gi, '')}(?![A-Z0-9])`, 'i')
+  const queued = state.project?.queue?.entries ?? []
+  const open = state.project?.reviews?.items ?? []
+  return [...queued, ...open].some((one) => named.test(one.title))
+}
+
+/** What the idle-with-no-PR line read, so the lead can tell a missing PR from a missed one. */
+function noPrEvidenceOf(state: GameLeadAlertInput, row: GameFleetRow): string {
+  const branch = row.branch ? `none for ${row.branch}` : 'no branch read'
+  const lists = [
+    state.project?.reviews ? 'open PRs' : null,
+    state.project?.queue?.entries ? 'merge queue' : null
+  ].filter((one) => one !== null)
+  const named =
+    row.ticket && lists.length > 0 ? `, none naming ${row.ticket} in ${lists.join(' or ')}` : ''
+  return `${branch}${named}`
+}
+
 function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, now: number) {
   const fleet = gameFleetReportOf(state, now)
+  const queued = mergeQueuedOf(state)
   const alerts: GameLeadAlert[] = []
   const add = (who: string, kind: string, line: string): void => {
     alerts.push({ key: `${kind}:${who}`, line: `${who} ${line}` })
@@ -85,11 +129,16 @@ function memberAlertsOf(state: GameLeadAlertInput, memory: GameLeadAlertMemory, 
     } else if (!row.stateKnown && row.phase === 'unknown') {
       // Why: these rows left idle, whose alert was the only one that named the silent host (ORCA-1395).
       add(who, 'silent-host', row.next)
-    } else if (row.phase === 'idle' && row.review === null) {
-      add(who, 'idle-no-pr', `idle with no PR: ${row.next}`)
+    } else if (
+      row.phase === 'idle' &&
+      row.review === null &&
+      !hasPrNamingTicket(state, row.ticket)
+    ) {
+      add(who, 'idle-no-pr', `idle with no PR (${noPrEvidenceOf(state, row)}): ${row.next}`)
     }
-    if (row.ci === 'failure' && row.phase !== 'finished') {
-      add(who, `ci-red:${review}`, `CI red on ${review}: give it its next step now.`)
+    const ciRed = ciRedLineOf(row, queued)
+    if (ciRed) {
+      add(who, `ci-red:${review}`, ciRed)
     }
   }
   for (const one of fleet.paused) {
