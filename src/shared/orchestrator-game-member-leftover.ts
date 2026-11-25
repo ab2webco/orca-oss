@@ -23,3 +23,9 @@ export function leftoverNextOf(
     : `orca terminal list ${env}`
   return `leftover on ${remote.host} (idle, no lead): ${adopt}, else close its tab there (${list}, then orca terminal close ${env} --terminal <handle> --tab)`
 }
+
+/** ` · 2 leftover, no slot held` for the fleet head; nothing when there are none. */
+export const leftoverCountOf = (rows: readonly { leftover: boolean }[]): string => {
+  const count = rows.filter((row) => row.leftover).length
+  return count > 0 ? ` · ${count} leftover, no slot held` : ''
+}

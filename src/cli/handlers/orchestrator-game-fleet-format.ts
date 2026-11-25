@@ -1,6 +1,7 @@
 import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch-result'
 import { GAME_GLOBAL_LOGIN_LABEL } from './orchestrator-game-launch-account'
 import { formatStop, type GameStopResult } from './orchestrator-game-stop'
+import { leftoverCountOf } from '../../shared/orchestrator-game-member-leftover'
 import type { GameHold } from './orchestrator-game-hold'
 import { formatSetupQueue } from './orchestrator-game-setup-queue'
 import {
@@ -192,11 +193,6 @@ function phaseCellOf(row: GameFleetRow, now: number): string {
 export type GameFleetWithBudget = GameFleet & {
   githubBudget?: GameGitHubBudget
   hostCapacity?: GameHostCapacity[]
-}
-
-const leftoverCountOf = (rows: readonly GameFleetRow[]): string => {
-  const count = rows.filter((row) => row.leftover).length
-  return count > 0 ? ` · ${count} leftover, no slot held` : ''
 }
 
 export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()): string {
