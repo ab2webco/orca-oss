@@ -6,6 +6,7 @@ import type { OrchestratorGameState } from '../../../../shared/orchestrator-game
 import type { TeamPanelGameModel } from '../../../../shared/team-panel-model-types'
 import type { TeamLeadCaller, TeamLeadRoster } from './team-panel-lead-read'
 import type { TeamPanelModelSource } from './use-team-panel-model'
+import type { TeamPanelNoTeamNotes } from './team-panel-no-team-breadcrumb'
 
 /** One project on one host; `key` changes whenever either does. */
 export type TeamPanelScope = {
@@ -42,6 +43,8 @@ export type TeamPanelPollDeps = {
   publish: (source: TeamPanelModelSource, scope: TeamPanelScope) => void
   /** Notes a failure streak's start, its turn to sustained, and its end. */
   record?: (name: string, data: CrashReportBreadcrumbData) => void
+  /** Notes why a read found no team while the host lists a lead. */
+  noTeam?: TeamPanelNoTeamNotes
 }
 
 /**
@@ -136,8 +139,9 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
     const retry = (): void => void refresh()
     let stage: ReadStage = 'game.leads'
     try {
-      const found = deps.findCaller(await deps.readLeads(scope.target), scope)
-      if (found === 'restoring') {
+      const roster = await deps.readLeads(scope.target)
+      const caller = deps.findCaller(roster, scope)
+      if (caller === 'restoring') {
         if (current()) {
           endStreak(scope, false)
           publishOpening(scope)
@@ -148,7 +152,6 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         }
         return
       }
-      const caller = found
       // Why only while opening: a later poll would swap an error or the no-team view for it (review N4).
       if (caller && run.opening && !lastTeams.has(scope.key) && current()) {
         deps.publish({ section: { kind: 'loading', team: true }, retry: null }, scope)
@@ -186,9 +189,11 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         return
       }
       if (!model) {
+        deps.noTeam?.read(scope.key, { roster, caller, state })
         publishNoTeam(scope)
         return
       }
+      deps.noTeam?.clear(scope.key)
       lastTeams.set(scope.key, model)
       endStreak(scope, true)
       // Why: a panel opening draws the sidebar's read before re-reading, so it is the last team, not news.
@@ -201,13 +206,11 @@ export function createTeamPanelModelPoller(deps: TeamPanelPollDeps, intervalMs: 
         scope
       )
     } catch (error) {
-      // Why: a failed game.leads read shows its error too, which a later skeleton must not replace.
-      if (current()) {
-        run.opening = false
-      }
       if (!current()) {
         return
       }
+      // Why: a failed game.leads read shows its error too, which a later skeleton must not replace.
+      run.opening = false
       // Why: a host older than the game has nothing to read, which is no team and not a failure.
       if (hasRuntimeRpcErrorCode(error, 'method_not_found')) {
         publishNoTeam(scope)

@@ -26,6 +26,8 @@ export type GameLeadsDeps = {
     write: (records: GameLeadRecord[]) => Promise<void>
   }
   paneOf?: (handle: string) => string | null
+  /** The worktree a pane runs in; names a restored lead's, which no caller registered (ORCA-1402). */
+  worktreeOfPane?: (paneKey: string) => string | null
   /** The handle of a pane whose terminal is connected now; null until the pane is back. */
   handleOfPane?: (paneKey: string) => string | null
   /** `starting` is anything that is neither Claude nor a shell, and an unreadable pane. */

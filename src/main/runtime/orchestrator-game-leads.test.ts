@@ -579,11 +579,22 @@ describe('GameLeads after a restart', () => {
       roster: new GameLeadRoster(() => dir),
       handleOfPane: (paneKey) => (paneKey === PANE ? 'term_new' : null),
       paneOf: (handle) => (handle === 'term_new' ? PANE : null),
+      // Why (ORCA-1402): the panel places a lead with no tab for its pane by this worktree.
+      worktreeOfPane: (paneKey) => (paneKey === PANE ? 'wt1' : null),
       paneState: async () => 'running'
     })
 
     await expect(game.list()).resolves.toEqual({
-      leads: [{ project: 'cineco', label: 'Ana', handle: 'term_new', since: AT, paneKey: PANE }]
+      leads: [
+        {
+          project: 'cineco',
+          label: 'Ana',
+          handle: 'term_new',
+          since: AT,
+          paneKey: PANE,
+          worktreeId: 'wt1'
+        }
+      ]
     })
   })
 

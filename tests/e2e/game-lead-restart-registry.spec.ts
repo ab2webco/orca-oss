@@ -125,7 +125,8 @@ test('lists a registered game lead again after Orca restarts', async ({
           label: 'Ana',
           handle: expect.any(String),
           since: before[0].since,
-          paneKey
+          paneKey,
+          worktreeId
         }
       ])
     const restored = (await secondClient.call<Leads>('game.leads')).result.leads[0].handle

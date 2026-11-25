@@ -99,11 +99,13 @@ describe("a lead's game state lists this machine's sessions it did not launch (O
         agent.found ?? false
       ])
     ).toEqual([
+      // Why (ORCA-1402): the lead's own row, though no worktree was named, so its team is drawn.
+      ['tab-1:lead', null, 'claude', 'term_lead', false],
       ['tab-4:member', null, 'claude', 'term_member', false],
       ['tab-2:plain', 'orca-914', 'claude', 'term_plain', true],
       ['tab-3:codex', 'x', 'codex', 'term_codex', true]
     ])
-    expect(lead.agents[1]?.worktree).toEqual({
+    expect(lead.agents[2]?.worktree).toEqual({
       id: 'wt-914',
       branch: 'fabolivark/orca-914',
       displayName: 'orca-914'

@@ -16,8 +16,11 @@ const TEAM_RPC_TIMEOUT_MS = 15_000
 /** The lead mod's own caller identity; game.state lists members only for the lead's pane. */
 export type TeamLeadCaller = { worktreeId: string; terminalHandle: string; paneKey: string }
 
-/** `paneKey` is absent from a host older than ORCA-1130, and on a pane the host has not placed. */
-export type TeamLeadListing = { handle: string; paneKey?: string }
+/**
+ * `paneKey` is absent from a host older than ORCA-1130, and on a pane the host has not placed.
+ * `worktreeId` is where the lead registered; absent from an older CLI's registration.
+ */
+export type TeamLeadListing = { handle: string; paneKey?: string; worktreeId?: string }
 
 /** `game.leads`: live leads, and the panes of leads a restarted host is still bringing back. */
 export type TeamLeadRoster = { leads: TeamLeadListing[]; restoring: string[] }
@@ -55,8 +58,25 @@ export function findTeamLeadCaller(args: {
       return { worktreeId, terminalHandle: entry.terminalHandle, paneKey: entry.paneKey }
     }
   }
+  // Why last: the lead's pane can be live on the host with no tab here to place it (ORCA-1402).
+  for (const lead of args.leads) {
+    if (lead.paneKey && lead.worktreeId && args.repoWorktreeIds.has(lead.worktreeId)) {
+      return { worktreeId: lead.worktreeId, terminalHandle: lead.handle, paneKey: lead.paneKey }
+    }
+  }
   return args.restoring?.some((paneKey) => worktreeOf(paneKey)) ? 'restoring' : null
 }
+
+/** Listed leads this window cannot place: no pane listed, or neither a tab here nor a registered worktree. */
+export const unplacedLeadCountOf = (
+  leads: readonly TeamLeadListing[],
+  worktreeIdOfTab: (tabId: string) => string | null
+): number =>
+  leads.filter((lead) => {
+    const tabId = lead.paneKey ? parsePaneKey(lead.paneKey)?.tabId : null
+    // Why: findTeamLeadCaller's last fallback places a paned lead by the worktree it registered from.
+    return !tabId || (worktreeIdOfTab(tabId) === null && !lead.worktreeId)
+  }).length
 
 const stringOf = (value: unknown, key: string): string | null => {
   const field = (value as Record<string, unknown>)[key]
@@ -79,7 +99,10 @@ export async function readTeamLeadRoster(target: RuntimeClientTarget): Promise<T
     leads: objects(result.leads).flatMap((one) => {
       const handle = stringOf(one, 'handle')
       const paneKey = stringOf(one, 'paneKey')
-      return handle ? [{ handle, ...(paneKey ? { paneKey } : {}) }] : []
+      const worktreeId = stringOf(one, 'worktreeId')
+      return handle
+        ? [{ handle, ...(paneKey ? { paneKey } : {}), ...(worktreeId ? { worktreeId } : {}) }]
+        : []
     }),
     restoring: objects(result.restoring).flatMap((one) => stringOf(one, 'paneKey') ?? [])
   }

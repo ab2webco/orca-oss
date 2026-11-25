@@ -1,4 +1,4 @@
-import type { GameLeadListing } from './orchestrator-game-lead-types'
+import type { GameLeadListing, GameLeadsDeps } from './orchestrator-game-lead-types'
 
 /** A project's lead as `orca game lead` registered it on this Orca host. */
 export type GameLeadEntry = {
@@ -11,15 +11,25 @@ export type GameLeadEntry = {
   worktreeId?: string
 }
 
-/** How `orca game leads` lists a live lead; `paneKey` is the pane it answers to now. */
-export const gameLeadListingOf = (one: GameLeadEntry, paneKey: string | null): GameLeadListing => ({
-  project: one.project,
-  label: one.label,
-  handle: one.handle,
-  since: one.at,
-  ...(paneKey ? { paneKey } : {}),
-  ...(one.worktreeId ? { worktreeId: one.worktreeId } : {})
-})
+/**
+ * How `orca game leads` lists a live lead; `paneKey` is the pane it answers to now. Why the pane's
+ * worktree: a restored lead was registered by no caller, and the panel places it by this (ORCA-1402).
+ */
+export function gameLeadListingOf(
+  one: GameLeadEntry,
+  panes: Pick<GameLeadsDeps, 'paneOf' | 'worktreeOfPane'>
+): GameLeadListing {
+  const paneKey = panes.paneOf?.(one.handle) ?? null
+  const worktreeId = one.worktreeId ?? (paneKey ? panes.worktreeOfPane?.(paneKey) : null)
+  return {
+    project: one.project,
+    label: one.label,
+    handle: one.handle,
+    since: one.at,
+    ...(paneKey ? { paneKey } : {}),
+    ...(worktreeId ? { worktreeId } : {})
+  }
+}
 
 /**
  * The leads on this host. Why registered, not derived: the host cannot tell a lead from any other
