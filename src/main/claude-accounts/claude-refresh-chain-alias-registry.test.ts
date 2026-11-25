@@ -207,6 +207,85 @@ describe('Claude refresh-chain alias registry', () => {
     })
   })
 
+  it('does not report Token accounts whose stored logins share one chain (ORCA-1430)', async () => {
+    const rootPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(rootPath)
+    const tokenAccounts = [
+      { ...account('token-a', 'first@example.com'), longLivedTokenSetAt: 1 },
+      { ...account('token-b', 'second@example.com'), longLivedTokenSetAt: 2 },
+      { ...account('token-c', 'third@example.com'), tokenOnly: true, longLivedTokenSetAt: 3 }
+    ]
+    const dependencies = {
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: tokenAccounts,
+      readManagedCredentials: async () => credentials('fixture-chain')
+    }
+
+    const report = await reportManagedClaudeRefreshChainAliases(dependencies)
+    const rotation = await inspectManagedClaudeRefreshChainAliases(
+      'token-a',
+      fingerprint('fixture-chain'),
+      dependencies
+    )
+
+    expect(report).toEqual({ status: 'available', conflictSets: [] })
+    // Rotation for a Token account still runs; it is not paused as an alias.
+    expect(rotation).toEqual({ status: 'unique' })
+  })
+
+  it('still reports two OAuth accounts sharing a chain beside Token accounts on it', async () => {
+    const rootPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(rootPath)
+    const dependencies = {
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: [
+        account('oauth-a', 'first@example.com'),
+        account('oauth-b', 'second@example.com'),
+        { ...account('token-c', 'third@example.com'), longLivedTokenSetAt: 3 }
+      ],
+      readManagedCredentials: async () => credentials('shared-grant')
+    }
+
+    const report = await reportManagedClaudeRefreshChainAliases(dependencies)
+
+    expect(report.conflictSets).toHaveLength(1)
+    expect(report.conflictSets[0].accounts.map((entry) => entry.accountId)).toEqual([
+      'oauth-a',
+      'oauth-b'
+    ])
+    await expect(
+      inspectManagedClaudeRefreshChainAliases('oauth-a', fingerprint('shared-grant'), dependencies)
+    ).resolves.toEqual({ status: 'alias-conflict', accountIds: ['oauth-a', 'oauth-b'] })
+  })
+
+  it('clears a conflict recorded before the accounts gained a token, with no re-authentication', async () => {
+    const rootPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
+    roots.push(rootPath)
+    const before = [
+      account('account-a', 'first@example.com'),
+      account('account-b', 'second@example.com')
+    ]
+    const readManagedCredentials = async () => credentials('fixture-chain')
+    const recorded = await reportManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: before,
+      readManagedCredentials
+    })
+    expect(recorded.conflictSets).toHaveLength(1)
+
+    const report = await reportManagedClaudeRefreshChainAliases({
+      rootPath,
+      profilePath: '/profiles/orca',
+      accounts: before.map((entry) => ({ ...entry, longLivedTokenSetAt: 1 })),
+      readManagedCredentials
+    })
+
+    expect(report).toEqual({ status: 'available', conflictSets: [] })
+  })
+
   it('does not report same-email accounts backed by different chains', async () => {
     const rootPath = mkdtempSync(join(tmpdir(), 'orca-claude-aliases-'))
     roots.push(rootPath)
