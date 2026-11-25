@@ -15,6 +15,7 @@ import type { GameAgent, GameStatusGroup, OrchestratorGameState } from './orches
 import { ticketInText } from './orchestrator-game-ticket-id'
 import { gameMemberModelTextOf } from './team-panel-agent-model'
 import { isFinishedMember } from './orchestrator-game-member-finished'
+import { isLeftoverMember, leftoverNextOf } from './orchestrator-game-member-leftover'
 import type { GamePausedMember } from './orchestrator-game-member-sessions'
 import type { GameQueuedMember } from './orchestrator-game-queued-members'
 import {
@@ -71,6 +72,8 @@ export type GameFleetRow = {
   earlierLead: boolean
   /** No `game launch` started it: only verbs that name it act on it (ORCA-914). */
   found: boolean
+  /** Found, its agent neither working nor waiting: it loads no host; adopt or close it (ORCA-1424). */
+  leftover: boolean
 }
 
 const ORPHANED_NEXT = 'orphaned, still working: adopt its work or stop it'
@@ -113,8 +116,10 @@ export function gameFleetRowOf(
   now = Date.now()
 ): GameFleetRow {
   const phase = memberPhaseOf(agent, now)
+  const leftover = isLeftoverMember(agent)
+  const name = agent.displayName ?? agent.paneKey
   return {
-    name: agent.displayName ?? agent.paneKey,
+    name,
     ticket: ticketOfMember(agent),
     ticketStatus: memberTicketStatusOf(agent, queued),
     state: agent.state,
@@ -122,9 +127,10 @@ export function gameFleetRowOf(
     ci: agent.review?.ci ?? null,
     branch: agent.worktree?.branch ?? null,
     phase,
-    next:
-      remoteNextOf(agent, ticketOfMember(agent)) ??
-      nextWithQuestionOf(agent, phase, question, queued),
+    next: leftover
+      ? leftoverNextOf(agent, ticketOfMember(agent) ?? name)
+      : (remoteNextOf(agent, ticketOfMember(agent)) ??
+        nextWithQuestionOf(agent, phase, question, queued)),
     terminalHandle: agent.terminalHandle ?? null,
     agent: agent.agentType,
     account: agent.account?.email ?? null,
@@ -141,7 +147,8 @@ export function gameFleetRowOf(
     host: agent.remote?.host ?? null,
     stateKnown: agent.remote?.stateKnown !== false,
     earlierLead: agent.remote?.earlierLead === true,
-    found: agent.found === true
+    found: agent.found === true,
+    leftover
   }
 }
 
@@ -200,7 +207,7 @@ export function gameFleetReportOf(state: GameFleetInput, now = Date.now()): Game
   )
   const running = rows.length - counts.finished - slotless.length + holding.length + queued.length
   const others = state.otherProjectMembers ?? []
-  // Why every member here: a found session still loads the machine it runs on.
+  // Why every member here: a found session with a live agent still loads its machine (ORCA-1424).
   const hosts =
     state.hosts &&
     gameFleetHostLoadsOf(

@@ -194,6 +194,11 @@ export type GameFleetWithBudget = GameFleet & {
   hostCapacity?: GameHostCapacity[]
 }
 
+const leftoverCountOf = (rows: readonly GameFleetRow[]): string => {
+  const count = rows.filter((row) => row.leftover).length
+  return count > 0 ? ` · ${count} leftover, no slot held` : ''
+}
+
 export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()): string {
   const { counts } = fleet
   // Why only when present: most fleets have none, and the head keeps the shape scripts read.
@@ -201,7 +206,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     .filter((phase) => counts[phase] > 0)
     .map((phase) => `, ${phase} ${counts[phase]}`)
     .join('')
-  const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}${unproven}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free`
+  const head = `Members: ${fleet.rows.length} (needs you ${counts['needs-you']}, limited ${counts.limited}${unproven}, working ${counts.working}, idle ${counts.idle}, finished ${counts.finished}) · ${fleet.running}/${fleet.cap} running, ${fleet.free} free${leftoverCountOf(fleet.rows)}`
   const hosts = fleet.hostCapacity
     ? formatGameHostCapacity(fleet.hostCapacity)
     : fleet.hosts
@@ -227,7 +232,7 @@ export function formatFleet(fleet: GameFleetWithBudget, now: number = Date.now()
     row.account ?? (row.globalLogin ? GAME_GLOBAL_LOGIN_LABEL : '-'),
     row.model ?? '-',
     row.next,
-    row.found ? `${row.name} (found)` : row.name
+    row.found ? `${row.name} (${row.leftover ? 'leftover' : 'found'})` : row.name
   ])
   const header = [
     'PHASE',

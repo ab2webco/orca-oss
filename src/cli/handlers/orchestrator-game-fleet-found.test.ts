@@ -47,7 +47,7 @@ describe('orca game fleet verbs on found sessions (ORCA-914)', () => {
     expect(row).toContain('codex')
     expect(row).toContain('game stop ORCA-914')
     expect(row).not.toContain('sweep')
-    expect(row).toMatch(/orca-914 \(found\)$/)
+    expect(row).toMatch(/orca-914 \(leftover\)$/)
   })
 
   it('sweep --close and stop --all leave a found session running', async () => {
