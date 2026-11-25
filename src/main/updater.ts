@@ -1,8 +1,11 @@
 /* eslint-disable max-lines */
 import { app, BrowserWindow, powerMonitor } from 'electron'
 import { is } from '@electron-toolkit/utils'
+import { relaunchApp } from './app-relaunch'
+import { buildLinuxPackageInstallCommand } from './linux-package-install-command'
 import type {
   LinuxPackageInstallInstructions,
+  LinuxPackageInstallPreview,
   LinuxPackageInstallRecovery,
   UpdateCheckOptions,
   UpdateSource,
@@ -40,7 +43,9 @@ import {
   createUpdaterDiagnosticLogger,
   endLinuxPackageInstallDiagnosticCapture,
   getLinuxPackageInstallDiagnostic,
+  isPrivilegeEscalationBlocked,
   parseLinuxPackageInstallExitCode,
+  resolveLinuxPackageInstallFailureReason,
   redactLinuxPackageInstallText,
   type LinuxPackageInstallDiagnostic
 } from './linux-package-install-diagnostic'
@@ -838,6 +843,9 @@ async function performQuitAndInstall(): Promise<void> {
       if (getLinuxRootPackageType() !== null) {
         updateInstallCommitted = true
         armUpdateInstallExitWatchdog()
+        if (updateInstallMode === 'interactive') {
+          relaunchApp('update-install')
+        }
       }
 
       killAllPty()
@@ -971,10 +979,18 @@ function buildLinuxPackageInstallFailureStatus(error: unknown): UpdateStatus | n
     return null
   }
   const diagnostic = getLinuxPackageInstallDiagnostic() ?? lastInstallAttemptDiagnostic
-  // Why: the reason was classified from the original output, before redaction could rewrite a match.
-  const reason = diagnostic?.reason ?? 'package-install-failed'
-  // Durable data carries classification only — never the package path, home path, command, or stderr.
   const exitCode = parseLinuxPackageInstallExitCode(error)
+  // Why: the output reason was classified before redaction could rewrite a match.
+  // 126/127 carry pkexec's meaning only when pkexec ran, not gksudo, kdesudo, beesu or sudo.
+  const pkexecExitCode = /\bpkexec\b/.test(String((error as Error)?.message ?? error))
+    ? exitCode
+    : null
+  const reason = resolveLinuxPackageInstallFailureReason(
+    diagnostic?.reason ?? null,
+    pkexecExitCode,
+    isPrivilegeEscalationBlocked()
+  )
+  // Durable data carries classification only — never the package path, home path, command, or stderr.
   recordUpdaterLifecycle(
     'linux_package_install_failed',
     {
@@ -1994,6 +2010,21 @@ function reportLinuxPackageRevalidationFailure({
   })
 }
 
+export function getLinuxPackageInstallPreview(): LinuxPackageInstallPreview {
+  const recovery = getActiveLinuxPackageRecovery()
+  const artifact = getTrackedLinuxPackageArtifact()
+  if (
+    !recovery ||
+    !artifact ||
+    artifact.version !== recovery.version ||
+    artifact.packageType !== recovery.packageType
+  ) {
+    return { ok: false }
+  }
+  const built = buildLinuxPackageInstallCommand(artifact.packageType, artifact.path)
+  return built.ok ? { ok: true, command: built.command, packagePath: artifact.path } : { ok: false }
+}
+
 export async function getLinuxPackageInstallInstructions(): Promise<LinuxPackageInstallInstructions> {
   const recovery = getActiveLinuxPackageRecovery()
   if (!recovery) {
@@ -2227,7 +2258,9 @@ export function setupAutoUpdater(
   autoUpdater.autoInstallOnAppQuit =
     updateInstallMode === 'interactive' && getLinuxRootPackageType() === null
   // Why: MacUpdater ignores quitAndInstall arguments; the surviving CLI supervisor must be the only serve relaunch owner.
-  autoUpdater.autoRunAppAfterInstall = updateInstallMode === 'interactive'
+  // Root Linux packages relaunch through relaunchApp: electron-updater's app.relaunch() sets no_new_privs.
+  autoUpdater.autoRunAppAfterInstall =
+    updateInstallMode === 'interactive' && getLinuxRootPackageType() === null
 
   // Why: our only on-machine window into electron-updater; otherwise an unexpected update-not-available or failed fetch is invisible.
   // The adapter also retains the redacted child stderr that BaseUpdater logs but drops from the 'error' event.

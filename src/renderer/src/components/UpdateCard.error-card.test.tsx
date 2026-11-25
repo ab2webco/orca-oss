@@ -77,6 +77,7 @@ beforeEach(() => {
         dismissAvailableUpdate: vi.fn().mockResolvedValue(undefined),
         download,
         getLinuxPackageInstallInstructions: getInstructions,
+        getLinuxPackageInstallPreview: vi.fn().mockResolvedValue({ ok: false }),
         showLinuxPackage,
         quitAndInstall
       }

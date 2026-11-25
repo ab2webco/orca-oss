@@ -3413,6 +3413,8 @@ const api = {
     dismissAvailableUpdate: () => ipcRenderer.invoke('updater:dismissAvailableUpdate'),
     getLinuxPackageInstallInstructions: () =>
       ipcRenderer.invoke('updater:getLinuxPackageInstallInstructions'),
+    getLinuxPackageInstallPreview: () =>
+      ipcRenderer.invoke('updater:getLinuxPackageInstallPreview'),
     showLinuxPackage: () => ipcRenderer.invoke('updater:showLinuxPackage'),
     listBuilds: (channel) => ipcRenderer.invoke('updater:listBuilds', channel),
     quitAndInstall: (): Promise<void> =>

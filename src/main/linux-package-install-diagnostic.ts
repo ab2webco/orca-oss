@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import os from 'node:os'
 import type { LinuxPackageInstallFailureReason } from '../shared/update-status-types'
 
@@ -23,6 +24,8 @@ const CONTROL_CHARACTERS = new RegExp(String.raw`[\u0000-\u001f\u007f]`, 'g')
 
 // Why: pkexec/polkit print these before any package manager runs; matching them keeps the UI from
 // blaming dpkg for an authentication problem. Anything else stays generic on purpose.
+// pkexec prints this whenever it is not running as root: no_new_privs, a nosuid mount, a container.
+const ESCALATION_BLOCKED_PATTERNS = [/must be setuid root/i]
 const AGENT_UNAVAILABLE_PATTERNS = [
   /no authentication agent/i,
   /polkit.{0,20}agent.{0,20}not found/i
@@ -187,6 +190,9 @@ export function classifyLinuxPackageInstallFailure(
   if (!diagnostic) {
     return 'package-install-failed'
   }
+  if (ESCALATION_BLOCKED_PATTERNS.some((pattern) => pattern.test(diagnostic))) {
+    return 'privilege-escalation-blocked'
+  }
   if (AGENT_UNAVAILABLE_PATTERNS.some((pattern) => pattern.test(diagnostic))) {
     return 'authentication-agent-unavailable'
   }
@@ -195,6 +201,39 @@ export function classifyLinuxPackageInstallFailure(
   }
   // Localized or unrecognized output must never be reported as a missing agent.
   return 'package-install-failed'
+}
+
+/** True when this non-root process carries no_new_privs, under which setuid pkexec never elevates. */
+export function isPrivilegeEscalationBlocked(): boolean {
+  if (process.getuid?.() === 0) {
+    return false
+  }
+  try {
+    return /^NoNewPrivs:\s*1$/m.test(fs.readFileSync('/proc/self/status', 'utf8'))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The cause the evidence proves. Output wins when it matched a pattern; otherwise pkexec's exit
+ * status, which holds in every locale and when nothing was printed: 126 dismissed, 127 not authorized.
+ */
+export function resolveLinuxPackageInstallFailureReason(
+  outputReason: LinuxPackageInstallFailureReason | null,
+  exitCode: number | null,
+  escalationBlocked: boolean
+): LinuxPackageInstallFailureReason {
+  if (escalationBlocked) {
+    return 'no-new-privs'
+  }
+  if (outputReason && outputReason !== 'package-install-failed') {
+    return outputReason
+  }
+  if (exitCode === 126) {
+    return 'authentication-denied'
+  }
+  return exitCode === 127 ? 'authorization-not-obtained' : 'package-install-failed'
 }
 
 /** Parses the child exit status out of electron-updater's `Command <x> exited with code <n>`. */

@@ -9,6 +9,8 @@ const RELEASE_URL = 'https://github.com/stablyai/orca/releases/tag/v1.4.200'
 const DIAGNOSTIC = 'pkexec: no polkit authentication agent found'
 const INSTALL_COMMAND = 'sudo apt-get install -y /tmp/orca-updates/orca_1.4.200_amd64.deb'
 const PACKAGE_FILE_NAME = 'orca_1.4.200_amd64.deb'
+const PACKAGE_PATH = `/home/u/.cache/orca-updater/pending/${PACKAGE_FILE_NAME}`
+const PREVIEW = { ok: true as const, command: INSTALL_COMMAND, packagePath: PACKAGE_PATH }
 const SUMMARY =
   'Orca Lab downloaded the update but could not install the system package automatically.'
 const COPIED_NOTE =
@@ -26,6 +28,7 @@ const NO_PACKAGE_MANAGER = {
 }
 
 const getInstructions = vi.fn()
+const getPreview = vi.fn()
 const showLinuxPackage = vi.fn()
 const quitAndInstall = vi.fn()
 const writeClipboardText = vi.fn()
@@ -33,6 +36,7 @@ const openUrl = vi.fn()
 const onClose = vi.fn()
 const allMocks = [
   getInstructions,
+  getPreview,
   showLinuxPackage,
   quitAndInstall,
   writeClipboardText,
@@ -120,6 +124,7 @@ function footnoteText(): string | null {
 beforeEach(() => {
   allMocks.forEach((mock) => mock.mockReset())
   getInstructions.mockResolvedValue(INSTRUCTIONS)
+  getPreview.mockResolvedValue(PREVIEW)
   showLinuxPackage.mockResolvedValue(undefined)
   quitAndInstall.mockResolvedValue(undefined)
   writeClipboardText.mockResolvedValue(undefined)
@@ -130,6 +135,7 @@ beforeEach(() => {
       ui: { writeClipboardText },
       updater: {
         getLinuxPackageInstallInstructions: getInstructions,
+        getLinuxPackageInstallPreview: getPreview,
         showLinuxPackage,
         quitAndInstall
       }
@@ -414,21 +420,20 @@ describe('LinuxPackageInstallRecoveryCard hashing state', () => {
 })
 
 describe('LinuxPackageInstallRecoveryCard details', () => {
-  it('adds the neutral no-agent note for authentication-agent-unavailable', () => {
+  it('keeps the raw diagnostic collapsed behind the disclosure', () => {
     renderCard({ recovery: makeRecovery({ reason: 'authentication-agent-unavailable' }) })
 
-    expect(screen.queryByText(/No usable authentication agent/)).toBeNull()
+    expect(screen.queryByText(new RegExp(DIAGNOSTIC))).toBeNull()
 
     const disclosure = button('Show details')
     expect(disclosure.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(disclosure)
 
-    const detail = screen.getByText(/No usable authentication agent answered/)
-    expect(detail.textContent).toContain(DIAGNOSTIC)
+    expect(screen.getByText(new RegExp(DIAGNOSTIC))).toBeTruthy()
     expect(button('Hide details').getAttribute('aria-expanded')).toBe('true')
 
     fireEvent.click(button('Hide details'))
-    expect(screen.queryByText(/No usable authentication agent/)).toBeNull()
+    expect(screen.queryByText(new RegExp(DIAGNOSTIC))).toBeNull()
     expect(button('Show details').getAttribute('aria-expanded')).toBe('false')
   })
 
@@ -448,7 +453,7 @@ describe('LinuxPackageInstallRecoveryCard details', () => {
     )
   })
 
-  it('omits the no-agent note for other failure reasons', () => {
+  it('omits the no-agent cause for other failure reasons', () => {
     renderCard({ recovery: makeRecovery({ reason: 'authentication-denied' }) })
 
     fireEvent.click(button('Show details'))
@@ -468,6 +473,101 @@ describe('LinuxPackageInstallRecoveryCard details', () => {
     expect(detail?.className).toContain('overflow-auto')
     expect(detail?.className).toContain('break-words')
     expect(detail?.textContent).toContain('diagnostic-overflow')
+  })
+})
+
+describe('LinuxPackageInstallRecoveryCard cause and manual command', () => {
+  const CAUSES = {
+    'authentication-agent-unavailable': /No usable authentication agent answered/,
+    'authentication-denied': /password prompt was dismissed or authentication failed/,
+    'authorization-not-obtained': /did not grant administrator authorization/,
+    'privilege-escalation-blocked': /pkexec reported that it is not running as root/,
+    'no-new-privs': /runs with no_new_privs set, so pkexec cannot run as root/
+  } as const
+
+  // Main's verdict for pkexec exit 127 with no polkit output, English output and localized output.
+  it.each([
+    ['no polkit output', 'authorization-not-obtained', ''],
+    [
+      'English polkit output',
+      'authentication-agent-unavailable',
+      'Error executing command as another user: No authentication agent found.'
+    ],
+    [
+      'localized polkit output',
+      'authorization-not-obtained',
+      'Error al ejecutar la orden como otro usuario: no se encontró ningún agente de autenticación.'
+    ]
+  ] as const)(
+    'after pkexec exit 127 with %s, names the cause and shows the package and command',
+    async (_label, reason, diagnostic) => {
+      renderCard({ recovery: makeRecovery({ reason }), diagnostic })
+      await flushActions()
+
+      // Visible without expanding details: never only the raw stack.
+      expect(screen.getByText(CAUSES[reason])).toBeTruthy()
+      expect(screen.getByText(PACKAGE_PATH)).toBeTruthy()
+      expect(screen.getByText(INSTALL_COMMAND)).toBeTruthy()
+      expect(button('Copy Install Command')).toBeTruthy()
+      expect(getInstructions).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each(['authentication-denied', 'privilege-escalation-blocked', 'no-new-privs'] as const)(
+    'names the %s cause',
+    (reason) => {
+      renderCard({ recovery: makeRecovery({ reason }) })
+      expect(screen.getByText(CAUSES[reason])).toBeTruthy()
+    }
+  )
+
+  it('names no cause it cannot prove', () => {
+    renderCard()
+    for (const cause of Object.values(CAUSES)) {
+      expect(screen.queryByText(cause)).toBeNull()
+    }
+  })
+
+  // Why: nosuid mounts and containers print the same text, so only NoNewPrivs names the restart.
+  it('names the automatic restart only when this process carries no_new_privs', () => {
+    renderCard({ recovery: makeRecovery({ reason: 'privilege-escalation-blocked' }) })
+    expect(screen.queryByText(/automatic restart/)).toBeNull()
+    cleanup()
+
+    renderCard({ recovery: makeRecovery({ reason: 'no-new-privs' }) })
+    expect(
+      screen.getByText(/An automatic restart of Orca Lab is a likely cause; if so/)
+    ).toBeTruthy()
+  })
+
+  // Why: neither cause changes within this process, so its own retry fails the same way.
+  it.each(['privilege-escalation-blocked', 'no-new-privs'] as const)(
+    'drops the automatic retry for %s but keeps the manual install path',
+    (reason) => {
+      renderCard({ recovery: makeRecovery({ reason }) })
+
+      expect(screen.queryByRole('button', { name: 'Try Automatic Install Again' })).toBeNull()
+      expect(button('Copy Install Command')).toBeTruthy()
+      expect(button('Show Package')).toBeTruthy()
+    }
+  )
+
+  it('keeps the copy path when no preview can be built', async () => {
+    getPreview.mockResolvedValue({ ok: false })
+    renderCard()
+    await flushActions()
+
+    expect(screen.queryByText(INSTALL_COMMAND)).toBeNull()
+    expect(button('Copy Install Command')).toBeTruthy()
+  })
+
+  it('survives a rejected preview', async () => {
+    getPreview.mockRejectedValue(new Error('No package install recovery is available.'))
+    renderCard()
+    await flushActions()
+
+    expect(screen.queryByText(INSTALL_COMMAND)).toBeNull()
+    expect(footnoteText()).toBeNull()
   })
 })
 

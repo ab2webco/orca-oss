@@ -1,5 +1,6 @@
 import type {
   LinuxPackageInstallInstructions,
+  LinuxPackageInstallPreview,
   ReleaseBuildListResult,
   UpdateCheckOptions,
   UpdateStatus
@@ -17,6 +18,8 @@ export type UpdaterApi = {
   dismissAvailableUpdate: () => Promise<void>
   /** Desktop-only. Rejects unless the current status carries `linux-package-install` recovery. */
   getLinuxPackageInstallInstructions: () => Promise<LinuxPackageInstallInstructions>
+  /** Desktop-only. The command and package path to show, without re-proving the package. */
+  getLinuxPackageInstallPreview: () => Promise<LinuxPackageInstallPreview>
   /** Desktop-only. Reveals the revalidated cached package in the native file manager. */
   showLinuxPackage: () => Promise<void>
   listBuilds: (channel: ReleaseChannel) => Promise<ReleaseBuildListResult>

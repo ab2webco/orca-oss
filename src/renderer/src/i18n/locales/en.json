@@ -16316,7 +16316,13 @@
         "53c4b8e148": "No usable authentication agent answered the privileged install request.",
         "c732bcbf8f": "Checking package...",
         "aa57fa4f80": "Command copied. Run it in a system terminal to install {{value0}}, then quit and reopen Orca Lab.",
-        "b7e7c5bc95": "Orca Lab checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca Lab cannot vouch for the file after that point."
+        "b7e7c5bc95": "Orca Lab checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca Lab cannot vouch for the file after that point.",
+        "62e76ff8b8": "The administrator password prompt was dismissed or authentication failed.",
+        "3eb547793c": "The system did not grant administrator authorization (pkexec exit 127), so the package was not installed.",
+        "0c4d1f7a92": "Orca Lab could not get administrator rights: pkexec reported that it is not running as root, so the package was not installed.",
+        "5be0a3c6d1": "Orca Lab could not get administrator rights: this process runs with no_new_privs set, so pkexec cannot run as root. An automatic restart of Orca Lab is a likely cause; if so, quitting Orca Lab and opening it again from your app menu should clear it. To install now, run the command in a system terminal outside Orca Lab.",
+        "7431e3df24": "Package",
+        "8901895fb1": "Command"
       },
       "pr-check-counts": {
         "passingChip": "{{value0}} passing",

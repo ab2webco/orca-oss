@@ -247,6 +247,9 @@ vi.mock('./local-builds/local-build-feed-server', () => ({
   startLocalBuildFeed: startLocalBuildFeedMock
 }))
 
+// Why: a committed Linux root-package install relaunches; the real one would spawn a process.
+vi.mock('./app-relaunch', () => ({ relaunchApp: vi.fn() }))
+
 /** Mirrors AUTO_UPDATE_CHECK_INTERVAL_MS in updater.ts. */
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 
@@ -4382,7 +4385,7 @@ describe('updater', () => {
         recovery: {
           kind: 'linux-package-install',
           packageType: 'deb',
-          reason: 'package-install-failed',
+          reason: 'authorization-not-obtained',
           version: '1.0.61'
         }
       })
