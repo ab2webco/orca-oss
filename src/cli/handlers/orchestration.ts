@@ -122,6 +122,8 @@ type OrchestrationSendResult =
         /** Whether the member's host took it within the send's wait; absent from an older home (ORCA-1301). */
         delivered?: boolean
         deliveredAt?: string | null
+        /** Why the home's last hand-over of this Dispatch's mail failed; absent from an older home (ORCA-1439). */
+        hostRefusal?: string
       }
       lifecycle?: LifecycleSendResult
     }
@@ -131,6 +133,9 @@ type WorkerRelay = Extract<OrchestrationSendResult, { relay: unknown }>['relay']
 function workerRelayLineOf(relay: WorkerRelay): string {
   if (relay.delivered === true) {
     return `Delivered ${relay.messageId} to worker Dispatch ${relay.dispatchId}'s host at ${relay.deliveredAt}`
+  }
+  if (relay.delivered === false && relay.hostRefusal) {
+    return `Queued ${relay.messageId} for worker Dispatch ${relay.dispatchId}, NOT delivered: its host did not take this Dispatch's queued mail (${relay.hostRefusal}). The member has not seen it; reach its pane with orca terminal send.`
   }
   if (relay.delivered === false) {
     return `Queued ${relay.messageId} for worker Dispatch ${relay.dispatchId}, NOT delivered: its host has not taken it. orca game state shows when it does; until then the member has not seen it.`

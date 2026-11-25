@@ -221,7 +221,9 @@ function undeliveredMailAlertsOf(state: GameLeadAlertInput, now: number): GameLe
     return [
       {
         key: `undelivered:${who}:${remote.undeliveredSince}`,
-        line: `${who} has not received lead mail for ${minutesOf(now - since)}+ min: ${remote.host} has not taken it, so the member has not seen it. Check the host, or reach the pane: ${pane}`
+        line: remote.undeliveredReason
+          ? `${who} has not received lead mail for ${minutesOf(now - since)}+ min: ${remote.host} did not take it (${remote.undeliveredReason}), so the member has not seen it. Reach the pane: ${pane}`
+          : `${who} has not received lead mail for ${minutesOf(now - since)}+ min: ${remote.host} has not taken it, so the member has not seen it. Check the host, or reach the pane: ${pane}`
       }
     ]
   })

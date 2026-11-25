@@ -3,6 +3,7 @@ import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { OrchestrationDb } from '../../orchestration/db'
 import { routeFederatedMail } from '../../orchestration/federated-follow-up'
 import { encodeFederatedControlMessage } from '../../orchestration/federation-control-message'
+import { federationImportRefusalOf } from '../../orchestration/federation-import-refusal'
 import { waitForRelayDelivery } from '../../orchestration/federation-relay-delivery'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import type { FederatedDispatchRow, MessagePriority, MessageType } from '../../orchestration/types'
@@ -56,6 +57,8 @@ export async function relayFederatedControlMail(
   const deliveredAt = await waitForRelayDelivery(() =>
     db.getFederationRelayAckedAt(dispatchId, 'to_worker', relay.message_id)
   )
+  const hostRefusal =
+    deliveredAt === null ? federationImportRefusalOf(runtime, dispatchId) : undefined
   return {
     relay: {
       messageId: relay.message_id,
@@ -64,7 +67,8 @@ export async function relayFederatedControlMail(
       destination: 'worker' as const,
       accepted: true as const,
       delivered: deliveredAt !== null,
-      deliveredAt
+      deliveredAt,
+      ...(hostRefusal ? { hostRefusal } : {})
     },
     ...(followUp ? { reopenedDispatchId: dispatchId } : {})
   }

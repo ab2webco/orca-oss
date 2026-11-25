@@ -6005,6 +6005,30 @@ export class OrchestrationDb {
       .all(dispatchId, direction, Math.min(Math.max(limit, 1), 50)) as FederationRelayItemRow[]
   }
 
+  /** Replaces a lead-to-member item its host has not taken; keeps its sequence and id (ORCA-1439). */
+  rewritePendingWorkerRelayItem(params: {
+    dispatchId: string
+    sequence: number
+    kind: string
+    payload: string
+  }): boolean {
+    return (
+      this.db
+        .prepare(
+          `UPDATE federation_relay_items SET kind = ?, payload = ?, byte_count = ?
+           WHERE dispatch_id = ? AND direction = 'to_worker' AND sequence = ?
+             AND acked_at IS NULL`
+        )
+        .run(
+          params.kind,
+          params.payload,
+          Buffer.byteLength(params.payload, 'utf8'),
+          params.dispatchId,
+          params.sequence
+        ).changes === 1
+    )
+  }
+
   acknowledgeFederationRelay(params: {
     dispatchId: string
     direction: FederationRelayDirection

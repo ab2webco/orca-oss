@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RELAY_DELIVERY_WAIT_MS } from '../../orchestration/federation-relay-delivery'
+import { federationImportRefusalOf } from '../../orchestration/federation-import-refusal'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../shared/protocol-version'
 import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope'
 import { OrcaRuntimeService } from '../../orca-runtime'
@@ -215,6 +216,79 @@ describe('orchestration federation control mail', () => {
       ok: true,
       result: { count: 1, messages: [{ subject: 'Re: Blocked', body: 'Use 8080' }] }
     })
+  })
+
+  // ORCA-1439: a question sent with `send --type question` has no host record, so the host refused
+  // the lead's reply and every relay queued behind it stayed 'host has not taken it' for hours.
+  it('delivers a reply to a question the member sent instead of asked, and the mail behind it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+    try {
+      vi.spyOn(homeRuntime, 'ensureOrchestrationFederationRelay').mockImplementation(() => {})
+      workerDb.enqueueFederationRelay({
+        dispatchId,
+        direction: 'to_home',
+        kind: 'question',
+        payload: JSON.stringify({
+          from: 'term_worker',
+          subject: 'Edit TC-4868?',
+          body: 'May I edit it in place?',
+          type: 'question',
+          priority: 'normal',
+          threadId: null,
+          payload: null
+        })
+      })
+      await homeRuntime.syncOrchestrationFederation()
+      const [question] = homeDb.getUnreadMessages(`run:${runId}`, ['question'])
+      await homeDispatcher.dispatch({
+        id: 'reply-sent-question',
+        authToken: 'coordinator-token',
+        orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+        orchestrationRequestId: 'reply-sent-question-request',
+        method: 'orchestration.reply',
+        params: { from: 'term_coord', id: question.id, body: 'Yes, edit it in place.' }
+      })
+      await homeRuntime.syncOrchestrationFederation()
+      const queuedBehind = homeDispatcher.dispatch({
+        id: 'send-behind-reply',
+        authToken: 'coordinator-token',
+        orchestrationContractVersion: ORCHESTRATION_CONTRACT_VERSION,
+        orchestrationRequestId: 'send-behind-reply-request',
+        method: 'orchestration.send',
+        params: {
+          from: 'term_coord',
+          to: `dispatch:${dispatchId}`,
+          subject: 'Next',
+          type: 'status'
+        }
+      })
+      await vi.advanceTimersByTimeAsync(RELAY_DELIVERY_WAIT_MS + 1_000)
+      await expect(queuedBehind).resolves.toMatchObject({
+        ok: true,
+        result: {
+          relay: { delivered: false, hostRefusal: expect.stringContaining('question_not_found') }
+        }
+      })
+
+      await homeRuntime.syncOrchestrationFederation()
+
+      expect(homeDb.listPendingFederationRelay(dispatchId, 'to_worker')).toHaveLength(0)
+      expect(federationImportRefusalOf(homeRuntime, dispatchId)).toBeUndefined()
+      await expect(
+        workerDispatcher.dispatch(checkRequest('check-sent-question-reply'))
+      ).resolves.toMatchObject({
+        ok: true,
+        result: {
+          count: 2,
+          messages: [
+            { body: 'Yes, edit it in place.', thread_id: question.id },
+            { subject: 'Next' }
+          ]
+        }
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('returns remote-attached worker terminal mail alongside Dispatch mail without crossing recipients', async () => {

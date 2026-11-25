@@ -12,7 +12,11 @@ afterEach(() => {
   callMock.mockReset()
 })
 
-async function lineFor(delivery: { delivered?: boolean; deliveredAt?: string | null }) {
+async function lineFor(delivery: {
+  delivered?: boolean
+  deliveredAt?: string | null
+  hostRefusal?: string
+}) {
   callMock.mockResolvedValueOnce({
     result: {
       relay: {
@@ -41,6 +45,16 @@ async function lineFor(delivery: { delivered?: boolean; deliveredAt?: string | n
 }
 
 // Why: three stop orders to a member on m1 printed a plain 'Queued' while he never saw them (ORCA-1301).
+it('says why the host did not take a send when the home recorded a refusal (ORCA-1439)', async () => {
+  const line = await lineFor({
+    delivered: false,
+    deliveredAt: null,
+    hostRefusal: 'dispatch_inactive: gone'
+  })
+  expect(line).toContain('NOT delivered')
+  expect(line).toContain('(dispatch_inactive: gone)')
+})
+
 it('says a send its host has not taken is NOT delivered', async () => {
   await expect(lineFor({ delivered: false, deliveredAt: null })).resolves.toContain('NOT delivered')
 })

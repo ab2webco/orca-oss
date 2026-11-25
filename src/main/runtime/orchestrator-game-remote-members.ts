@@ -31,6 +31,7 @@ export type RemoteGameMemberSource = {
   startError?: string | null
   starting?: boolean // Its worker start has not finished (ORCA-1263).
   undeliveredSince?: string | null // Oldest lead mail its host has not taken (ORCA-1301).
+  undeliveredReason?: string // Why the last hand-over of that mail failed (ORCA-1439).
   /** The home Run completed the member's task. */
   ticketDone: boolean
   /** Launched by a lead that no longer leads it (ORCA-793). */
@@ -305,6 +306,9 @@ export async function remoteGameMembersOf(
           ...(gone ? { gone: true as const } : {}),
           ...(starting ? { starting: true as const } : {}),
           ...(source.undeliveredSince ? { undeliveredSince: source.undeliveredSince } : {}),
+          ...(source.undeliveredSince && source.undeliveredReason
+            ? { undeliveredReason: source.undeliveredReason }
+            : {}),
           ...(show?.asleep ? { asleep: true as const } : {}),
           ...(source.startFailed && !agent
             ? {
