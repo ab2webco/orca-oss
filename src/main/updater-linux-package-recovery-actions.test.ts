@@ -142,7 +142,7 @@ describe('linux package recovery actions', () => {
   /** Drives a pre-commit install failure so the status carries the recovery discriminant. */
   const failInstall = async (updater: typeof UpdaterModule): Promise<void> => {
     autoUpdaterMock.quitAndInstall.mockImplementation(() => {
-      autoUpdaterMock.emit('error', new Error('Command failed, exited with code 127'))
+      autoUpdaterMock.emit('error', new Error('Command pkexec exited with code 127'))
     })
     updater.quitAndInstall()
     await vi.advanceTimersByTimeAsync(100)

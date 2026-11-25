@@ -356,8 +356,8 @@ describe('resolveLinuxPackageInstallFailureReason', () => {
   ) => diagnostic.resolveLinuxPackageInstallFailureReason(outputReason, exitCode, escalationBlocked)
 
   it('names no_new_privs whatever pkexec printed', () => {
-    expect(resolve(null, 127, true)).toBe('privilege-escalation-blocked')
-    expect(resolve('package-install-failed', 1, true)).toBe('privilege-escalation-blocked')
+    expect(resolve(null, 127, true)).toBe('no-new-privs')
+    expect(resolve('privilege-escalation-blocked', 1, true)).toBe('no-new-privs')
   })
 
   it('keeps a reason the captured output proved', () => {

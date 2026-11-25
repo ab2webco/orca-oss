@@ -40,8 +40,10 @@ export type LinuxPackageInstallFailureReason =
   | 'authentication-denied'
   // pkexec exit 127 with no output that names why (none, or localized).
   | 'authorization-not-obtained'
-  // This process carries no_new_privs, so setuid pkexec cannot elevate at all.
+  // pkexec printed that it is not running as root; the output does not say why.
   | 'privilege-escalation-blocked'
+  // /proc/self/status shows NoNewPrivs: 1, so no setuid helper can elevate from this process.
+  | 'no-new-privs'
   | 'package-install-failed'
 
 // Why: the renderer must not infer "no polkit agent" from copy alone — main classifies and the card branches on this discriminant.

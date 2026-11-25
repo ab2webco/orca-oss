@@ -981,9 +981,13 @@ function buildLinuxPackageInstallFailureStatus(error: unknown): UpdateStatus | n
   const diagnostic = getLinuxPackageInstallDiagnostic() ?? lastInstallAttemptDiagnostic
   const exitCode = parseLinuxPackageInstallExitCode(error)
   // Why: the output reason was classified before redaction could rewrite a match.
+  // 126/127 carry pkexec's meaning only when pkexec ran, not gksudo, kdesudo, beesu or sudo.
+  const pkexecExitCode = /\bpkexec\b/.test(String((error as Error)?.message ?? error))
+    ? exitCode
+    : null
   const reason = resolveLinuxPackageInstallFailureReason(
     diagnostic?.reason ?? null,
-    exitCode,
+    pkexecExitCode,
     isPrivilegeEscalationBlocked()
   )
   // Durable data carries classification only — never the package path, home path, command, or stderr.

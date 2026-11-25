@@ -15784,7 +15784,8 @@
       "LinuxPackageInstallRecoveryCard": {
         "62e76ff8b8": "Se cerró la solicitud de contraseña de administrador o la autenticación falló.",
         "3eb547793c": "El sistema no concedió la autorización de administrador (pkexec salió con código 127), así que el paquete no se instaló.",
-        "8518002a26": "Esta ventana de Orca Lab se abrió con un reinicio automático que bloquea las solicitudes de administrador. Cierra Orca Lab y ábrelo de nuevo desde el menú de aplicaciones para reintentar, o ejecuta el comando en una terminal fuera de Orca Lab.",
+        "0c4d1f7a92": "Orca Lab no pudo obtener permisos de administrador: pkexec indicó que no se está ejecutando como root, así que el paquete no se instaló.",
+        "5be0a3c6d1": "Orca Lab no pudo obtener permisos de administrador: este proceso se ejecuta con no_new_privs activado, así que pkexec no puede ejecutarse como root. Una causa probable es un reinicio automático de Orca Lab; si es así, cerrar Orca Lab y abrirlo de nuevo desde el menú de aplicaciones debería resolverlo. Para instalar ahora, ejecuta el comando en una terminal del sistema fuera de Orca Lab.",
         "7431e3df24": "Paquete",
         "8901895fb1": "Comando"
       }

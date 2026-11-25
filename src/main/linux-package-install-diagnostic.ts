@@ -24,7 +24,7 @@ const CONTROL_CHARACTERS = new RegExp(String.raw`[\u0000-\u001f\u007f]`, 'g')
 
 // Why: pkexec/polkit print these before any package manager runs; matching them keeps the UI from
 // blaming dpkg for an authentication problem. Anything else stays generic on purpose.
-// pkexec prints this when no_new_privs stripped its setuid bit, before polkit is ever asked.
+// pkexec prints this whenever it is not running as root: no_new_privs, a nosuid mount, a container.
 const ESCALATION_BLOCKED_PATTERNS = [/must be setuid root/i]
 const AGENT_UNAVAILABLE_PATTERNS = [
   /no authentication agent/i,
@@ -225,7 +225,7 @@ export function resolveLinuxPackageInstallFailureReason(
   escalationBlocked: boolean
 ): LinuxPackageInstallFailureReason {
   if (escalationBlocked) {
-    return 'privilege-escalation-blocked'
+    return 'no-new-privs'
   }
   if (outputReason && outputReason !== 'package-install-failed') {
     return outputReason

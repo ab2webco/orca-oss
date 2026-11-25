@@ -40,8 +40,13 @@ function causeNote(reason: LinuxPackageInstallFailureReason): string | null {
       )
     case 'privilege-escalation-blocked':
       return translate(
-        'auto.components.LinuxPackageInstallRecoveryCard.8518002a26',
-        'This Orca Lab window was started by an automatic restart that blocks administrator prompts. Quit Orca Lab and open it again from your app menu to retry, or run the command in a terminal outside Orca Lab.'
+        'auto.components.LinuxPackageInstallRecoveryCard.0c4d1f7a92',
+        'Orca Lab could not get administrator rights: pkexec reported that it is not running as root, so the package was not installed.'
+      )
+    case 'no-new-privs':
+      return translate(
+        'auto.components.LinuxPackageInstallRecoveryCard.5be0a3c6d1',
+        'Orca Lab could not get administrator rights: this process runs with no_new_privs set, so pkexec cannot run as root. An automatic restart of Orca Lab is a likely cause; if so, quitting Orca Lab and opening it again from your app menu should clear it. To install now, run the command in a system terminal outside Orca Lab.'
       )
     case 'package-install-failed':
       return null
@@ -264,9 +269,11 @@ export function LinuxPackageInstallRecoveryCard({
 
   const detail = [diagnostic, TRUST_NOTE].filter(Boolean).join(' ')
   const cause = causeNote(recovery.reason)
-  // Why: no_new_privs is permanent for this process, so its own retry would fail the same way.
-  const canRetry = recovery.reason !== 'privilege-escalation-blocked'
-  const fieldLabel = 'mb-0.5 text-[11px] font-medium uppercase text-muted-foreground'
+  // Why: neither cause changes within this process, so its own retry would fail the same way.
+  const canRetry =
+    recovery.reason !== 'privilege-escalation-blocked' && recovery.reason !== 'no-new-privs'
+  const fieldLabel =
+    'mb-0.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground'
   const fieldValue = 'select-text break-all font-mono text-xs leading-relaxed text-foreground'
   const body =
     cause || (preview && !commandUnavailable) ? (

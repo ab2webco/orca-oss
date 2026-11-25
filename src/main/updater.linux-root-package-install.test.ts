@@ -506,7 +506,7 @@ describe('updater', () => {
         'Error al ejecutar la orden como otro usuario: no se encontró ningún agente de autenticación.',
         'authorization-not-obtained'
       ],
-      ['the no_new_privs refusal', 'pkexec must be setuid root', 'privilege-escalation-blocked']
+      ['the not-root refusal', 'pkexec must be setuid root', 'privilege-escalation-blocked']
     ])('names the cause of a pkexec exit 127 with %s', async (_label, stderr, reason) => {
       const { send, updater } = await startUpdater('deb')
       await reachDownloaded(updater, downloadedEvent())
@@ -537,7 +537,23 @@ describe('updater', () => {
       await settleQuitAndInstall()
 
       expect(lastStatus(send)).toMatchObject({
-        recovery: { reason: 'privilege-escalation-blocked' }
+        recovery: { reason: 'no-new-privs' }
+      })
+    })
+
+    // Why: electron-updater falls back to gksudo, kdesudo, beesu or sudo, where 127 is not pkexec's.
+    it('reads no pkexec cause from another helper exit 127', async () => {
+      const { send, updater } = await startUpdater('deb')
+      await reachDownloaded(updater, downloadedEvent())
+      autoUpdaterMock.quitAndInstall.mockImplementation(() => {
+        autoUpdaterMock.emit('error', new Error('Command sudo exited with code 127'))
+      })
+
+      updater.quitAndInstall()
+      await settleQuitAndInstall()
+
+      expect(lastStatus(send)).toMatchObject({
+        recovery: { reason: 'package-install-failed' }
       })
     })
 

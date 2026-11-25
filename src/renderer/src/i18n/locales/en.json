@@ -16319,7 +16319,8 @@
         "b7e7c5bc95": "Orca Lab checks the downloaded file against the release metadata at the moment it builds this command. The system package itself is not signature-checked, and Orca Lab cannot vouch for the file after that point.",
         "62e76ff8b8": "The administrator password prompt was dismissed or authentication failed.",
         "3eb547793c": "The system did not grant administrator authorization (pkexec exit 127), so the package was not installed.",
-        "8518002a26": "This Orca Lab window was started by an automatic restart that blocks administrator prompts. Quit Orca Lab and open it again from your app menu to retry, or run the command in a terminal outside Orca Lab.",
+        "0c4d1f7a92": "Orca Lab could not get administrator rights: pkexec reported that it is not running as root, so the package was not installed.",
+        "5be0a3c6d1": "Orca Lab could not get administrator rights: this process runs with no_new_privs set, so pkexec cannot run as root. An automatic restart of Orca Lab is a likely cause; if so, quitting Orca Lab and opening it again from your app menu should clear it. To install now, run the command in a system terminal outside Orca Lab.",
         "7431e3df24": "Package",
         "8901895fb1": "Command"
       },

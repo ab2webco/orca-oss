@@ -481,8 +481,8 @@ describe('LinuxPackageInstallRecoveryCard cause and manual command', () => {
     'authentication-agent-unavailable': /No usable authentication agent answered/,
     'authentication-denied': /password prompt was dismissed or authentication failed/,
     'authorization-not-obtained': /did not grant administrator authorization/,
-    'privilege-escalation-blocked':
-      /started by an automatic restart that blocks administrator prompts/
+    'privilege-escalation-blocked': /pkexec reported that it is not running as root/,
+    'no-new-privs': /runs with no_new_privs set, so pkexec cannot run as root/
   } as const
 
   // Main's verdict for pkexec exit 127 with no polkit output, English output and localized output.
@@ -513,7 +513,7 @@ describe('LinuxPackageInstallRecoveryCard cause and manual command', () => {
     }
   )
 
-  it.each(['authentication-denied', 'privilege-escalation-blocked'] as const)(
+  it.each(['authentication-denied', 'privilege-escalation-blocked', 'no-new-privs'] as const)(
     'names the %s cause',
     (reason) => {
       renderCard({ recovery: makeRecovery({ reason }) })
@@ -528,14 +528,29 @@ describe('LinuxPackageInstallRecoveryCard cause and manual command', () => {
     }
   })
 
-  // Why: no_new_privs is permanent for this process, so its own retry fails the same way.
-  it('drops the automatic retry when this process cannot elevate', () => {
+  // Why: nosuid mounts and containers print the same text, so only NoNewPrivs names the restart.
+  it('names the automatic restart only when this process carries no_new_privs', () => {
     renderCard({ recovery: makeRecovery({ reason: 'privilege-escalation-blocked' }) })
+    expect(screen.queryByText(/automatic restart/)).toBeNull()
+    cleanup()
 
-    expect(screen.queryByRole('button', { name: 'Try Automatic Install Again' })).toBeNull()
-    expect(button('Copy Install Command')).toBeTruthy()
-    expect(button('Show Package')).toBeTruthy()
+    renderCard({ recovery: makeRecovery({ reason: 'no-new-privs' }) })
+    expect(
+      screen.getByText(/An automatic restart of Orca Lab is a likely cause; if so/)
+    ).toBeTruthy()
   })
+
+  // Why: neither cause changes within this process, so its own retry fails the same way.
+  it.each(['privilege-escalation-blocked', 'no-new-privs'] as const)(
+    'drops the automatic retry for %s but keeps the manual install path',
+    (reason) => {
+      renderCard({ recovery: makeRecovery({ reason }) })
+
+      expect(screen.queryByRole('button', { name: 'Try Automatic Install Again' })).toBeNull()
+      expect(button('Copy Install Command')).toBeTruthy()
+      expect(button('Show Package')).toBeTruthy()
+    }
+  )
 
   it('keeps the copy path when no preview can be built', async () => {
     getPreview.mockResolvedValue({ ok: false })

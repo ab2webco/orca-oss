@@ -11,9 +11,10 @@ export type AppRelaunchReason =
   | 'renderer-request'
   | 'update-install'
 
-// Waits up to 30 s for the old process (single-instance lock) to exit, then execs the app.
+// Why: no cap, like Electron's relauncher. A quit can run past any cap (daemon checkpoints are 30 s
+// each), and an early exec loses the single-instance lock and exits. A zombie already let go of it.
 const WAIT_THEN_EXEC_SCRIPT =
-  'i=0; while kill -0 "$1" 2>/dev/null && [ "$i" -lt 150 ]; do sleep 0.2; i=$((i+1)); done; shift; exec "$@"'
+  'while kill -0 "$1" 2>/dev/null && ! grep -qs "^State:[[:space:]]*Z" "/proc/$1/status"; do sleep 0.2; done; shift; exec "$@"'
 
 function relaunchKeepingPrivilegeEscalation(): void {
   // Why: Electron starts its relauncher through Chromium's LaunchProcess, which sets
@@ -35,7 +36,8 @@ function relaunchKeepingPrivilegeEscalation(): void {
         process.execPath,
         ...process.argv.slice(1)
       ],
-      { detached: true, stdio: 'ignore' }
+      // Electron's relauncher passes fds 0-2 through, so a .desktop launch keeps logging to the journal.
+      { detached: true, stdio: 'inherit' }
     )
     waiter.on('error', () => app.relaunch())
     waiter.unref()
