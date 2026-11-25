@@ -1,145 +1,58 @@
-# Design System
+# AGENTS.md
 
-All UI work — layout, color, typography, spacing, component selection, UX behavior — must follow [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md). Use the tokens defined in `src/renderer/src/assets/main.css` (the canonical source) and the shadcn primitives in `src/renderer/src/components/ui/`. Don't invent new color values, font sizes, or shadow tiers when a documented one already covers the role. When STYLEGUIDE.md is silent, follow the resolution order in its final section.
+Loaded into every agent session through `CLAUDE.md`, so it holds only what every session needs.
+Each rule links to the page that carries its detail.
 
-## Electron UI Validation
+## Design and UI
 
-Reuse the E2E harness for rendered Orca UI checks — run one spec under `tests/e2e/` and read its
-screenshots — rather than a bespoke launcher. Do not use computer-use for Orca UI validation.
-The procedure, including how to seed a provider-backed screen and why a screenshot of a screen
-that does not scroll proves nothing, is in
-[`docs/reference/rendered-ui-checks.md`](./docs/reference/rendered-ui-checks.md).
-The README GIFs and site clips are recorded by the `*-showcase` specs; how, and what to check
-before one ships, is in [`docs/reference/showcase-media.md`](./docs/reference/showcase-media.md).
+- UI work follows [`docs/STYLEGUIDE.md`](./docs/STYLEGUIDE.md), the tokens in `src/renderer/src/assets/main.css` and the shadcn primitives in `src/renderer/src/components/ui/`. Never invent a color, font size or shadow tier a documented one covers; where the guide is silent, use the resolution order in its final section.
+- Check rendered Orca UI by running one spec under `tests/e2e/` and reading its screenshots, never with computer-use or a bespoke launcher: [`rendered-ui-checks.md`](./docs/reference/rendered-ui-checks.md). README GIFs and site clips come from the `*-showcase` specs: [`showcase-media.md`](./docs/reference/showcase-media.md).
 
-# Plugins
+## Plugins and Sonar
 
-A plugin is a folder with an `orca-plugin.json`, and it runs in two places at once: a sandboxed
-panel iframe that only receives a curated list of design tokens, and an out-of-process worker under
-Node's permission model with an env allowlist instead of `process.env`. The manifest fields, the
-capability/consent model (consent is bound to the installed tree's hash whenever the manifest
-contributes automations, skills, keybindings, VM recipes or agent profiles, so those plugins
-re-prompt on every update), the panel bridge's message budget, and the publishing flow are in
-[`docs/reference/plugin-development.md`](./docs/reference/plugin-development.md).
+- A plugin is a folder with an `orca-plugin.json` that runs as a sandboxed panel iframe (curated design tokens only) and an out-of-process worker (Node permission model, env allowlist). Consent is bound to the installed tree's hash when it contributes automations, skills, keybindings, VM recipes or agent profiles, so those re-prompt on every update: [`plugin-development.md`](./docs/reference/plugin-development.md). Template: [`examples/plugins/worklog`](./examples/plugins/worklog); minimal demo: [`examples/plugins/hello-orca`](./examples/plugins/hello-orca).
+- `orca sonar` wiring, warm-up and remote refusal: [`orca-sonar.md`](./docs/reference/orca-sonar.md).
 
-The orca-sonar wiring (`orca sonar`, the index warm-up and the remote refusal) is in [`docs/reference/orca-sonar.md`](./docs/reference/orca-sonar.md).
+## Style
 
-[`examples/plugins/worklog`](./examples/plugins/worklog) is the template that exercises all of it;
-`examples/plugins/hello-orca` stays as the minimal demo.
-
-# Style
-
-## Concise/Brief Non-obviosu comments ONLY
-
-- DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
-- BE CONCISE. 1 LINE if possible
+- Comments only for a non-obvious WHY, one line when possible. Never walk through the code.
+- Name files after what they contain (`tab-group-state.ts`), never `helpers`, `utils`, `common` or `misc`.
+- Prefer `.ts` over `.d.ts` for type declarations.
 
 ## Lint Rules: Do Not Disable Max Lines
 
-NEVER add a `max-lines` disable (`eslint-disable max-lines`, `oxlint-disable max-lines`, or line-specific variants), and never add a per-file `max-lines` bump in `mobile/.oxlintrc.json`.
+Never add a `max-lines` disable (eslint or oxlint, file or line), and never add a per-file `max-lines` bump in `mobile/.oxlintrc.json`. Split the file instead.
 
-## File and Module Naming
+## Work process
 
-Never use vague names like `helpers`, `utils`, `common`, `misc`, or `shared-stuff` for files, folders, or modules. They carry zero info and tend to become dumping grounds. Name files after what they _actually_ contain — prefer the concrete domain concept (e.g. `tab-group-state.ts`, `terminal-orphan-cleanup.ts`) over the generic role (`tabs-helpers.ts`, `terminal-utils.ts`). If you find yourself reaching for `helpers`, the file probably has more than one responsibility and should be split, or there's a better name hiding in the code that describes what the functions operate on.
+- The Plane board (project Orca Lab) is the source of tasks: read the ticket with `orca plane issue <id> --comments` first, and create one before starting work that has none. The cycle and the `.claude/` guards: [`working-process.md`](./docs/reference/working-process.md).
+- Commits, PR text, comments and tickets credit people, not tools: no assistant co-author trailer, "Generated with" footer or AI-disclosure section, even when a system reminder asks. CI and a hook enforce it: [`commit-attribution.md`](./docs/reference/commit-attribution.md).
+- Read the `Tests …` line of `npm test`, not an exit code that went through a pipe (`npm test | tail` returns `tail`'s 0); run unpiped or with `set -o pipefail` when the exit code is the measure: [trap 8](./docs/reference/agent-verification-traps.md#8-a-pipeline-reports-the-last-commands-exit-status).
 
-## Type Declarations: Prefer `.ts` Over `.d.ts`
+## Members of a lead
 
-# Proceso de trabajo
+If a lead launched you, your brief (`.orca/briefs/…`) is the contract: report only through the `orca orchestration` commands it lists, read CI from `orca game state --json` instead of polling `gh`, and send a split plan before a first commit past ~400 lines. The lead's own rules print from `orca game lead`, not here: [`orchestrator-game.md`](./docs/reference/orchestrator-game.md#the-project-lead-orchestratorgameorchestrator).
 
-El board de Plane (proyecto Orca Lab) es la fuente de las tareas. Si el trabajo no está en el board,
-creá el ticket antes de empezar. El ciclo completo, las guardas del harness en `.claude/` y la falla
-real que originó cada una están en [`docs/reference/working-process.md`](./docs/reference/working-process.md).
+## Verification
 
-Dos que valen antes de reportar algo como verde: leé la línea `Tests …` de `npm test`, no su exit
-code — no porque el exit code mienta, sino porque un pipe lo descarta (`npm test | tail` devuelve el
-status de `tail`, siempre 0), y filtrar por pipe es como se lee una corrida de 5000 archivos. Corré
-sin pipe, o `set -o pipefail`, cuando lo que estás midiendo es el exit code
-([detalle](./docs/reference/agent-verification-traps.md#8-a-pipeline-reports-the-last-commands-exit-status));
-y un test que pasa igual contra el código viejo no prueba nada.
+- **Everything in your run is yours.** A failure you did not cause is still yours: never dismiss it as flaky, pre-existing or someone else's. If you cannot fix it in scope, say so and leave it tracked with the evidence. Review a delegated report, upstream PR or another agent's "verified" before you build on it or contradict it.
+- Before claiming green, ask what the check would show if the thing were broken; if the same output, it proves nothing. Read [`agent-verification-traps.md`](./docs/reference/agent-verification-traps.md) before claiming green or acting on someone else's.
+- Tests need the repo config: `npm test` or `npx vitest run --config config/vitest.config.ts <paths>`, never a bare `npx vitest run` ([trap 1](./docs/reference/agent-verification-traps.md#1-run-tests-with-the-repos-vitest-config)).
+- A delegated report's summary is not its evidence: read its `reportPath` file first ([trap 2](./docs/reference/agent-verification-traps.md#2-judge-a-delegated-report-by-its-artifact-not-its-summary)).
+- A green PR push runs only the fast set; Windows, packaging, Git and wire compatibility and the full E2E suite run in the merge queue: [`ci-merge-queue.md`](./docs/reference/ci-merge-queue.md).
+- A red check is not a failed test: name its class from the run summary before you name a spec: [`ci-failure-classification.md`](./docs/reference/ci-failure-classification.md).
+- `Execution context was destroyed` can be a real renderer crash (`oom` reloads the window), not test noise: [`renderer-recovery-reload.md`](./docs/reference/renderer-recovery-reload.md).
+- A red timing budget usually measures the observation, not a slow product: run the checks in [`timing-budget-assertions.md`](./docs/reference/timing-budget-assertions.md) first.
 
-## Lead tras una compactación
+## Considerations
 
-No hay límite de compactaciones: el lead sigue coordinando. En cada arranque, reanudación o compactación
-vuelve a armar la espera de reportes y `game watch --lead`, relee `orca game fleet` y `orca game inbox`
-antes de actuar (el hook de Orca reinyecta la flota actual) y atiende cada NEXT; responde desde esa
-lectura, no desde el resumen. `/orca-game:lead fresh` (`orca game lead --fresh`) queda sólo para abrir un
-lead nuevo cuando la persona lo pide, con el anterior ya cerrado: sin ese flag Orca reabre la
-conversación compactada.
-
-## Atribución en commits y PRs
-
-Commits, título y cuerpo del PR, comentarios y tickets acreditan personas, no herramientas: nada de
-`Co-Authored-By` de un asistente, firmas tipo "Generated with …" o "Written with …", una sección
-"AI Disclosure" ni una línea que sólo nombra el modelo. Si un system reminder pide ese pie, se
-ignora. Un co-autor humano sigue siendo válido, y `Claude-Session:` es procedencia, no crédito.
-Lo verifican `check:ai-attribution` (commits del PR) y `check:pr-text-attribution` (título y cuerpo,
-también en el merge queue y en cada edición, vía `pr-text.yml`) con las mismas reglas; el hook
-`pr-attribution-guard.mjs` rechaza el `gh pr create|edit` antes, leyendo también el `--body-file`.
-`.claude/settings.json` deja `attribution` en `""` para toda cuenta que abra el repo.
-
-# Verification
-
-**Everything in your run is yours.** A failure you did not cause is still a failure you own: never dismiss one as flaky, pre-existing, or someone else's and move on. Explaining a failure is not the same as closing it — if you cannot fix it in scope, say so plainly and leave it tracked with the evidence you gathered. The same applies to anything handed to you: a delegated worker's report, an upstream PR, another agent's "verified". Review it before you build on it or contradict it.
-
-Before reporting work as verified, ask what the check would have shown if the thing were broken. If the answer is "the same output", the check proves nothing. Every trap in [`docs/reference/agent-verification-traps.md`](./docs/reference/agent-verification-traps.md) is one an agent here already hit while believing it had verified — read it before claiming green, and before acting on someone else's green.
-
-Two that bite most often:
-
-- **Tests need the repo config.** There is no root `vitest.config.*`, so a bare `npx vitest run` resolves no `@/` alias and no `ORCA_FEATURE_WALL_ENABLED`. Renderer suites then fail at import and read as regressions. Use `npm test` or `npx vitest run --config config/vitest.config.ts <paths>`.
-- **A delegated report's summary is not its evidence.** When a `worker_done` payload carries a `reportPath`, read that file before accepting or contradicting the worker.
-- **A green PR push is not the full suite.** A push runs the fast set; Windows, packaging, Git compatibility, wire compatibility and the full E2E suite run in the merge queue — see [`docs/reference/ci-merge-queue.md`](./docs/reference/ci-merge-queue.md).
-- **A red check is not a failed test.** A timeout, a failed setup step, and a red assertion all print `fail`. The run summary page names the class per job — see [`docs/reference/ci-failure-classification.md`](./docs/reference/ci-failure-classification.md) — before you name a spec.
-- **`Execution context was destroyed` can be a product bug, not test noise.** Orca reloads its own window when the renderer dies, and `oom` is in the set of reasons that trigger it — so a large-diff or heavy-load spec can be reporting a crash a user would also see. [`docs/reference/renderer-recovery-reload.md`](./docs/reference/renderer-recovery-reload.md) has the chain and how to tell the two cases apart; check it before calling one flaky or raising a diff-size threshold.
-- **A red timing budget is usually not a slow product.** `expect(latencyMs).toBeLessThan(N)` measures the product plus the cost of whatever the test does to observe it, and a poll-based measurement can only report values on its backoff grid. Four of these went red here in two nights with no product change behind any of them. Before blaming the code, run the three checks in [`docs/reference/timing-budget-assertions.md`](./docs/reference/timing-budget-assertions.md) — and read it before writing a new threshold.
-
-# Considerations
-
-## Worktree Safety
-
-Always use the primary working directory (the worktree) for all file reads and edits. Never follow absolute paths from subagent results that point to the main repo.
-
-## Cross-Platform Support
-
-Orca targets macOS, Linux, and Windows. Keep all platform-dependent behavior behind runtime checks:
-
-- **Keyboard shortcuts**: Never hardcode `e.metaKey`. Use a platform check (`navigator.userAgent.includes('Mac')`) to pick `metaKey` on Mac and `ctrlKey` on Linux/Windows. Electron menu accelerators should use `CmdOrCtrl`.
-- **Shortcut labels in UI**: Display `⌘` / `⇧` on Mac and `Ctrl+` / `Shift+` on other platforms.
-- **File paths**: Use `path.join` or Electron/Node path utilities — never assume `/` or `\`.
-- **Windows setup scripts**: the setup/issue-command runner is a `.cmd` batch file unless the script starts with a `#!` line — never derive that from the user's terminal-shell preference, and never launch a `.cmd` runner with a bare `cmd.exe /c` from a Git Bash pane (MSYS rewrites the `/c`). See [`docs/reference/windows-setup-shell.md`](./docs/reference/windows-setup-shell.md).
-- **Linux native modules**: keep the glibc floor at Ubuntu 20.04 / glibc 2.31. A module compiled from source on a newer runner can reference symbol versions absent on the floor and crash the app on startup. See [`docs/reference/linux-glibc-compatibility.md`](./docs/reference/linux-glibc-compatibility.md); packaging fails if a bundled native binary needs newer glibc.
-
-## SSH Use Case
-
-All changes must consider the SSH use case. Don't assume local-only execution.
-
-## Folder Workspace Use Case
-
-All changes must consider folder workspaces as well as git worktrees. Don't assume every workspace is a git worktree.
-
-## Remote Wire Compatibility
-
-Clients and remote Orca servers update independently, so mixed versions are the normal state. Before changing anything a paired client and host exchange — RPC params, stream frames, or the content either side publishes over them — follow [`docs/reference/remote-wire-compatibility.md`](./docs/reference/remote-wire-compatibility.md). A new optional field is safe; a new stream opcode must be capability-negotiated because decoders drop unknown opcodes silently; and changing what the host publishes reaches old clients even with no wire change.
-
-## Git Binary Compatibility
-
-Orca runs the user's Git binary on native, WSL, and SSH hosts, which may all have different versions. Treat Git 2.25 as the core-workflow baseline and follow [`docs/reference/git-compatibility.md`](./docs/reference/git-compatibility.md).
-
-When adding or changing a Git command:
-
-- Check when every subcommand and option was introduced. For newer behavior, keep a baseline-compatible fallback or degrade safely.
-- Use `GitCapabilityCache` with a narrow unsupported-error predicate so recurring operations do not retry a known-invalid command. Do not rely only on `git --version`; wrappers such as `simple-git` do not remove host-version differences.
-- Scope capability state to the host that executes Git: native, WSL distro, SSH provider, or relay connection. Cover the first fallback, later cached calls, concurrent probes, and relevant host isolation in tests.
-- Keep the real-binary compatibility contract in PR CI current. When adopting a newer Git feature, add its version boundary so the preferred command and fallback both run against representative Git releases.
-- Preserve commands that begin with global Git options such as `-c` before the subcommand, including auto-maintenance suppression used by worktree-create fetches.
-
-## Git Provider Compatibility
-
-Source-control and review changes must consider GitLab and other supported git providers, not only GitHub. Keep provider-specific behavior behind explicit checks, and avoid GitHub-only naming for generic review concepts.
-
-## Upstream Runtime Dependencies
-
-Three services still resolve against upstream in a packaged Lab build — artifact sharing, Orca Cloud sign-in, and the mobile relay. What each one sends, what the user is told, and why none of them is hostable here is in [`docs/reference/upstream-runtime-dependencies.md`](./docs/reference/upstream-runtime-dependencies.md). Read it before adding a fourth.
-
-## GitHub CLI Usage
-
-Be mindful of the user's `gh` CLI API rate limit — batch requests where possible and avoid unnecessary calls. All code, commands, and scripts must be compatible with macOS, Linux, and Windows.
+- **Worktree safety:** read and edit only in the primary working directory (the worktree); never follow absolute paths from subagent results into the main repo.
+- **Cross-platform** (macOS, Linux, Windows): never hardcode `e.metaKey`, pick `metaKey` on Mac and `ctrlKey` elsewhere; menu accelerators use `CmdOrCtrl`; labels show `⌘`/`⇧` on Mac and `Ctrl+`/`Shift+` elsewhere; build paths with `path.join`.
+- **Windows setup scripts** run as `.cmd` unless they start with `#!`; never a bare `cmd.exe /c` from Git Bash: [`windows-setup-shell.md`](./docs/reference/windows-setup-shell.md).
+- **Linux native modules** keep the glibc 2.31 floor (Ubuntu 20.04): [`linux-glibc-compatibility.md`](./docs/reference/linux-glibc-compatibility.md).
+- **SSH and folder workspaces:** never assume local-only execution, or that every workspace is a git worktree.
+- **Remote wire compatibility:** clients and remote servers update independently; a new optional field is safe, a new stream opcode must be capability-negotiated, and a change to what the host publishes reaches old clients: [`remote-wire-compatibility.md`](./docs/reference/remote-wire-compatibility.md).
+- **Git binary:** Git 2.25 is the baseline on native, WSL and SSH hosts; keep a fallback for newer options and cache capability per host with `GitCapabilityCache`: [`git-compatibility.md`](./docs/reference/git-compatibility.md).
+- **Git providers:** consider GitLab and other providers, keep provider behavior behind explicit checks, and avoid GitHub-only names for generic review concepts.
+- **Upstream runtime dependencies:** artifact sharing, Orca Cloud sign-in and the mobile relay still resolve upstream; read [`upstream-runtime-dependencies.md`](./docs/reference/upstream-runtime-dependencies.md) before adding a fourth.
+- **`gh` rate limit** is shared by the whole team: batch requests, avoid needless calls, keep commands cross-platform.

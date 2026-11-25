@@ -20,11 +20,16 @@ When a newer Git feature materially improves correctness or performance:
 1. Keep a baseline-compatible command or parser as the fallback.
 2. Detect rejection with a narrow predicate for that option or subcommand.
 3. Run the preferred command through `GitCapabilityCache` so a rejection is
-   remembered for the native host, WSL distro, or SSH provider that produced it.
+   remembered for the native host, WSL distro, SSH provider, or relay connection
+   that produced it.
 4. Retry after the cache interval so an in-place Git upgrade self-heals without
    restarting Orca.
 5. Test the first fallback, later calls that skip the rejected probe, concurrent
    probe coalescing, and execution-host isolation where applicable.
+6. Check when every subcommand and option was introduced before using it.
+7. Preserve commands that begin with global Git options such as `-c` before the
+   subcommand, including the auto-maintenance suppression used by
+   worktree-create fetches.
 
 Do not branch only on a parsed `git --version`. Vendor builds can backport
 features, and wrappers can report a host version that differs from the binary
@@ -56,6 +61,9 @@ capability problem.
 PR checks run the capability contract against real Git 2.25.5, 2.38.1, and
 2.49.1 binaries. This spans the core-workflow baseline, the transitional
 `merge-tree --write-tree` behavior before `--merge-base`, and current Git.
+
+When adopting a newer Git feature, add its version boundary to the matrix so
+the preferred command and its fallback both run against a real binary.
 
 Keep the unit tests alongside that matrix. They cover concurrent probes,
 native/WSL/SSH/relay isolation, and error-stream shapes that a single real
