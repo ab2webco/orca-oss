@@ -9,6 +9,10 @@ type State = {
   persistedUIReady: boolean
   rightSidebarTab: string
   rightSidebarOpen: boolean
+  sidebarOpen: boolean
+  sidebarWidth: number
+  rightSidebarWidth: number
+  activityBarPosition: string
   getKnownWorktreeById: (id: string) => { repoId: string } | undefined
   setRightSidebarTab: (tab: string) => void
   setRightSidebarOpen: (open: boolean) => void
@@ -38,6 +42,7 @@ let leadStarted: ((worktreeId: string) => void) | null
 let root: Root | null = null
 
 beforeEach(() => {
+  window.innerWidth = 1440
   resetTeamTabDefaultedForTests()
   stored = {}
   set.mockClear()
@@ -48,6 +53,10 @@ beforeEach(() => {
     persistedUIReady: true,
     rightSidebarTab: 'explorer',
     rightSidebarOpen: false,
+    sidebarOpen: true,
+    sidebarWidth: 280,
+    rightSidebarWidth: 350,
+    activityBarPosition: 'top',
     getKnownWorktreeById: (id) => (repoOf[id] ? { repoId: repoOf[id] } : undefined),
     setRightSidebarTab: (tab) => void (state.rightSidebarTab = tab),
     setRightSidebarOpen: (open) => void (state.rightSidebarOpen = open)
@@ -88,6 +97,16 @@ describe('Team tab on a lead start (ORCA-1414)', () => {
     openTeamTabOnLeadStart('wt-2')
 
     expect(state).toMatchObject({ rightSidebarTab: 'team', rightSidebarOpen: true })
+  })
+
+  it('does not open where the sidebar would overlay the left sidebar and content', () => {
+    // 280 + 350 + 120 > 700: the sidebar would float over the content instead of docking.
+    window.innerWidth = 700
+    openTeamTabOnLeadStart('wt-1')
+    expect(state).toMatchObject({ rightSidebarOpen: false, rightSidebarTab: 'explorer' })
+    window.innerWidth = 1440
+    openTeamTabOnLeadStart('wt-1')
+    expect(state).toMatchObject({ rightSidebarOpen: true, rightSidebarTab: 'team' })
   })
 
   it('leaves the sidebar alone when another project is shown', () => {

@@ -47,3 +47,22 @@ export function rightSidebarOverlaysContent(args: {
   }
   return leftSidebarWidth + rightPanelWidth + RIGHT_SIDEBAR_OVERLAY_MIN_CONTENT_WIDTH > windowWidth
 }
+
+export const ACTIVITY_BAR_SIDE_WIDTH = 40
+
+/** Whether the right sidebar, opened now with this layout, would overlay the content. */
+export function rightSidebarWouldOverlay(args: {
+  windowWidth: number | null | undefined
+  sidebarOpen: boolean
+  sidebarWidth: number
+  rightSidebarWidth: number
+  activityBarPosition: string
+}): boolean {
+  const barWidth = args.activityBarPosition === 'side' ? ACTIVITY_BAR_SIDE_WIDTH : 0
+  return rightSidebarOverlaysContent({
+    windowWidth: args.windowWidth,
+    leftSidebarWidth: args.sidebarOpen ? args.sidebarWidth : 0,
+    rightPanelWidth:
+      clampRightSidebarPanelWidth(args.rightSidebarWidth, args.windowWidth, barWidth) + barWidth
+  })
+}

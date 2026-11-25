@@ -27,6 +27,9 @@ const SIDEBAR_WIDTHS = [
   ['max', 1440 - RIGHT_SIDEBAR_MIN_NON_SIDEBAR_AREA]
 ] as const
 
+// Left sidebar 280 + right 350 + 120 of content is over 700: the sidebar would overlay.
+const OVERLAY_WINDOW = 700
+
 const sidebarOf = (page: Page) =>
   page.evaluate(() => {
     const state = window.__store!.getState()
@@ -111,6 +114,72 @@ test('a lead start opens Team once, keeps terminal focus, and respects a later t
   expect(await sidebarOf(orcaPage)).toEqual({ open: true, tab: 'source-control' })
 
   // A fresh lead in the same pane is a new start.
+  expect((await register(true)).result.registered).toBe(true)
+  await expect.poll(() => sidebarOf(orcaPage)).toEqual({ open: true, tab: 'team' })
+})
+
+test('a lead start does not open Team where the sidebar would overlay the left sidebar', async ({
+  electronApp,
+  orcaPage
+}, testInfo) => {
+  test.setTimeout(180_000)
+  await waitForSessionReady(orcaPage)
+  const worktreeId = await waitForActiveWorktree(orcaPage)
+  await ensureTerminalVisible(orcaPage)
+  await waitForActivePanePtyId(orcaPage)
+  const pane = await waitForActivePaneHookDescriptor(orcaPage)
+  const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
+  const client = new RuntimeClient(userDataDir, 30_000, null, null)
+  const lead = (
+    await client.call<{ terminal: { handle: string } }>('terminal.resolvePane', {
+      paneKey: pane.paneKey
+    })
+  ).result.terminal.handle
+  await client.call('terminal.send', {
+    terminal: lead,
+    text: 'node -e "setInterval(() => {}, 1e9)"',
+    enter: true
+  })
+  await setWindowWidth(electronApp, orcaPage, OVERLAY_WINDOW)
+  await orcaPage.evaluate(() => {
+    const state = window.__store!.getState()
+    state.setSidebarOpen(true)
+    state.setRightSidebarOpen(false)
+    state.setRightSidebarTab('source-control')
+  })
+  const fit = await orcaPage.evaluate(() => {
+    const s = window.__store!.getState()
+    return { left: s.sidebarWidth, right: s.rightSidebarWidth, window: innerWidth }
+  })
+  // The layout must be one where an open sidebar would float over the content.
+  expect(fit.left + Math.min(fit.right, fit.window - 320) + 120).toBeGreaterThan(fit.window)
+
+  const register = (fresh = false) =>
+    client.call<{ registered: boolean }>('game.leadRegister', {
+      worktreeId,
+      terminalHandle: lead,
+      project: 'e2e',
+      label: 'Alfred',
+      claim: true,
+      ...(fresh ? { fresh: true } : {})
+    })
+  await expect.poll(async () => (await register()).result.registered).toBe(true)
+  // Why a pause: no open is the outcome, so give a wrong one the time IPC takes to land.
+  await orcaPage.waitForTimeout(1_500)
+  expect(await sidebarOf(orcaPage)).toEqual({ open: false, tab: 'source-control' })
+  await expect(orcaPage.locator('[data-right-sidebar-overlay]')).toHaveCount(0)
+  for (const theme of THEMES) {
+    await setTheme(orcaPage, theme)
+    // Why the left sidebar only: it is what an overlay covered; the content shows the prompt.
+    await orcaPage.screenshot({
+      animations: 'disabled',
+      clip: { x: 0, y: 0, width: fit.left, height: await orcaPage.evaluate(() => innerHeight) },
+      path: testInfo.outputPath(`lead-start-overlay-${OVERLAY_WINDOW}-${theme}.png`)
+    })
+  }
+
+  // Where the sidebar docks, the next start opens it.
+  await setWindowWidth(electronApp, orcaPage, 1440)
   expect((await register(true)).result.registered).toBe(true)
   await expect.poll(() => sidebarOf(orcaPage)).toEqual({ open: true, tab: 'team' })
 })

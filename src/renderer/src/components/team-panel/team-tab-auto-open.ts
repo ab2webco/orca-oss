@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store'
+import { rightSidebarWouldOverlay } from '@/components/right-sidebar/right-sidebar-width'
 
 // Why one-shot: V30 opens on Team, but once the person picks a tab, or Orca applied it, it never forces it again.
 const DEFAULTED_KEY = '_rightSidebarTeamTabDefaulted'
@@ -45,6 +46,19 @@ export function openTeamTabOnLeadStart(worktreeId: string): void {
     return
   }
   const state = useAppStore.getState()
+  // Why: an overlaid sidebar would cover the left sidebar and content the person is using.
+  if (
+    !state.rightSidebarOpen &&
+    rightSidebarWouldOverlay({
+      windowWidth: window.innerWidth,
+      sidebarOpen: state.sidebarOpen,
+      sidebarWidth: state.sidebarWidth,
+      rightSidebarWidth: state.rightSidebarWidth,
+      activityBarPosition: state.activityBarPosition
+    })
+  ) {
+    return
+  }
   state.setRightSidebarTab('team')
   state.setRightSidebarOpen(true)
   markTeamTabDefaulted()

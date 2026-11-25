@@ -13,7 +13,8 @@ import {
   RIGHT_SIDEBAR_MIN_WIDTH,
   clampRightSidebarPanelWidth,
   computeMaxRightSidebarPanelWidth,
-  rightSidebarOverlaysContent
+  rightSidebarOverlaysContent,
+  ACTIVITY_BAR_SIDE_WIDTH
 } from './right-sidebar-width'
 import { translate } from '@/i18n/i18n'
 import { RightSidebarPanelContent } from './right-sidebar-panel-content'
@@ -29,8 +30,6 @@ import { useRightSidebarActivityItems } from './use-right-sidebar-activity-items
 import { useRightSidebarTabRouting } from './use-right-sidebar-tab-routing'
 import { useWindowWidth } from './use-window-width'
 import { RightSidebarDrawerScrim, useRightSidebarDrawer } from './right-sidebar-drawer'
-
-const ACTIVITY_BAR_SIDE_WIDTH = 40
 
 function RightSidebarInner(): React.JSX.Element {
   const hasDesktopWindowChrome = shouldRenderDesktopWindowChrome({
