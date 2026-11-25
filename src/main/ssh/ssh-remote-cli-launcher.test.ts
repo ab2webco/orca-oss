@@ -250,7 +250,7 @@ describe('SSH remote Orca Lab CLI launcher', () => {
     })
 
     const gh = plan.files.find((file) => file.path === '/home/me/.orca-relay/bin/gh')
-    expect(gh?.contents).toContain('orca game pr-cap-check')
+    expect(gh?.contents).toContain('"${ORCA_CLI_COMMAND:-orca}" game pr-cap-check')
     expect(plan.postWriteCommands).toEqual([
       "chmod +x '/home/me/.orca-relay/bin/orca' '/home/me/.orca-relay/bin/gh'"
     ])

@@ -14006,6 +14006,34 @@ describe('OrcaRuntimeService', () => {
     expect(plain).not.toHaveProperty('ORCA_GAME_CLI')
   })
 
+  it("marks a game member's pane for the gh PR-cap wrapper whatever its agent, and no other pane (ORCA-1388)", async () => {
+    const spawn = vi.fn().mockResolvedValue({ id: 'pty-bg' })
+    const runtime = new OrcaRuntimeService(store)
+    runtime.setPtyController({
+      spawn,
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      startupAgent: 'codex',
+      orchestrationGameMember: true,
+      title: 'member'
+    })
+    await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      startupAgent: 'codex',
+      orchestrationWorker: true,
+      title: 'worker'
+    })
+
+    const [member, worker] = spawn.mock.calls.map(
+      (call) => (call[0] as { env?: Record<string, string> }).env ?? {}
+    )
+    expect(member.ORCA_GH_PR_CAP_MEMBER).toBe('1')
+    expect(worker).not.toHaveProperty('ORCA_GH_PR_CAP_MEMBER')
+  })
+
   it.skipIf(process.platform === 'win32')(
     'gives a game member under Agent Teams its own game once, not the lead game on top',
     async () => {

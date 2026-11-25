@@ -695,6 +695,7 @@ import type {
   PtyTransientFact
 } from '../providers/types'
 import { ClaudeAgentTeamsService } from './claude-agent-teams-service'
+import { GH_PR_CAP_MEMBER_ENV } from '../pty/gh-pr-cap-shim'
 import type {
   AgentTeamsTmuxCompatRequest,
   AgentTeamsTmuxCompatResponse
@@ -29186,6 +29187,10 @@ export class OrcaRuntimeService {
           tabId,
           {
             ...(opts.orchestrationWorker ? this.orchestrationMemberGameEnv(workspace) : {}),
+            // Why local only: a remote member's relay already puts its gh wrapper beside its orca.
+            ...(opts.orchestrationGameMember && !workspace.connectionId
+              ? { [GH_PR_CAP_MEMBER_ENV]: '1' }
+              : {}),
             ...agentTeamsPlan?.env
           }
         )
