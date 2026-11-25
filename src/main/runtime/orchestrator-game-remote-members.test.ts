@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { OrchestrationDb } from './orchestration/db'
+import { memberPhaseOf } from '../../shared/orchestrator-game-member-phase'
 import {
   listEarlierLeadRemoteMemberSources,
   listRemoteGameMemberSources,
@@ -203,6 +204,23 @@ describe('remote members of a lead (ORCA-824)', () => {
       lastActivityAt: '2026-10-27T14:12:00.000Z',
       stateSince: Date.parse('2026-10-27T14:10:00Z')
     })
+  })
+
+  // Why (ORCA-1395): the hook time is how a launched remote member's silent hook reads unknown.
+  it('carries the hook time its host relays, so a stale working hook reads unknown', async () => {
+    const hookAt = Date.parse('2026-10-27T14:12:00Z')
+    const [member] = await remoteGameMembersOf([source], {
+      showOf: async () => ({
+        branch: 'b',
+        title: null,
+        liveness: 'running',
+        agent: { state: 'working', agentType: 'claude', updatedAt: hookAt }
+      }),
+      reviewOf: async () => null
+    })
+
+    expect(member.hookAt).toBe(hookAt)
+    expect(memberPhaseOf(member, hookAt + 31 * 60_000)).toBe('unknown')
   })
 
   it("shows the tool and its input preview the member's host relays (ORCA-1049)", async () => {
