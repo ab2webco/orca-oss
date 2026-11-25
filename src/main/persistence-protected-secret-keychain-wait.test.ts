@@ -360,13 +360,18 @@ describe('protected secrets at startup when the Keychain prompts', () => {
   it('the quit flush waits for a secret still encrypting', async () => {
     await seedEncryptedProfile()
     useAsyncKeychain(async (ciphertext) => ({ result: decode(ciphertext), shouldReEncrypt: false }))
-    safeStorageMock.encryptStringAsync = async (plaintext: string) =>
-      Buffer.from(`enc:${crypto.randomUUID()}:${plaintext}`, 'utf-8')
+    // Why: lands after 1 s, inside the 2 s bound, so a flush that does not wait misses it.
+    safeStorageMock.encryptStringAsync = (plaintext: string) =>
+      new Promise<Buffer>((resolve) =>
+        setTimeout(() => resolve(Buffer.from(`enc:${crypto.randomUUID()}:${plaintext}`)), 1000)
+      )
 
     const store = await createStore()
     await store.unsealProtectedSecrets()
     store.updateSettings({ opencodeSessionCookie: 'cookie-set-before-quit' })
-    await store.flushAsync()
+    const flushing = store.flushAsync()
+    await vi.advanceTimersByTimeAsync(2500)
+    await flushing
 
     expect(decode(Buffer.from(persistedBlobs().cookie, 'base64'))).toBe('cookie-set-before-quit')
     expect(keychain.syncCalls).toBe(0)

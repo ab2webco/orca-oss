@@ -331,3 +331,86 @@ describe('a cloud session merge during a refresh save', () => {
     })
   })
 })
+
+describe('a delete while a save encrypts', () => {
+  async function expectDeleteWins(
+    save: () => Promise<unknown>,
+    remove: () => void,
+    isStored: () => boolean
+  ): Promise<void> {
+    const pending = deferred<Buffer<ArrayBuffer>>()
+    safeStorageMock.encryptStringAsync.mockImplementationOnce(() => pending.promise)
+    const saving = save()
+    await vi.waitFor(() => expect(safeStorageMock.encryptStringAsync).toHaveBeenCalled())
+    remove()
+    pending.resolve(Buffer.from('v10:late'))
+    await saving
+    expect(isStored()).toBe(false)
+  }
+
+  it('Bitbucket credential', async () => {
+    const store = await load<typeof CredentialStoreModule>('./bitbucket/credential-store')
+    await expectDeleteWins(
+      () =>
+        store.saveBitbucketCredential({
+          authMode: 'token',
+          email: null,
+          baseUrl: null,
+          account: 'ada',
+          accessToken: 'bb-key',
+          apiToken: null
+        }),
+      store.clearStoredBitbucketCredential,
+      store.hasStoredBitbucketCredential
+    )
+  })
+
+  it('OpenAI speech key', async () => {
+    const store = await load<typeof OpenaiApiKeyStoreModule>('./speech/openai-api-key-store')
+    await expectDeleteWins(
+      () => store.saveOpenAiSpeechApiKey('sk-1'),
+      store.clearOpenAiSpeechApiKey,
+      store.hasOpenAiSpeechApiKey
+    )
+  })
+
+  it('MiniMax cookie', async () => {
+    const store = await load<typeof MinimaxCookieStoreModule>('./minimax/minimax-cookie-store')
+    await expectDeleteWins(
+      () => store.saveMiniMaxSessionCookie('_token=abc'),
+      store.clearMiniMaxSessionCookie,
+      store.hasMiniMaxSessionCookie
+    )
+  })
+
+  it('plugin secret', async () => {
+    const { PluginSecretsStore } = await load<typeof PluginSecretsStoreModule>(
+      './plugins/plugin-secrets-store'
+    )
+    const vault = new PluginSecretsStore(tempHome, 'acme.first')
+    await expectDeleteWins(
+      () => vault.set('k', 'v'),
+      () => vault.delete('k'),
+      () => vault.get('k').ok && (vault.get('k') as { value: string | null }).value !== null
+    )
+  })
+
+  it('Orca Cloud session', async () => {
+    const store = await load<typeof ProfileCloudSessionStoreModule>(
+      './orca-profiles/profile-cloud-session-store'
+    )
+    const session = {
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: 1,
+      capabilities: { flags: {}, refreshedAt: 1 }
+    }
+    await expectDeleteWins(
+      () => store.saveOrcaCloudSession('p', tempHome, session),
+      () => store.clearOrcaCloudSession('p', tempHome),
+      () =>
+        existsSync(store.getOrcaCloudSessionPath('p', tempHome)) ||
+        store.readOrcaCloudSession('p', tempHome).status === 'found'
+    )
+  })
+})
