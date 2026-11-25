@@ -92,8 +92,11 @@ async function hostSeatOf(
   ) {
     return refuse(`it leads a Run on ${host}; a lead is never adopted as a member`)
   }
-  const terminal = hostTerminalOf(terminals.result.terminals, hostPane)
-  if (!terminal?.connected || terminal.liveness !== 'running') {
+  const running = terminals.result.terminals.filter(
+    (one) => one.connected && one.liveness === 'running'
+  )
+  const terminal = hostTerminalOf(running, hostPane)
+  if (!terminal) {
     return refuse(`its terminal no longer runs on ${host}`)
   }
   const agentState = hostAgentStateOf(ps.result, found)
