@@ -1,5 +1,5 @@
 ---
-sourceHash: 3bbf88ec093aba24
+sourceHash: dd312bc9213da8d6
 ---
 
 # El juego orquestador de Agent Teams
@@ -891,6 +891,15 @@ Los verbos del líder, ejecutados desde la terminal del líder
   conversación de líder guardada del proyecto y esta sesión pasa a ser el nuevo líder en lugar de
   reabrirla. Un líder vivo sigue ganando, y un host más antiguo que descarta el flag reabre el
   anterior y lo dice.
+- Bajo sus reglas, `game lead` y `game lead --fresh` imprimen una sección **Inherited** (ORCA-1429),
+  una línea por ítem, de la misma lectura que `game fleet` más el registro del proyecto: la línea de
+  slots, los miembros en curso, los terminados con el pane aún abierto (`game sweep --close`), los
+  leftovers con su comando de cierre, los pausados, quién espera a quién (miembros a la respuesta del
+  líder, el líder a una pregunta abierta a la persona, una respuesta que nunca llegó al líder), los
+  follow-ups pendientes y las últimas cinco decisiones
+  ([`orchestrator-game-inherited.ts`](../../../src/cli/handlers/orchestrator-game-inherited.ts)).
+  Solo usa llamadas existentes; un Orca sin las preguntas a la persona o sin el registro de
+  decisiones igual imprime las reglas y nombra el registro que no pudo leer.
 - Cuando los PR abiertos del proyecto (el total de la lista de PR) alcanzan el tope, `orca game
 launch` se niega antes de iniciar nada, salvo que el PR del propio ticket sea uno de ellos (un
   relanzamiento no agrega PR) o se pase `--past-pr-cap "<por qué>"`, que lanza e imprime el motivo.

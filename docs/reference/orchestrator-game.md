@@ -852,6 +852,14 @@ The lead's verbs, run from the lead's terminal
 - `orca game lead --fresh` — rotates the lead: with the outgoing lead's pane closed, Orca retires the
   project's stored lead conversation and this session becomes the new lead instead of reopening it.
   A live lead still wins, and an older host that drops the flag reopens the old one and says so.
+- Under its rules, `game lead` and `game lead --fresh` print an **Inherited** section (ORCA-1429),
+  one line per item, from the same read as `game fleet` plus the project record: the slots line,
+  members running, finished ones whose pane is still open (`game sweep --close`), leftovers with
+  their close command, paused members, who waits on whom (members on the lead's reply, the lead on
+  an open owner question, an answer that never reached the lead), pending follow-ups and the latest
+  five decisions ([`orchestrator-game-inherited.ts`](../../src/cli/handlers/orchestrator-game-inherited.ts)).
+  It reads only existing calls; an Orca without the owner questions or the decision trail still
+  prints the rules and names the record it could not read.
 - When the project's open PRs (the PR list's total) reach the cap, `orca game launch` refuses before
   anything starts, unless the ticket's own PR is one of them (a relaunch adds no PR) or
   `--past-pr-cap "<why>"` is given, which launches and prints why. `orca game wave` prints `Warning:`
