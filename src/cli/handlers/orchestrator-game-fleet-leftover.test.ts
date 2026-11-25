@@ -77,7 +77,7 @@ describe('found sessions with no live agent are leftovers (ORCA-1424)', () => {
 
     expect(row.leftover).toBe(true)
     expect(row.next).toBe(
-      'leftover on koombea (idle, no lead): orca game adopt ORCA-1388 if its work goes on, else close its tab there (orca terminal list --environment env-koombea --worktree "id:repo::/w/ORCA-1388", then orca terminal close --environment env-koombea --terminal <handle> --tab)'
+      'leftover on koombea (idle, no lead): orca game adopt ORCA-1388 if its work goes on, else orca game stop ORCA-1388 closes its pane there'
     )
     expect(working.leftover).toBe(false)
     expect(working.next).toContain('orca game adopt ORCA-1400')
