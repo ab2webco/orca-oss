@@ -156,16 +156,20 @@ export class GameHistoryStore {
     return result as R
   }
 
-  /** `change` sees the team XP rows (ORCA-1264) and the characters; null rows leave the file. */
-  async changeTeamXp<R>(
+  /**
+   * `change` sees one kept field (team XP rows, ORCA-1264; the decision trail, ORCA-1428) and the
+   * characters; a null next leaves the file.
+   */
+  async changeDataField<R>(
     projectKey: string,
+    field: 'teamXp' | 'decisions',
     change: (raw: unknown, characters: Record<string, unknown>) => { next: unknown; result: R }
   ): Promise<R> {
     let result: R | undefined
     await this.update(projectKey, (current) => {
-      const { next, result: changed } = change(current.data.teamXp, current.characters ?? {})
+      const { next, result: changed } = change(current.data[field], current.characters ?? {})
       result = changed
-      return next === null ? null : { ...current, data: { ...current.data, teamXp: next } }
+      return next === null ? null : { ...current, data: { ...current.data, [field]: next } }
     })
     return result as R
   }
@@ -226,12 +230,7 @@ export class GameHistoryStore {
    */
   async adopt(fromKey: string, toKey: string): Promise<{ records: number; events: number } | null> {
     const from = this.fileOf(fromKey)
-    if (
-      !(await stat(from).then(
-        () => true,
-        () => false
-      ))
-    ) {
+    if (!(await stat(from).catch(() => null))) {
       return null
     }
     const { log, before } = await this.read(fromKey)

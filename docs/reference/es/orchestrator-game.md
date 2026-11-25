@@ -1,5 +1,5 @@
 ---
-sourceHash: 02cbd3399ed45dec
+sourceHash: 3bbf88ec093aba24
 ---
 
 # El juego orquestador de Agent Teams
@@ -1155,6 +1155,9 @@ matches …` (ORCA-866).
 - `orca game ask-owner --question [--ticket] [--option]... [--context]`, `orca game owner-questions
 [--all]`, `orca game owner-question <id>` y `orca game answer-owner <id> (--pick <n> | --answer <text>)` — las preguntas del líder a
   la persona como registros, más abajo.
+- `orca game decision add (--decision | --follow-up) [--ticket] [--why] [--evidence]`,
+  `orca game decision list [--ticket] [--all]` y `orca game decision done <id>` — el registro de
+  decisiones del proyecto y sus seguimientos pendientes, más abajo.
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — trae de vuelta a los miembros
   que un reinicio dejó en pausa, más abajo.
 
@@ -1644,6 +1647,15 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   con `game.ownerQuestionsImport`, que el host del miembro solo acepta de la huella del home de la
   asignación ([`orchestrator-game-member-owner-answer-check.ts`](../../../src/main/runtime/orchestrator-game-member-owner-answer-check.ts)).
   Un host más antiguo no tiene esa llamada, así que su miembro le pregunta a la persona como antes.
+- Lo que el líder decide es un registro, no texto de chat (ORCA-1428): `game decision add` guarda una
+  fila (hora, ticket, decisión, por qué, evidencia) en el archivo del tablero del proyecto en el host
+  que ejecuta al líder, junto a las preguntas a la persona ([`orchestrator-game-decisions.ts`](../../../src/shared/orchestrator-game-decisions.ts)).
+  `--follow-up` la vuelve un seguimiento pendiente hasta `game decision done <id>`. `game decision list`
+  lee las mismas filas desde cualquier líder del proyecto, así que un líder iniciado con `--fresh` o
+  tras una compactación las hereda; las reglas del líder le piden leer la lista en cada inicio. Se
+  guardan las últimas 500 filas cerradas; un seguimiento pendiente nunca se descarta. Solo el líder
+  escribe; un miembro lee el registro de su líder. Todo campo salvo la decisión es opcional en el
+  cable, y un host más antiguo responde `method_not_found`, que la CLI informa como un Orca a actualizar.
 - Los miembros que un líder coloca en un host emparejado con `orchestration worker-start --on <env>`
   forman parte de su flota (ORCA-824): `game fleet`, `game state --json` y `game member <ticket>` los
   listan con su host (`HOST`, `remote.host`), y el estado, la rama y el PR que informa el

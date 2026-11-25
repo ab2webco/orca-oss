@@ -145,6 +145,13 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
         .ORCHESTRATOR_GAME_OWNER_QUESTION_HANDLERS
   },
   {
+    name: 'orchestrator-game-decisions',
+    keys: ['game decision add', 'game decision list', 'game decision done'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-decisions.js'))
+        .ORCHESTRATOR_GAME_DECISION_HANDLERS
+  },
+  {
     name: 'orchestrator-game-leads',
     keys: ['game leads'],
     load: async () =>

@@ -94,6 +94,18 @@ describe('gameLeadBriefOf', () => {
     )
   })
 
+  // Why (ORCA-1428): a lead started with --fresh or compacted has only what the runtime kept.
+  it('records decisions and follow-ups in the trail and reads it on every start', () => {
+    const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
+
+    expect(brief).toContain(
+      '`orca game decision add --ticket <id> --decision <text> --why <text> --evidence <link>`'
+    )
+    expect(brief).toContain('`--follow-up <text>` in place of --decision')
+    expect(brief).toContain('On every start, resume or compaction read `orca game decision list`')
+    expect(brief).toContain('`orca game decision done <id>`')
+  })
+
   it('resumes the members a restart paused at once, then tells the person', () => {
     const brief = gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')
 
