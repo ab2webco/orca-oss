@@ -243,4 +243,13 @@ describe('planeHtmlToMarkdown <-> markdownToPlaneHtml round-trip', () => {
     const original = 'Say "hi" at [q](https://x.test/?q="a b")'
     expect(planeHtmlToMarkdown(markdownToPlaneHtml(original))).toBe(original)
   })
+
+  it.each([
+    ['bullet list', '- say "hi"\n- "two"'],
+    ['ordered list', '1. say "hi"'],
+    ['heading', '## The "quoted" title'],
+    ['blockquote', '> she said "hi"']
+  ])('keeps a double quote in a %s', (_kind, original) => {
+    expect(planeHtmlToMarkdown(markdownToPlaneHtml(original))).toBe(original)
+  })
 })
