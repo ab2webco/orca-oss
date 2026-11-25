@@ -4,12 +4,18 @@ import {
   type GameFleetInput,
   type GameFleetRow
 } from './orchestrator-game-fleet-verbs'
+import { remoteDispatchIdOf } from './orchestrator-game-auto-release'
+import { foundHostPaneOf, type FoundHostPane } from './orchestrator-game-found-host-pane'
+import type { GameAgent } from './orchestrator-game-state'
 
 export type GameStopTarget = {
+  agent: GameAgent
   row: GameFleetRow
   worktreeId: string | null
   /** A remote member's home dispatch; its terminal handle only resolves on its host. */
   remoteDispatchId: string | null
+  /** A session found on a paired host: only its pane there ends it (ORCA-1396). */
+  hostPane: FoundHostPane | null
 }
 
 /** Members `orca game stop` ends, in list order; never the lead, and a found session only by name. */
@@ -18,9 +24,11 @@ export function gameStopTargetsOf(
   tickets: 'all' | readonly string[]
 ): { targets: GameStopTarget[]; missing: string[] } {
   const all = gameFleetMembersOf(state).map((agent) => ({
+    agent,
     row: gameFleetRowOf(agent),
     worktreeId: agent.worktree?.id ?? null,
-    remoteDispatchId: agent.remote ? agent.paneKey.replace(/^remote:/, '') : null
+    remoteDispatchId: remoteDispatchIdOf(agent),
+    hostPane: foundHostPaneOf(agent)
   }))
   if (tickets === 'all') {
     return { targets: all.filter((target) => !target.row.found), missing: [] }

@@ -11,6 +11,7 @@ import {
   type GameMemberName
 } from '../../shared/orchestrator-game-member-names'
 import type { GameAgent, OrchestratorGameState } from '../../shared/orchestrator-game-state'
+import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -57,7 +58,7 @@ export function historyDispatchOf(
   member: Pick<GameAgent, 'paneKey' | 'remote' | 'terminalHandle' | 'worktree'>,
   workers: readonly GameStopWorker[]
 ): GameStopWorker | undefined {
-  const remoteId = member.remote ? member.paneKey.replace(/^remote:/, '') : null
+  const remoteId = remoteDispatchIdOf(member)
   const handle = member.terminalHandle ?? null
   const worktreeId = member.worktree?.id ?? null
   return (

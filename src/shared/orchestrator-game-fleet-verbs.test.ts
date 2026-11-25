@@ -387,7 +387,7 @@ describe('gameFleetReportOf', () => {
       expect.objectContaining({
         ticket: 'ORCA-915',
         next: expect.stringMatching(
-          /^leftover on m1 \(idle, no lead\): orca game adopt ORCA-915 if its work goes on, else close its tab there/
+          /^leftover on m1 \(idle, no lead\): orca game adopt ORCA-915 if its work goes on, else orca game stop ORCA-915 closes its pane there$/
         )
       })
     ])

@@ -469,7 +469,7 @@ describe('orca game fleet verbs', () => {
     expect(process.exitCode).toBe(1)
   })
 
-  it('sweep --close records each finished member in the history before freeing it', async () => {
+  it('sweep --close records each finished member in the history after freeing it', async () => {
     const agents = [
       LEAD,
       member({
@@ -514,8 +514,9 @@ describe('orca game fleet verbs', () => {
 
     await run('game sweep', client, [['close', true]])
 
+    // Why after (ORCA-1396): a release the host refuses leaves the member, so it was not freed.
     const order = methods(calls)
-    expect(order.indexOf('game.historyRecord')).toBeLessThan(
+    expect(order.indexOf('game.historyRecord')).toBeGreaterThan(
       order.indexOf('orchestration.workerRelease')
     )
     expect(calls.find(([method]) => method === 'game.historyRecord')?.[1]).toEqual({
@@ -821,7 +822,7 @@ describe('orca game fleet verbs', () => {
 
       await run('game stop', client, [['all', true]])
 
-      expect(methods(calls).slice(-1)).toEqual(['terminal.close'])
+      expect(methods(freeing(calls)).slice(-1)).toEqual(['terminal.close'])
       expect(printed().members).toEqual([
         expect.objectContaining({
           outcome: 'stopped',
@@ -831,7 +832,7 @@ describe('orca game fleet verbs', () => {
       ])
     })
 
-    it('records each member as stopped, limited or failed before stopping it', async () => {
+    it('records each member as stopped, limited or failed after stopping it', async () => {
       const agents = [
         LEAD,
         member({ paneKey: 'a', displayName: 'CIN-1', terminalHandle: 'term_1' }),
@@ -867,7 +868,7 @@ describe('orca game fleet verbs', () => {
         ['CIN-3', 'stopped']
       ])
       const order = methods(calls)
-      expect(order.indexOf('game.historyRecord')).toBeLessThan(
+      expect(order.indexOf('game.historyRecord')).toBeGreaterThan(
         order.indexOf('orchestration.workerStop')
       )
     })

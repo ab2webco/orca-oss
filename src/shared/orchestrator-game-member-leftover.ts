@@ -7,21 +7,12 @@ import type { GameAgent } from './orchestrator-game-state'
 export const isLeftoverMember = (agent: Pick<GameAgent, 'found' | 'state'>): boolean =>
   agent.found === true && agent.state !== 'working' && agent.state !== 'waiting'
 
-/** Adopt when its work goes on, else close it; a found pane on a paired host has no handle here. */
-export function leftoverNextOf(
-  agent: Pick<GameAgent, 'remote' | 'worktree'>,
-  name: string
-): string {
-  const remote = agent.remote
+/** Adopt when its work goes on, else stop it; on a paired host the stop closes its pane there (ORCA-1396). */
+export function leftoverNextOf(agent: Pick<GameAgent, 'remote'>, name: string): string {
   const adopt = `orca game adopt ${name} if its work goes on`
-  if (!remote) {
-    return `leftover (idle, no lead): ${adopt}, else orca game stop ${name}`
-  }
-  const env = `--environment ${remote.environmentId ?? remote.host}`
-  const list = agent.worktree
-    ? `orca terminal list ${env} --worktree "id:${agent.worktree.id}"`
-    : `orca terminal list ${env}`
-  return `leftover on ${remote.host} (idle, no lead): ${adopt}, else close its tab there (${list}, then orca terminal close ${env} --terminal <handle> --tab)`
+  return agent.remote
+    ? `leftover on ${agent.remote.host} (idle, no lead): ${adopt}, else orca game stop ${name} closes its pane there`
+    : `leftover (idle, no lead): ${adopt}, else orca game stop ${name}`
 }
 
 /** ` · 2 leftover, no slot held` for the fleet head; nothing when there are none. */

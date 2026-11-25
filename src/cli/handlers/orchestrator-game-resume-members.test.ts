@@ -425,6 +425,81 @@ describe('orca game resume-members', () => {
     expect(calls.map(([m]) => m)).not.toContain('game.memberResume')
   })
 
+  // Why (ORCA-1433): --discard ran before --dry-run was read, so a dry run freed records for real.
+  it('--discard --dry-run frees nothing and says what it would free', async () => {
+    const { client, calls } = fakeClient({ pausedMembers: [paused('CIN-1'), paused('CIN-2')] })
+
+    await run(
+      client,
+      [
+        ['discard', true],
+        ['dry-run', true]
+      ],
+      false
+    )
+
+    expect(calls.map(([m]) => m)).not.toContain('game.memberDiscard')
+    expect(output.join('')).toBe('Would free 2: CIN-1, CIN-2')
+  })
+
+  // Why (ORCA-1433): the runtime drops every saved record of a named ticket, a live member's too.
+  it('--discard keeps the saved record of a ticket a live member holds, and never offers to free it', async () => {
+    const agents = [
+      LEAD,
+      {
+        paneKey: 'p',
+        displayName: 'Alex · CIN-1887',
+        state: 'working',
+        isMember: true,
+        isLeader: false,
+        terminalHandle: 'term_alex'
+      }
+    ]
+    const named: [string, string | boolean] = ['tickets', 'CIN-1887,CIN-1914']
+    const { client, calls } = fakeClient({ agents, pausedMembers: [paused('CIN-1914')] })
+
+    await run(client, [['discard', true], named, ['dry-run', true]], false)
+    const dryRun = output.join('')
+    output = []
+    await run(client, [['discard', true], named])
+
+    expect(dryRun).toBe(
+      'Would free 1: CIN-1914 · kept, a live member holds it: CIN-1887 (Alex · CIN-1887)'
+    )
+    expect(calls.filter(([m]) => m === 'game.memberDiscard').map(([, p]) => p.tickets)).toEqual([
+      ['CIN-1914']
+    ])
+    expect(printed()).toMatchObject({
+      discarded: ['CIN-1914'],
+      held: [{ ticket: 'CIN-1887', name: 'Alex · CIN-1887' }]
+    })
+  })
+
+  it('--discard of all frees only saved members while a live member runs', async () => {
+    const agents = [
+      LEAD,
+      {
+        paneKey: 'p',
+        displayName: 'Alex · CIN-1887',
+        state: 'idle',
+        isMember: true,
+        isLeader: false,
+        terminalHandle: 'term_alex'
+      }
+    ]
+    const { client, calls } = fakeClient({
+      agents,
+      pausedMembers: [paused('CIN-1914')],
+      unlistedMembers: [{ ticket: 'CIN-1372', name: null, branch: null, worktreeId: 'wt-1372' }]
+    })
+
+    await run(client, [['discard', true]])
+
+    expect(calls.filter(([m]) => m === 'game.memberDiscard').map(([, p]) => p.tickets)).toEqual([
+      ['CIN-1914', 'CIN-1372']
+    ])
+  })
+
   it('says why saved members cannot be read and how to start over, with exit code 1', async () => {
     const { client, calls } = fakeClient({
       pausedMembersError: 'the saved members file is damaged'

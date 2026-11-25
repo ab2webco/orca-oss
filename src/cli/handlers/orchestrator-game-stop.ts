@@ -2,7 +2,9 @@ import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
 import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-stop-targets'
 import { memberRosterOf } from '../../shared/orchestrator-game-member-names'
-import { agentOfRow, recordFreedMember } from './orchestrator-game-history-record'
+import { recordFreedMember } from './orchestrator-game-history-record'
+import { closeFoundHostPane } from './orchestrator-game-found-host-close'
+import type { FoundHostPane } from '../../shared/orchestrator-game-found-host-pane'
 
 type Client = Parameters<CommandHandler>[0]['client']
 
@@ -23,6 +25,8 @@ export type GameStopEntry = {
   dispatchId?: string
   dispatchState?: string
   closedTerminal?: string
+  /** The paired host whose pane it closed, for a session found there. */
+  host?: string
   /** Its tab was gone before the close; nothing was left to close. */
   alreadyClosedTerminal?: string
   reason?: string
@@ -73,6 +77,7 @@ export async function stopOne(
       Partial<Pick<GameStopTarget['row'], 'host'>>
     worktreeId: string | null
     remoteDispatchId?: string | null
+    hostPane?: FoundHostPane | null
   },
   workers: GameStopWorker[]
 ): Promise<GameStopEntry> {
@@ -80,6 +85,9 @@ export async function stopOne(
     ticket: target.row.ticket,
     name: target.row.name,
     outcome: 'already stopped'
+  }
+  if (target.hostPane) {
+    return await stopFoundOnHost(entry, target.hostPane)
   }
   if (target.remoteDispatchId) {
     const remote = { row: target.row, remoteDispatchId: target.remoteDispatchId }
@@ -123,6 +131,23 @@ export async function stopOne(
     entry.outcome = 'failed'
   }
   return entry
+}
+
+/** A session found on a paired host has no dispatch here: its pane closes on that host. */
+async function stopFoundOnHost(entry: GameStopEntry, found: FoundHostPane): Promise<GameStopEntry> {
+  try {
+    const closed = await closeFoundHostPane(found, { keepMidTurn: false })
+    if (closed.outcome === 'closed') {
+      return { ...entry, outcome: 'stopped', closedTerminal: closed.terminal, host: found.host }
+    }
+    if (closed.outcome === 'gone') {
+      return { ...entry, reason: `its pane is no longer on ${found.host}` }
+    }
+    return { ...entry, outcome: 'failed', reason: `its agent is ${closed.agentState}` }
+  } catch (error) {
+    const reason = `closing its pane on ${found.host} failed: ${errorText(error)}`
+    return { ...entry, outcome: 'failed', reason }
+  }
 }
 
 /** A remote member ends on its host: stop it if live, then release its terminal and worktree there. */
@@ -172,16 +197,17 @@ export async function stopGameMembers(
       {}
     )
     for (const target of targets) {
-      const member = agentOfRow(state, target.row)
-      const history = member
-        ? await recordFreedMember({
-            client,
-            member,
-            workers: result.workers,
-            roster: memberRosterOf(state)
-          })
-        : null
       const entry = await stopOne(client, target, result.workers)
+      // Why after: a member whose stop failed still runs, so it was never freed (ORCA-1396).
+      const history =
+        entry.outcome === 'failed'
+          ? null
+          : await recordFreedMember({
+              client,
+              member: target.agent,
+              workers: result.workers,
+              roster: memberRosterOf(state)
+            })
       members.push(history ? { ...entry, history } : entry)
     }
   }
@@ -207,7 +233,9 @@ export function formatStop(stop: GameStopResult): string {
     .map((member) => {
       const done = [
         member.dispatchId ? `dispatch ${member.dispatchId} ${member.dispatchState ?? '?'}` : '',
-        member.closedTerminal ? `closed ${member.closedTerminal}` : '',
+        member.closedTerminal
+          ? `closed ${member.closedTerminal}${member.host ? ` on ${member.host}` : ''}`
+          : '',
         member.alreadyClosedTerminal ? `${member.alreadyClosedTerminal} tab already closed` : ''
       ].filter(Boolean)
       return `${member.ticket ?? member.name} ${member.outcome}${done.length > 0 ? ` (${done.join(', ')})` : ''}${member.reason ? `: ${member.reason}` : ''}${member.history ? `\n  history ${member.history}` : ''}`

@@ -1,4 +1,5 @@
 import { formatGameLaunch, type GameLaunchResult } from './orchestrator-game-launch-result'
+import { formatSweepClose, type SweepClose } from './orchestrator-game-sweep-close-text'
 import { GAME_GLOBAL_LOGIN_LABEL } from './orchestrator-game-launch-account'
 import { formatStop, type GameStopResult } from './orchestrator-game-stop'
 import { leftoverCountOf } from '../../shared/orchestrator-game-member-leftover'
@@ -35,19 +36,6 @@ export type GameWaveResult = GameWavePlan & {
   launched: GameLaunchResult[]
   failed: { ticket: string; error: string }[]
 }
-
-export type SweepClose =
-  | {
-      via: 'release'
-      dispatchId: string
-      state: string
-      reason?: string
-      recovery?: string
-      /** The other dispatches of its host worktree this release freed too (ORCA-1076). */
-      worktreeDispatches?: { dispatchId: string; state: string }[]
-    }
-  | { via: 'close'; terminal: string }
-  | { via: 'release' | 'close'; error: string }
 
 export type GameSweepResult = {
   closed: boolean
@@ -267,18 +255,6 @@ export function formatWave(wave: GameWaveResult): string {
       : [])
   ]
   return lines.join('\n')
-}
-
-function formatSweepClose(closed: SweepClose | null | undefined): string {
-  if (!closed) {
-    return closed === null ? ' — nothing to close' : ''
-  }
-  if ('error' in closed) {
-    return ` — ${closed.via} failed: ${closed.error}`
-  }
-  return closed.via === 'close'
-    ? ` — closed ${closed.terminal}`
-    : ` — release ${closed.dispatchId} [${closed.state}]${(closed.worktreeDispatches ?? []).map((other, index) => `${index === 0 ? ' with' : ','} ${other.dispatchId} [${other.state}]`).join('')}${closed.reason ? ` ${closed.reason}` : ''}`
 }
 
 export function formatSweep(sweep: GameSweepResult, now: number = Date.now()): string {
