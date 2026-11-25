@@ -1,5 +1,5 @@
 ---
-sourceHash: 680f2013e1231211
+sourceHash: 02cbd3399ed45dec
 ---
 
 # El juego orquestador de Agent Teams
@@ -1194,6 +1194,11 @@ fijan el criterio:
   relojes que GitHub no da (los checks de una corrida, un lanzamiento en cola) empiezan cuando la
   vigilancia los ve por primera vez. Tras una compactación su contexto le recuerda volver a armar
   ambas.
+- **Tras una compactación.** Una compactación no termina al líder; sigue coordinando. El hook de Orca
+  reinyecta el `game fleet` actual y le indica responder desde ahí o desde una lectura nueva, nunca
+  desde el resumen, y volver a correr `game lead` si el resumen perdió sus reglas. La skill
+  `/orca-game:lead` corre `orca game lead --fresh` solo cuando la persona pide un líder nuevo, con el
+  anterior ya cerrado; sin ese flag Orca reabre la conversación compactada.
 - **Sesiones perdidas.** Una fila `gone from <host>` en `game fleet` se resuelve de inmediato: el líder
   compara el head del worktree en ese host con la rama publicada, y cierra, hace merge, o detiene y
   relanza. Nunca envía trabajo a una sesión perdida.
