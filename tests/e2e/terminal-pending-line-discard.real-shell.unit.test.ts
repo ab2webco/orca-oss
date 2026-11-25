@@ -102,8 +102,13 @@ describe.skipIf(SHELLS.length === 0)('pending line discard against a real shell'
       }
     })
     spawnedAt = Date.now()
+    const spawned = proc
+    // Why the check: the previous shell's SIGKILL exit can land after this test starts, and it
+    // would end every wait at once (ORCA-1407).
     proc.onExit((event) => {
-      exited = event
+      if (proc === spawned) {
+        exited = event
+      }
     })
     let output = ''
     proc.onData((chunk) => {

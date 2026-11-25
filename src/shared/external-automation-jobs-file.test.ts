@@ -1,7 +1,7 @@
 import { mkdtemp, rm, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   EXTERNAL_AUTOMATION_JOBS_FILE_MAX_BYTES,
   EXTERNAL_AUTOMATION_JOBS_MAX_ENTRIES,
@@ -11,6 +11,7 @@ import {
 const tempDirs: string[] = []
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
@@ -45,7 +46,14 @@ describe('readExternalAutomationJobsFile', () => {
     )
   })
 
-  it('rejects excessive job counts explicitly', async () => {
+  it('rejects excessive job counts explicitly, in English under any host locale', async () => {
+    const hostToLocaleString = Number.prototype.toLocaleString
+    // Why: pins the es_CO host default so CI sees '10.000' too (ORCA-1407).
+    vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(
+      function (this: number, locales, options) {
+        return hostToLocaleString.call(this, locales ?? 'es-CO', options)
+      }
+    )
     const path = await tempFile('too-many.json')
     await writeFile(
       path,

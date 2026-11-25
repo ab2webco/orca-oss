@@ -146,6 +146,18 @@ describe('automation schedules', () => {
     expect(formatAutomationSchedule('30 12 * * 7')).toBe(`Sundays at ${formatTimeForTest(12, 30)}`)
   })
 
+  it('names the weekday in English under a non-English host locale', () => {
+    const HostDateTimeFormat = Intl.DateTimeFormat
+    // Why: pins the es_CO host default that labelled Sunday 'domingos at' (ORCA-1407).
+    vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (locales, options) {
+      return new HostDateTimeFormat(locales ?? 'es-CO', options)
+    } as typeof Intl.DateTimeFormat)
+
+    expect(formatAutomationSchedule('30 12 * * 7')).toMatch(/^Sundays at /)
+    const rrule = buildAutomationRrule({ preset: 'weekly', hour: 9, minute: 0, dayOfWeek: 1 })
+    expect(formatAutomationSchedule(rrule)).toMatch(/^Mondays at /)
+  })
+
   it('tokenizes pasted cron whitespace without regex field splitting', () => {
     const split = vi.spyOn(String.prototype, 'split')
     const schedule = ['15', String.fromCharCode(160), '10\n*\t*\rMON-FRI'].join('')

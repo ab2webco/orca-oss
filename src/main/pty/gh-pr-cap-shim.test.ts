@@ -1,5 +1,14 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -17,8 +26,14 @@ function setup(orcaExit: number | null) {
   roots.push(root)
   const wrap = join(root, 'wrap')
   const bin = join(root, 'bin')
+  const tools = join(root, 'tools')
   mkdirSync(wrap)
   mkdirSync(bin)
+  mkdirSync(tools)
+  // Why only dirname, not /usr/bin: Ubuntu's /usr/bin/orca is GNOME's screen reader, which
+  // the wrapper would run as a found Orca CLI (ORCA-1407).
+  const dirname = ['/usr/bin/dirname', '/bin/dirname'].find((path) => existsSync(path))
+  symlinkSync(dirname ?? '/usr/bin/dirname', join(tools, 'dirname'))
   const script = (path: string, body: string) => {
     writeFileSync(path, `#!/bin/sh\n${body}\n`)
     chmodSync(path, 0o755)
@@ -33,7 +48,7 @@ function setup(orcaExit: number | null) {
   }
   const run = (...args: string[]) => {
     const result = spawnSync(join(wrap, 'gh'), args, {
-      env: { PATH: `${wrap}:${bin}:/usr/bin:/bin` },
+      env: { PATH: `${wrap}:${bin}:${tools}` },
       encoding: 'utf8'
     })
     let log = ''

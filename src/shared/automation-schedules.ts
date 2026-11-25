@@ -331,6 +331,13 @@ function formatTime(hour: number, minute: number): string {
   }).format(date)
 }
 
+// Why en-US: the label around it is English, so a host locale gave 'domingos at' (ORCA-1407).
+function formatWeekdayName(dayOfWeek: number): string {
+  return new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(
+    new Date(2026, 0, 4 + dayOfWeek)
+  )
+}
+
 function getSingleSetValue(values: Set<number>): number | null {
   if (values.size !== 1) {
     return null
@@ -368,10 +375,7 @@ function formatParsedRruleSchedule(schedule: ReturnType<typeof parseAutomationRr
   if (schedule.preset === 'weekdays') {
     return `Weekdays at ${time}`
   }
-  const day = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(
-    new Date(2026, 0, 4 + schedule.dayOfWeek)
-  )
-  return `${day}s at ${time}`
+  return `${formatWeekdayName(schedule.dayOfWeek)}s at ${time}`
 }
 
 function classifyParsedCronSchedule(rule: ParsedCron): AutomationCronScheduleClassification {
@@ -406,15 +410,12 @@ function classifyParsedCronSchedule(rule: ParsedCron): AutomationCronScheduleCla
     }
     const dayOfWeek = getSingleSetValue(rule.daysOfWeek)
     if (dayOfWeek !== null) {
-      const day = new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(
-        new Date(2026, 0, 4 + dayOfWeek)
-      )
       return {
         kind: 'weekly',
         hour,
         minute,
         dayOfWeek,
-        label: `${day}s at ${time}`
+        label: `${formatWeekdayName(dayOfWeek)}s at ${time}`
       }
     }
   }

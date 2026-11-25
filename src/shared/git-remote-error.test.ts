@@ -79,6 +79,18 @@ describe('normalizeGitErrorMessage', () => {
     )
   })
 
+  it("keeps git's not-a-repository line over the filesystem boundary hint", () => {
+    // Why: a /tmp bind mount makes git add the hint, which hid the real error (ORCA-1407).
+    const error = new Error(
+      'Command failed: git rev-parse\nfatal: not a git repository (or any parent up to mount point /)\n' +
+        'Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).\n'
+    )
+
+    expect(normalizeGitErrorMessage(error, 'upstream')).toBe(
+      'fatal: not a git repository (or any parent up to mount point /)'
+    )
+  })
+
   it('uses the tail diagnostic from newline-heavy failures without line-array splitting', () => {
     const splitSpy = vi.spyOn(String.prototype, 'split')
     const error = new Error(
