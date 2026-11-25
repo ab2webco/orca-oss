@@ -171,5 +171,39 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
       'orca game answer-owner oq_1a2b3c4d5e6f --pick 2',
       'orca game answer-owner oq_1a2b3c4d5e6f --answer "Wait until Monday"'
     ]
+  },
+  {
+    path: ['game', 'decision', 'add'],
+    summary: "Record a project decision or a pending follow-up in the runtime's trail, not chat",
+    usage:
+      'orca game decision add (--decision <text> | --follow-up <text>) [--ticket <id>] [--why <text>] [--evidence <link or line>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'decision', 'follow-up', 'ticket', 'why', 'evidence'],
+    notes: [
+      'Only the lead records. Kept per project on the Orca host that runs the lead, next to `game events`, so the next lead (after --fresh or a compaction) reads it.',
+      '--follow-up records something left for later: it stays pending in `game decision list` until `game decision done <id>`.'
+    ],
+    examples: [
+      'orca game decision add --ticket ORCA-12 --decision "Split into 3 PRs" --why "~900 lines" --evidence "PR #41"',
+      'orca game decision add --ticket ORCA-12 --follow-up "Drop the legacy flag after lab.130"'
+    ]
+  },
+  {
+    path: ['game', 'decision', 'list'],
+    summary: "The project's pending follow-ups and its latest decisions, from any lead",
+    usage: 'orca game decision list [--ticket <id>] [--all] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'all'],
+    notes: [
+      'Pending follow-ups oldest first, then decisions newest first: the last 20, or every one kept with --all (the last 500; a pending follow-up is never dropped).'
+    ],
+    examples: ['orca game decision list', 'orca game decision list --ticket ORCA-12 --all --json']
+  },
+  {
+    path: ['game', 'decision', 'done'],
+    summary: 'Close a pending follow-up by its id',
+    usage: 'orca game decision done <id> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'id'],
+    positionalArgs: ['id'],
+    notes: ['The same id again is a no-op; a decision that is not a follow-up is refused.'],
+    examples: ['orca game decision done dec_1a2b3c4d5e6f']
   }
 ]

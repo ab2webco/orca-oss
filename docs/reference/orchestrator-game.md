@@ -1093,6 +1093,9 @@ matches …` (ORCA-866).
 - `orca game ask-owner --question [--ticket] [--option]... [--context]`, `orca game owner-questions
 [--all]`, `orca game owner-question <id>` and `orca game answer-owner <id> (--pick <n> | --answer <text>)` — the lead's questions
   to the person as records, below.
+- `orca game decision add (--decision | --follow-up) [--ticket] [--why] [--evidence]`,
+  `orca game decision list [--ticket] [--all]` and `orca game decision done <id>` — the project's
+  decision trail and pending follow-ups, below.
 - `orca game resume-members [<ticket>,...] [--discard] [--dry-run]` — brings back the members a
   restart left paused, below.
 
@@ -1539,6 +1542,15 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   `game.ownerQuestionsImport`, which the member's host accepts only from the attachment's home
   fingerprint ([`orchestrator-game-member-owner-answer-check.ts`](../../src/main/runtime/orchestrator-game-member-owner-answer-check.ts)).
   An older host lacks that call, so its member asks the person as before.
+- What the lead decides is a record, not chat text (ORCA-1428): `game decision add` keeps a row
+  (time, ticket, decision, why, evidence) in the project's board file on the host that runs the
+  lead, beside the owner questions ([`orchestrator-game-decisions.ts`](../../src/shared/orchestrator-game-decisions.ts)).
+  `--follow-up` makes it a pending follow-up until `game decision done <id>`. `game decision list`
+  reads the same rows from every lead of the project, so a lead started with `--fresh` or after a
+  compaction inherits them; the lead's rules have it read the list on every start. The last 500
+  settled rows are kept; a pending follow-up is never dropped. Only the lead writes; a member reads
+  its lead's trail. Every field but the decision is optional on the wire, and an older host answers
+  `method_not_found`, which the CLI reports as an Orca to update.
 - Members a lead places on a paired host with `orchestration worker-start --on <env>` are part of
   its fleet (ORCA-824): `game fleet`, `game state --json` and `game member <ticket>` list them with
   their host (`HOST`, `remote.host`), and the state, branch and PR the host's `federationShow`

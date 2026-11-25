@@ -897,6 +897,7 @@ import {
 import { withProjectLead } from './orchestrator-game-project-lead'
 import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
 import { GameTeamXpLedger } from './orchestrator-game-team-xp-ledger'
+import { GameDecisionTrail } from './orchestrator-game-decision-trail'
 import {
   gameOwnerQuestionMobileNotification,
   gameOwnerQuestionNotificationId,
@@ -4179,6 +4180,10 @@ export class OrcaRuntimeService {
     changed: () => this.noteGameFleetChanged()
   })
   private readonly gameTeamXp = new GameTeamXpLedger({
+    store: this.gameHistory,
+    projectOf: (caller) => this.gameBoardProjectOf(caller)
+  })
+  private readonly gameDecisions = new GameDecisionTrail({
     store: this.gameHistory,
     projectOf: (caller) => this.gameBoardProjectOf(caller)
   })
@@ -31777,6 +31782,10 @@ export class OrcaRuntimeService {
 
   getGameTeamXp(): GameTeamXpLedger {
     return this.gameTeamXp
+  }
+
+  getGameDecisions(): GameDecisionTrail {
+    return this.gameDecisions
   }
 
   /** What each pane running the mod reports now, for a panel with no lead to read it through. */

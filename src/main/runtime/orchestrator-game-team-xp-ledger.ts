@@ -11,7 +11,7 @@ import {
 export class GameTeamXpLedger {
   constructor(
     private readonly deps: {
-      store: Pick<GameHistoryStore, 'changeTeamXp'>
+      store: Pick<GameHistoryStore, 'changeDataField'>
       projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
       now?: () => number
     }
@@ -19,7 +19,7 @@ export class GameTeamXpLedger {
 
   async read(caller: GameBoardCaller): Promise<GameTeamXp> {
     const { key } = await this.deps.projectOf(caller)
-    return this.deps.store.changeTeamXp(key, (raw, characters) => ({
+    return this.deps.store.changeDataField(key, 'teamXp', (raw, characters) => ({
       next: null,
       result: teamXpOf(raw, characters)
     }))
@@ -32,7 +32,7 @@ export class GameTeamXpLedger {
   ): Promise<{ added: number; teamXp: GameTeamXp }> {
     const { key } = await this.deps.projectOf(caller)
     const at = this.deps.now?.() ?? Date.now()
-    return this.deps.store.changeTeamXp(key, (raw, characters) => {
+    return this.deps.store.changeDataField(key, 'teamXp', (raw, characters) => {
       const { next, added } = awardGameTeamXp(raw, characters, rewards, at)
       return { next, result: { added: added.length, teamXp: teamXpOf(next ?? raw, characters) } }
     })
