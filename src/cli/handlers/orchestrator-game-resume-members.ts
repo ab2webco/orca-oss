@@ -7,11 +7,8 @@ import { gameBoardCaller, recordGameMember } from './orchestrator-game-board-cal
 import { ticketsOf } from './orchestrator-game-fleet'
 import { readCallerGameState } from './orchestrator-game-launch'
 import { refuseWhileStopped } from './orchestrator-game-hold'
-import {
-  formatStoppedTerminal,
-  settleOpenTerminal,
-  stopDiscardedTerminals
-} from './orchestrator-game-open-member-terminal'
+import { settleOpenTerminal } from './orchestrator-game-open-member-terminal'
+import { discardGameMembers } from './orchestrator-game-member-discard'
 import {
   runtimeCapabilitiesOf,
   setupAdmissionOf,
@@ -186,22 +183,11 @@ export const ORCHESTRATOR_GAME_RESUME_MEMBERS_HANDLERS: Record<string, CommandHa
       )
     }
     if (flags.get('discard') === true) {
-      const discarded = await client.call<{ discarded: string[]; setAside: string | null }>(
-        'game.memberDiscard',
-        { ...gameBoardCaller(), tickets: named.length > 0 ? named : 'all' }
-      )
-      const stopped = await stopDiscardedTerminals(
-        client,
-        (state.pausedMembers ?? []).filter((one) => discarded.result.discarded.includes(one.ticket))
-      )
-      printResult({ ...discarded, result: { ...discarded.result, stopped } }, json, (result) =>
-        result.setAside
-          ? `Set the unreadable members file aside at ${result.setAside}; new members are saved from now on.`
-          : [
-              `Freed ${result.discarded.length}: ${result.discarded.join(', ') || 'none'}`,
-              ...result.stopped.map(formatStoppedTerminal)
-            ].join('\n')
-      )
+      await discardGameMembers(client, response, {
+        named,
+        dryRun: flags.get('dry-run') === true,
+        json
+      })
       return
     }
     if (state.pausedMembersError) {
