@@ -15,6 +15,11 @@ import {
   gameLeadPaneGapOf,
   type GameLeadPaneGap
 } from './orchestrator-game-lead-pane'
+import {
+  formatGameInherited,
+  readGameInherited,
+  type GameInherited
+} from './orchestrator-game-inherited'
 
 type GameLeadRegistration = {
   registered?: boolean
@@ -35,6 +40,8 @@ type GameLeadResult = {
   handle?: string
   resumeError?: string
   fresh?: boolean
+  /** What this lead takes over; absent unless the brief prints (ORCA-1429). */
+  inherited?: GameInherited
 }
 
 // Why the prefix: the game mod reads it to keep this session from counting as the lead.
@@ -169,13 +176,16 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
           .catch(() => undefined)) ?? {}
     }
     const elsewhere = registration.live ?? registration.resumed
+    const brief =
+      role === 'member' || elsewhere || gap === 'missing'
+        ? null
+        : gameLeadBriefOf(lead, project, gameLeadCliOf(process.env), state.locale)
+    const inherited = brief === null ? null : await readGameInherited(client, state)
     const result: GameLeadResult = {
       role,
       lead,
-      brief:
-        role === 'member' || elsewhere || gap === 'missing'
-          ? null
-          : gameLeadBriefOf(lead, project, gameLeadCliOf(process.env), state.locale),
+      brief,
+      ...(inherited ? { inherited } : {}),
       ...(gap === 'missing' ? { outcome: 'plain' } : {}),
       ...(elsewhere
         ? { outcome: registration.live ? 'live' : 'resumed', handle: elsewhere.handle }
@@ -192,15 +202,16 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
       if (notLead !== null || one.brief === null) {
         return notLead ?? ''
       }
-      const brief = one.noGameMod
+      const withNote = one.noGameMod
         ? `${gameLeadNoModNoteOf(one.noGameMod)}\n\n${one.brief}`
         : one.brief
+      const text = one.inherited ? `${withNote}\n\n${formatGameInherited(one.inherited)}` : withNote
       if (one.resumeError) {
-        return `Orca could not reopen ${project}'s previous lead conversation (${one.resumeError}), so this session is a new lead.\n\n${brief}`
+        return `Orca could not reopen ${project}'s previous lead conversation (${one.resumeError}), so this session is a new lead.\n\n${text}`
       }
       return one.fresh
-        ? `Orca retired ${project}'s previous lead conversation, so this session is the new lead.\n\n${brief}`
-        : brief
+        ? `Orca retired ${project}'s previous lead conversation, so this session is the new lead.\n\n${text}`
+        : text
     })
   }
 }

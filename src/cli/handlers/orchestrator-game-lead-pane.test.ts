@@ -32,6 +32,12 @@ describe('orca game lead from a pane without the game mod', () => {
       }
     }) as unknown as RuntimeClient
 
+  // Why: the Inherited section's record reads are checked in orchestrator-game-inherited.test.ts.
+  const registerCalls = () =>
+    calls
+      .map(([method]) => method)
+      .filter((method) => method !== 'game.ownerQuestions' && method !== 'game.decisions')
+
   const lead = (client: RuntimeClient, json = false) =>
     ORCHESTRATOR_GAME_HANDLERS['game lead']({ flags: new Map(), client, cwd: '/tmp', json })
 
@@ -91,7 +97,7 @@ describe('orca game lead from a pane without the game mod', () => {
     await lead(host())
 
     const text = output.join('\n')
-    expect(calls.map(([method]) => method)).toEqual(['game.state', 'game.leadRegister'])
+    expect(registerCalls()).toEqual(['game.state', 'game.leadRegister'])
     expect(text).toMatch(/^# You are the lead of cineco/)
     expect(text).toContain('`/opt/Orca/bin/orca game launch <ticket>`')
   })
@@ -102,7 +108,7 @@ describe('orca game lead from a pane without the game mod', () => {
     await lead(host())
 
     const text = output.join('\n')
-    expect(calls.map(([method]) => method)).toEqual(['game.state', 'game.leadRegister'])
+    expect(registerCalls()).toEqual(['game.state', 'game.leadRegister'])
     expect(text).toMatch(/^This pane leads without Orca's game mod, which never loads over SSH/)
     expect(text).toContain('You are the lead of cineco')
   })
@@ -133,7 +139,7 @@ describe('orca game lead from a pane without the game mod', () => {
     await lead(host())
 
     const text = output.join('\n')
-    expect(calls.map(([method]) => method)).toEqual(['game.state', 'game.leadRegister'])
+    expect(registerCalls()).toEqual(['game.state', 'game.leadRegister'])
     expect(text).toMatch(
       /^This pane leads without Orca's game mod, because it needs Claude Code 2\.1\.287/
     )
@@ -155,7 +161,7 @@ describe('orca game lead from a pane without the game mod', () => {
     await lead(host())
 
     const text = output.join('\n')
-    expect(calls.map(([method]) => method)).toEqual(['game.state', 'game.leadRegister'])
+    expect(registerCalls()).toEqual(['game.state', 'game.leadRegister'])
     expect(text).toMatch(/^# You are the lead of cineco/)
   })
 })

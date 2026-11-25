@@ -366,7 +366,13 @@ describe('orca game state', () => {
       json: true
     })
 
-    expect(calls.map(([method]) => method)).toEqual(['game.state', 'game.leadRegister'])
+    // Why after the register: the Inherited section reads the records of the project it now leads.
+    expect(calls.map(([method]) => method)).toEqual([
+      'game.state',
+      'game.leadRegister',
+      'game.ownerQuestions',
+      'game.decisions'
+    ])
     expect(calls[1]?.[1]).toEqual({
       worktreeId: 'wt1',
       terminalHandle: 'h1',
