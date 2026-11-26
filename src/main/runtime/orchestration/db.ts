@@ -239,6 +239,8 @@ type InsertMessageParams = {
   senderPaneKey?: string
   runId?: string
   deliveryContract?: MessageDeliveryContract
+  /** The message this one answers; a thread id alone cannot name a row inside its thread. */
+  replyTo?: string
 }
 
 function exposeRunTimestamps(run: RunRow): RunRow {
@@ -427,7 +429,8 @@ export class OrchestrationDb {
         sequence      INTEGER PRIMARY KEY AUTOINCREMENT,
         created_at    TEXT NOT NULL DEFAULT (datetime('now')),
         delivered_at  TEXT,
-        sender_pane_key TEXT
+        sender_pane_key TEXT,
+        reply_to      TEXT
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_id ON messages(id);
@@ -1187,6 +1190,9 @@ export class OrchestrationDb {
       }
       if (current < 39 && !this.hasColumn('federated_dispatches', 'release_requested_at')) {
         this.db.exec('ALTER TABLE federated_dispatches ADD COLUMN release_requested_at TEXT')
+      }
+      if (current < 40 && !this.hasColumn('messages', 'reply_to')) {
+        this.db.exec('ALTER TABLE messages ADD COLUMN reply_to TEXT')
       }
       this.db.pragma(`user_version = ${SCHEMA_VERSION}`)
       this.db.exec('COMMIT')
@@ -3223,9 +3229,9 @@ export class OrchestrationDb {
     const stmt = this.db.prepare(`
       INSERT INTO messages (
         id, run_id, delivery_contract, from_handle, to_handle, subject, body,
-        type, priority, thread_id, payload, sender_pane_key
+        type, priority, thread_id, payload, sender_pane_key, reply_to
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     stmt.run(
       id,
@@ -3239,7 +3245,8 @@ export class OrchestrationDb {
       msg.priority ?? 'normal',
       msg.threadId ?? null,
       msg.payload ?? null,
-      msg.senderPaneKey ?? null
+      msg.senderPaneKey ?? null,
+      msg.replyTo ?? null
     )
     return exposeMessageTimestamps(
       this.db.prepare('SELECT * FROM messages WHERE id = ?').get(id) as MessageRow

@@ -12,8 +12,10 @@ export type GameInboxMail = {
   sequence: number
   created_at: string
   payload: string | null
-  /** The question or message this one answers. */
+  /** The thread this message belongs to. */
   thread_id?: string | null
+  /** The message `orchestration reply` answered; absent from older builds and plain sends. */
+  reply_to?: string | null
 }
 
 /** Every address mail to the lead or to a ticket's member ever went to, and that mail. */
@@ -127,6 +129,14 @@ export function releasedSenderOf(source: GameInboxSource): (row: GameInboxMail) 
   }
 }
 
+/** The rows mail settles: the one a reply names, else, for a plain send or an older build's reply, its thread. */
+export function repliedIdsOf(rows: readonly GameInboxMail[]): Set<string> {
+  // Why the exact row first (ORCA-1481): a reply to a threaded escalation carries its thread id, not the row's.
+  return new Set(
+    rows.flatMap((row) => (row.reply_to ? [row.reply_to] : row.thread_id ? [row.thread_id] : []))
+  )
+}
+
 const dispatchOfRow = (row: GameInboxMail): string | null =>
   dispatchOfPayload(row.payload) ??
   (row.from_handle.startsWith('dispatch:') ? row.from_handle.slice('dispatch:'.length) : null)
@@ -212,11 +222,7 @@ export function gameInboxesOf(
   ]
   const pending = source.pendingQuestions ?? []
   // Why: an escalation or gate a member sent waits on the lead like a question until a reply threads it (ORCA-1154).
-  const replied = new Set(
-    [...allOldestFirst, ...(source.ownerReplies ?? [])].flatMap((row) =>
-      row.thread_id ? [row.thread_id] : []
-    )
-  )
+  const replied = repliedIdsOf([...allOldestFirst, ...(source.ownerReplies ?? [])])
   // Why (ORCA-1431): an owner answer asks for no reply, so the lead acking its delivery settles it.
   const settledOwnerAnswer = (row: GameInboxMail): boolean =>
     row.from_handle === GAME_OWNER_HANDLE && row.read !== 0

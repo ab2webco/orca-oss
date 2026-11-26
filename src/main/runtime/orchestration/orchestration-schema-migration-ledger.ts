@@ -35,7 +35,7 @@ export type OrchestrationMigrationStep = {
   readonly effects: readonly string[]
 }
 
-export const ORCHESTRATION_SCHEMA_VERSION = 39
+export const ORCHESTRATION_SCHEMA_VERSION = 40
 
 /**
  * Below this the two lineages agree step for step, and neither adds anything
@@ -162,5 +162,11 @@ export const ORCHESTRATION_SCHEMA_MIGRATION_LEDGER: readonly OrchestrationMigrat
     lineage: 'lab',
     summary: 'a release its host retained, so it finishes once the terminal is gone (ORCA-1076)',
     effects: ['column:federated_dispatches.release_requested_at']
+  },
+  {
+    version: 40,
+    lineage: 'lab',
+    summary: 'the message a reply answers, so it settles that row (ORCA-1481)',
+    effects: ['column:messages.reply_to']
   }
 ]

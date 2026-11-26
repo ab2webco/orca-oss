@@ -131,13 +131,18 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
     byTicket.set(ticket, thread)
   }
 
+  // Why the guess only for mail naming no row (ORCA-1481): a reply to a later gate does not answer this one.
   const leadReplyAfter = (gate: GameInboxMail): GameInboxMail | undefined => {
     const ticket = ticketOf.get(gate.from_handle)
-    return rows.find(
-      (row) =>
-        row.sequence > gate.sequence &&
-        lead.has(row.from_handle) &&
-        ticketOf.get(row.to_handle) === ticket
+    return (
+      rows.find((row) => row.reply_to === gate.id) ??
+      rows.find(
+        (row) =>
+          !row.reply_to &&
+          row.sequence > gate.sequence &&
+          lead.has(row.from_handle) &&
+          ticketOf.get(row.to_handle) === ticket
+      )
     )
   }
   const gates = rows.filter(
