@@ -66,6 +66,27 @@ export class GameDroppedAgentStore {
     })).then((hides) => hides.forgotten)
   }
 
+  /**
+   * Forgets the drops of this machine's removed worktrees, so a new one at the same path is listed;
+   * `all` empties the project, as for a removed repo. Returns how many entries went (ORCA-1478).
+   */
+  async forgetWorktrees(
+    projectKey: string,
+    removed: (worktreeId: string) => boolean,
+    all = false
+  ): Promise<number> {
+    let count = 0
+    await this.update(projectKey, (hides) => {
+      const dropped = all
+        ? []
+        : hides.dropped.filter((one) => one.environmentId !== null || !removed(one.worktreeId))
+      const forgotten = all ? [] : hides.forgotten
+      count = hides.dropped.length - dropped.length + hides.forgotten.length - forgotten.length
+      return count > 0 ? { dropped, forgotten } : hides
+    })
+    return count
+  }
+
   private update(
     projectKey: string,
     change: (hides: GameFleetHides) => GameFleetHides
@@ -74,7 +95,12 @@ export class GameDroppedAgentStore {
     const next = previous
       .catch(() => undefined)
       .then(async () => {
-        const hides = change(await this.readAll(projectKey))
+        const current = await this.readAll(projectKey)
+        const hides = change(current)
+        // Why: a change that keeps the list must not create a file for a project with none.
+        if (hides === current) {
+          return hides
+        }
         await mkdir(this.dirOf(), { recursive: true })
         const file = this.fileOf(projectKey)
         // Why durable: the drop must hold through the restart it exists for.

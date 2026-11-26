@@ -1110,6 +1110,14 @@ matches …` (ORCA-866).
   alert or slot waits on it. Another member in the same worktree,
   folder or ticket is never touched. The member card's Remove asks first, then sends the lead this
   command.
+- Deleting a worktree, a folder workspace or a repo settles and forgets its members (ORCA-1478):
+  each live dispatch this machine started there is stopped at home with `workspace_removed`, and
+  the saved member records and local drops of that workspace leave every project's files, matched
+  by workspace and never by ticket, so a member with the same ticket in another worktree stays. A
+  removed repo also empties its own project's saved members and drops; its history, lessons and
+  STOP switch stay for a re-add (ORCA-1011). A member on a paired host is released through its
+  home, and an SSH project forgotten on one host is left alone while another host has the same repo
+  id.
 - `orca game stop [<key>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each key names one

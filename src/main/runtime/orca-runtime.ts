@@ -851,6 +851,11 @@ import { splitDroppedGameAgents } from '../../shared/orchestrator-game-dropped-a
 import { withoutForgottenGameAgents } from '../../shared/orchestrator-game-forgotten-agents'
 import { gameRemoveKeyOf } from '../../shared/orchestrator-game-remove-target'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
+import {
+  retireRemovedGameWorkspace,
+  type GameWorkspaceRetired
+} from './orchestrator-game-workspace-retirement'
+import type { RemovedWorkspace } from './orchestration/removed-workspace-workers'
 import { GameHostCapacityReader } from './orchestrator-game-host-capacity-reader'
 import {
   RemoteHostSessionsReader,
@@ -6752,22 +6757,35 @@ export class OrcaRuntimeService {
 
   // Why: a paused member of a removed worktree has nothing left to resume, and only discard freed it.
   private async freeGameMembersOfRemovedWorktree(worktreeId: string): Promise<void> {
-    const repoId = splitWorktreeIdForFilesystem(worktreeId)?.repoId
-    if (!repoId) {
-      return
+    await this.retireGameWorkspace({ worktreeId })
+  }
+
+  /** Settles and forgets the members of a worktree, folder workspace or repo Orca removed (ORCA-1478). */
+  async retireGameWorkspace(removal: RemovedWorkspace): Promise<GameWorkspaceRetired> {
+    const retired = await retireRemovedGameWorkspace(
+      {
+        projectKeys: () => (this.store?.getRepos() ?? []).map((repo) => `repo:${repo.id}`),
+        members: this.gameMemberSessions,
+        drops: this.gameDroppedAgents,
+        settleWorkers: (one) =>
+          this.getOrchestrationDbIfAvailable()?.settleWorkersOfRemovedWorkspace(one) ?? null
+      },
+      removal
+    )
+    for (const dispatchId of retired.settled) {
+      this.notifyMessageArrived(`dispatch:${dispatchId}`, 'status')
     }
-    try {
-      const tickets = await this.gamePausedMembers.forgetWorktree(`repo:${repoId}`, worktreeId)
-      if (tickets.length > 0) {
-        this.gameFleetChange.changed()
-      }
-    } catch (error) {
-      // Why logged, not thrown: the next fleet read's gone-worktree sweep still frees the member.
+    if (retired.settled.length + retired.members.length + retired.drops > 0) {
+      this.gameFleetChange.changed()
+    }
+    if (retired.errors.length > 0) {
+      // Why logged, not thrown: the removal the person asked for already happened.
       console.warn('[orchestrator-game] the removed worktree did not free its members', {
-        worktreeId,
-        error
+        ...removal,
+        errors: retired.errors
       })
     }
+    return retired
   }
 
   notifyWorktreesChangedForRemoteClients(repoId: string): void {
@@ -21437,6 +21455,7 @@ export class OrcaRuntimeService {
     const deleted = this.store.removeFolderWorkspace(folderWorkspaceId)
     if (deleted) {
       this.notifyReposChanged()
+      await this.retireGameWorkspace({ worktreeId: folderWorkspaceKey(folderWorkspaceId) })
     }
     return { deleted }
   }
@@ -22093,6 +22112,8 @@ export class OrcaRuntimeService {
       }
       this.store.removeProjectForHost(repo.id, hostId)
     } else {
+      // Why before: the game files are named by the repo's place, which the removal forgets.
+      await this.retireGameWorkspace({ repoId: repo.id })
       this.store.removeProject(repo.id)
     }
     this.terminalTopologyRevisionByRepoId.delete(repo.id)

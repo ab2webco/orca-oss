@@ -87,6 +87,20 @@ export class GameMemberSessionStore {
     )
   }
 
+  /** Drops the members saved in removed worktrees, never by ticket: another worktree may share it. */
+  async removeInWorktrees(
+    projectKey: string,
+    removed: (worktreeId: string | null) => boolean
+  ): Promise<string[]> {
+    const tickets: string[] = []
+    await this.update(projectKey, (members) => {
+      const gone = members.filter((one) => removed(one.worktreeId))
+      tickets.push(...gone.map((one) => one.ticket))
+      return gone.length > 0 ? members.filter((one) => !gone.includes(one)) : members
+    })
+    return tickets
+  }
+
   /**
    * Moves a damaged file out of the way, bytes kept, and returns where it went; null when the file
    * is readable or missing. Only the person's discard calls this.

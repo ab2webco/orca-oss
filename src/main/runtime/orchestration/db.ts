@@ -74,6 +74,11 @@ import {
 } from './context-only-dispatch-release'
 import { retireSettledRunMail, type RetiredRunMail } from './run-mail-settlement'
 import {
+  liveLocalWorkersIn,
+  settleRemovedWorkspaceWorker,
+  type RemovedWorkspace
+} from './removed-workspace-workers'
+import {
   ensureMutationReceiptCapacity,
   migrateMutationReceiptCapacity
 } from './mutation-receipt-capacity'
@@ -6620,6 +6625,23 @@ export class OrchestrationDb {
       this.closeQuestionsForDispatch(dispatchId)
       this.db.exec('COMMIT')
       return { disposition: 'detached', worker: this.getWorkerDispatch(dispatchId)! }
+    } catch (error) {
+      this.db.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  /** Settles this machine's live workers in a workspace Orca removed; returns their dispatch ids (ORCA-1478). */
+  settleWorkersOfRemovedWorkspace(removal: RemovedWorkspace): string[] {
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      const settled = liveLocalWorkersIn(this.db, removal)
+      for (const dispatchId of settled) {
+        settleRemovedWorkspaceWorker(this.db, dispatchId)
+        this.closeQuestionsForDispatch(dispatchId)
+      }
+      this.db.exec('COMMIT')
+      return settled
     } catch (error) {
       this.db.exec('ROLLBACK')
       throw error
