@@ -384,12 +384,16 @@ test('the Team panel draws the live scene beside a member opened under its heade
       )
       .toBe(2)
 
+    // Why reopen: the lead start's panel drew the scene before the members came, and a member
+    // arriving mid-scene walks in; this spec judges a scene opened on a seated team.
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
+    const panel = orcaPage.getByTestId('team-panel')
+    await expect(panel).toHaveCount(0)
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
       state.setRightSidebarOpen(true)
       state.setRightSidebarTab('team')
     })
-    const panel = orcaPage.getByTestId('team-panel')
     const scene = panel.locator('[data-team-scene]')
     await expect(sceneCanvasIn(scene)).toBeVisible({ timeout: 90_000 })
     await expect.poll(() => paintedColors(orcaPage), { timeout: 30_000 }).toBeGreaterThan(8)

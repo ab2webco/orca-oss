@@ -171,6 +171,13 @@ test('freed members stay under their lead as Entregados, by ticket, PR and state
         return registered.result.registered
       })
       .toBe(true)
+    // Why: at this spec's narrow widths the open right sidebar floats over the rows it clicks.
+    await expect
+      .poll(() => orcaPage.evaluate(() => window.__store!.getState().rightSidebarOpen), {
+        message: 'the lead start never opened the Team panel'
+      })
+      .toBe(true)
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
     const endpoint = await readHookEndpoint(electronApp)
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,
