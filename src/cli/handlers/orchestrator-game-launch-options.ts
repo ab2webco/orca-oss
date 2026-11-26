@@ -3,11 +3,12 @@ import { parseGameLead, type OrchestratorGameLead } from '../../shared/orchestra
 import { accountProviderOfAgent } from '../../shared/orchestrator-game-member-agent'
 import { isAllowedGameAccount } from '../../shared/orchestrator-game-account-usage'
 import { isTuiAgent, TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
+import { GAME_TICKET_KINDS, type GameTicketKind } from '../../shared/orchestrator-game-ticket-kind'
 import {
-  GAME_TICKET_KINDS,
-  parseGameTicketKind,
-  type GameTicketKind
-} from '../../shared/orchestrator-game-ticket-kind'
+  GAME_PLAYBOOKS,
+  parseGameLaunchKind,
+  type GamePlaybook
+} from '../../shared/orchestrator-game-playbook'
 import { ORCHESTRATION_FEDERATION_MEMBER_ACCOUNT_ALLOWED_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import {
   GAME_PROMPT_MAX,
@@ -34,6 +35,8 @@ export type GameLaunchFlags = {
   account?: string
   /** The ticket's kind, which picks a Claude member's model when nothing else did (ORCA-851). */
   kind?: GameTicketKind
+  /** The playbook `--kind bug-fix|feature|review|live-check` named, linked from the brief (ORCA-1425). */
+  playbook?: GamePlaybook
 }
 
 /** What one member runs on: the flags over the project lead config. */
@@ -83,11 +86,12 @@ export function parseGameLaunchFlags(flags: Map<string, string | boolean>): Game
   }
   const account = flagText(flags, 'account')
   const kindText = flagText(flags, 'kind')
-  const kind = kindText === undefined ? undefined : parseGameTicketKind(kindText)
+  const kind = kindText === undefined ? undefined : parseGameLaunchKind(kindText)
   if (kind === null) {
+    const kinds = [...new Set([...GAME_TICKET_KINDS, ...GAME_PLAYBOOKS])]
     throw new RuntimeClientError(
       'invalid_argument',
-      `--kind must be ${GAME_TICKET_KINDS.slice(0, -1).join(', ')} or ${GAME_TICKET_KINDS.at(-1)}.`
+      `--kind must be ${kinds.slice(0, -1).join(', ')} or ${kinds.at(-1)}.`
     )
   }
   return {
@@ -95,7 +99,7 @@ export function parseGameLaunchFlags(flags: Map<string, string | boolean>): Game
     ...(model === undefined ? {} : { model }),
     ...(effort === undefined ? {} : { effort }),
     ...(account === undefined ? {} : { account }),
-    ...(kind === undefined ? {} : { kind })
+    ...kind
   }
 }
 

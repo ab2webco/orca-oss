@@ -54,7 +54,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     path: ['game', 'launch'],
     summary: "Start one member for a ticket in its own worktree, as this project's lead",
     usage:
-      'orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--kind <audit|implement|review|captures>] [--skip-mcp-check] [--past-pr-cap <why>] [--past-busy <why>] [--json]',
+      'orca game launch <ticket> [--repo <selector>] [--on <host>] [--prompt <task>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--kind <audit|implement|review|captures|bug-fix|feature|live-check>] [--skip-mcp-check] [--past-pr-cap <why>] [--past-busy <why>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'ticket',
@@ -188,7 +188,7 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
     path: ['game', 'wave'],
     summary: 'Launch members for the named tickets, or fill the free slots from the To Do',
     usage:
-      'orca game wave [<ticket>[,<ticket>...]] [--repo <selector>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--kind <audit|implement|review|captures>] [--skip-mcp-check] [--dry-run] [--json]',
+      'orca game wave [<ticket>[,<ticket>...]] [--repo <selector>] [--agent <id>] [--account <email|id>] [--model <id>] [--effort <level>] [--kind <audit|implement|review|captures|bug-fix|feature|live-check>] [--skip-mcp-check] [--dry-run] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'repo', 'dry-run', ...GAME_LAUNCH_OVERRIDE_FLAGS],
     positionalArgs: ['tickets'],
     notes: [

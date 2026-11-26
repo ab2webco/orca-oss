@@ -751,7 +751,7 @@ orchestratorGame:
 A lead is a session that coordinates and never works a ticket: each ticket goes to one member in its
 own worktree and tab, which reports back through Orca orchestration. The keys resolve one by one
 through the same layers ([`orchestrator-game-lead.ts`](../../src/shared/orchestrator-game-lead.ts));
-project Settings edits all but the two prompts, `rules` and `mcpServers`, which live in `orca.yaml`
+project Settings edits all but the two prompts, `rules`, `mcpServers` and `playbooks`, which live in `orca.yaml`
 (**Lead buttons** is `actions`).
 
 With no lead running, the native Team panel opens as **Your work** and heads it with **Start a team**:
@@ -781,6 +781,7 @@ orchestratorGame:
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
     mcpServers: [tambora, claude.ai Gmail] # optional: MCP servers every member needs
     memberRepos: [github.com/koombea/cineco-frontend] # optional: other repos members may work in
+    playbooks: docs/playbooks # optional: a repo folder with one playbook per task kind, linked from each brief
 ```
 
 A placeholder with no value is left empty; an unknown one drops the key with a warning.
@@ -881,6 +882,12 @@ The lead's verbs, run from the lead's terminal
     refused. Another agent than the lead's does not inherit the lead's `model`/`effort`.
   - `--model <id>`, `--effort <level>` — the same values `orchestrator.model`/`effort` take;
     `--effort` needs a model.
+  - `--kind <audit|implement|review|captures|bug-fix|feature|live-check>` — the ticket's kind,
+    which picks a Claude member's model when nothing else does. `bug-fix` and `feature` launch as
+    `implement`, `live-check` as `captures`. With `playbooks` set, the brief links
+    `<playbooks>/<kind>.md` for `bug-fix`, `feature`, `review` and `live-check` (`review` and
+    `captures` also from the title), else the folder; it never inlines the text (ORCA-1425,
+    [`orchestrator-game-playbook.ts`](../../src/shared/orchestrator-game-playbook.ts)).
   - `--account <email|id|auto>` — the managed account the member runs on, mapped to worker-start's
     `--claude-account` or `--codex-account` by the agent. Only `claude` and `codex` have managed
     accounts; another provider's account, or an account for any other agent, is refused. `auto` is

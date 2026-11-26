@@ -41,6 +41,7 @@ orchestratorGame:
         what needs my decision.
   orchestrator:
     label: Alfred
+    playbooks: docs/reference/playbooks
     rules: |
       - After every merge, in the same turn: remove the ticket's worktree and branch on its host,
         and its Claude scratchpad with its captures.
