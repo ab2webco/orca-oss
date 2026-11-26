@@ -56,7 +56,13 @@ describe('unproven dispatch delivery on the human-readable line (ORCA-208)', () 
     it('says the bytes were written and the delivery was not proven', async () => {
       callMock.mockResolvedValue(workerStartResult('written_unproven'))
 
-      await invoke('orchestration worker-start', new Map([['task', 'task_1']]))
+      await invoke(
+        'orchestration worker-start',
+        new Map([
+          ['task', 'task_1'],
+          ['from', 'term_coord']
+        ])
+      )
 
       const line = renderHumanLine()
       expect(line).toContain(DISPATCH_DELIVERY_UNPROVEN_NOTE)
@@ -69,7 +75,13 @@ describe('unproven dispatch delivery on the human-readable line (ORCA-208)', () 
     it('says nothing extra when the composer was proven ready', async () => {
       callMock.mockResolvedValue(workerStartResult('accepted'))
 
-      await invoke('orchestration worker-start', new Map([['task', 'task_1']]))
+      await invoke(
+        'orchestration worker-start',
+        new Map([
+          ['task', 'task_1'],
+          ['from', 'term_coord']
+        ])
+      )
 
       expect(renderHumanLine()).toBe('Worker ctx_1 [ready] for task_1')
     })

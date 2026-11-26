@@ -11,7 +11,6 @@ import {
 } from '../flags'
 import { RuntimeClientError } from '../runtime-client'
 import { requireWorkerDoneSettlement } from './orchestration-worker-settlement'
-import { getTerminalHandle } from '../selectors'
 import { resolveAccountSelectorFlags } from '../account-selector'
 import {
   clampOrchestrationAskTimeoutMs,
@@ -306,7 +305,7 @@ function getOptionalStructuredMessagePayload(
 
 async function resolveOrchestrationTerminalHandle(
   flags: Map<string, string | boolean>,
-  cwd: string,
+  _cwd: string,
   client: Parameters<CommandHandler>[0]['client'],
   flagName: 'from' | 'terminal',
   options: { validateEnvHandle?: boolean } = {}
@@ -330,10 +329,11 @@ async function resolveOrchestrationTerminalHandle(
     }
     return envHandle
   }
+  // Why no active-pane fallback: focus is not identity, so an outside caller would read, send and lead as another pane (ORCA-1411).
   if (flagName === 'from') {
-    return await resolveImplicitOrchestrationSender(flags, cwd, client)
+    throwNoActiveSenderTerminal()
   }
-  return await getTerminalHandle(flags, cwd, client)
+  throwNoCallerTerminal()
 }
 
 async function isLiveTerminalHandle(
@@ -362,10 +362,6 @@ function getClientErrorCode(err: unknown): string | undefined {
 function isStaleTerminalIdentityError(err: unknown): boolean {
   const code = getClientErrorCode(err)
   return code === 'terminal_handle_stale' || code === 'terminal_gone'
-}
-
-function isNoActiveTerminalError(err: unknown): boolean {
-  return getClientErrorCode(err) === 'no_active_terminal'
 }
 
 async function resolveOrchestrationPaneTerminalHandle(
@@ -431,26 +427,19 @@ export async function resolveCoordinatorTerminalHandle(
   })
 }
 
-async function resolveImplicitOrchestrationSender(
-  flags: Map<string, string | boolean>,
-  cwd: string,
-  client: Parameters<CommandHandler>[0]['client']
-): Promise<string> {
-  try {
-    return await getTerminalHandle(flags, cwd, client)
-  } catch (err) {
-    if (!isNoActiveTerminalError(err)) {
-      throw err
-    }
-    throwNoActiveSenderTerminal()
-  }
-}
-
 function throwNoActiveSenderTerminal(): never {
   throw new RuntimeClientError(
     'no_active_sender_terminal',
-    'Could not determine the sender terminal for this orchestration command. ' +
+    'Could not determine the sender terminal for this orchestration command, and Orca will not send as the active pane. ' +
       'Pass --from <terminal-handle> or run the command inside a live Orca Lab terminal with ORCA_TERMINAL_HANDLE set.'
+  )
+}
+
+function throwNoCallerTerminal(): never {
+  throw new RuntimeClientError(
+    'no_caller_terminal',
+    "Could not determine whose orchestration mail to read, and Orca will not read the active pane's. " +
+      'Pass --terminal <terminal-handle> or run the command inside a live Orca Lab terminal with ORCA_TERMINAL_HANDLE set.'
   )
 }
 
@@ -680,15 +669,6 @@ export const ORCHESTRATION_HANDLERS: Record<string, CommandHandler> = {
         'invalid_argument',
         '--envelope and --envelope-file are only valid with --type worker_done.'
       )
-    }
-
-    if (
-      (type === 'worker_done' || type === 'heartbeat') &&
-      !getOptionalStringFlag(flags, 'from') &&
-      !process.env.ORCA_TERMINAL_HANDLE
-    ) {
-      // Why: focus isn't lifecycle authority — an identity-less subprocess must fail closed rather than guess the worker.
-      throwNoActiveSenderTerminal()
     }
 
     // Why: lifecycle senders preserve ORCA_TERMINAL_HANDLE across restarts for older runtimes.

@@ -77,6 +77,20 @@ const callerParams = () => ({
   ...gameCallerRole()
 })
 
+// Why: with no pane identity the host has no caller to place and answers `lead` to whoever asks (ORCA-1411).
+const isUnidentifiedCaller = (): boolean =>
+  !process.env.ORCA_TERMINAL_HANDLE && !process.env.ORCA_PANE_KEY && !gameCallerRole().role
+
+const UNIDENTIFIED_TEXT =
+  'Orca cannot tell which pane is calling: ORCA_TERMINAL_HANDLE is not set. Run it inside the Orca terminal pane that should lead.'
+
+function unidentifiedGameStateOf<T extends { role?: string; warnings: string[] }>(
+  state: T
+): Omit<T, 'role'> {
+  const { role: _role, ...rest } = state
+  return { ...rest, warnings: [...state.warnings, `No role: ${UNIDENTIFIED_TEXT}`] }
+}
+
 // Why the env: an older CLI ignores a variable it does not know, where an unknown flag could fail the poll.
 const reportParam = <K extends string>(key: K, env: string): Partial<Record<K, unknown>> => {
   const raw = process.env[env]
@@ -145,13 +159,17 @@ export const ORCHESTRATOR_GAME_HANDLERS: Record<string, CommandHandler> = {
       ...paneReportParams()
     })
     // Why here, not on the host: an older host's members get the fields too.
+    const state = withGameMemberIdentity(response.result)
     printResult(
-      { ...response, result: withGameMemberIdentity(response.result) },
+      { ...response, result: isUnidentifiedCaller() ? unidentifiedGameStateOf(state) : state },
       json,
       formatGameState
     )
   },
   'game lead': async ({ flags, client, json }) => {
+    if (isUnidentifiedCaller()) {
+      throw new RuntimeClientError('no_caller_terminal', `${NOT_LEAD} ${UNIDENTIFIED_TEXT}`)
+    }
     const fresh = flags.get('fresh') === true
     const response = await client.call<OrchestratorGameState>('game.state', callerParams())
     const state = response.result
