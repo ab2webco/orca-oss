@@ -49,6 +49,7 @@ import { ORCHESTRATOR_GAME_QUEUE_DEPARTURE_METHODS } from './orchestrator-game-q
 import { ORCHESTRATOR_GAME_PR_CAP_METHODS } from './orchestrator-game-pr-cap'
 import { ORCHESTRATOR_GAME_SCENE_ART_METHODS } from './orchestrator-game-scene-art'
 import { ORCHESTRATOR_GAME_BOARD_METHODS } from './orchestrator-game-board'
+import { ORCHESTRATOR_GAME_INBOX_SETTLE_METHODS } from './orchestrator-game-inbox-settle'
 import { ORCHESTRATOR_GAME_LEADS_METHODS } from './orchestrator-game-leads'
 import { ORCHESTRATOR_GAME_PANE_ADVISORS_METHODS } from './orchestrator-game-pane-advisors'
 import { ORCHESTRATOR_GAME_PANE_ACCOUNTS_METHODS } from './orchestrator-game-pane-accounts'
@@ -71,6 +72,7 @@ export const ALL_RPC_METHODS: readonly RpcAnyMethod[] = [
   ...ORCHESTRATOR_GAME_PR_CAP_METHODS,
   ...ORCHESTRATOR_GAME_SCENE_ART_METHODS,
   ...ORCHESTRATOR_GAME_BOARD_METHODS,
+  ...ORCHESTRATOR_GAME_INBOX_SETTLE_METHODS,
   ...ORCHESTRATOR_GAME_LEADS_METHODS,
   ...ORCHESTRATOR_GAME_PANE_ADVISORS_METHODS,
   ...ORCHESTRATOR_GAME_PANE_ACCOUNTS_METHODS,

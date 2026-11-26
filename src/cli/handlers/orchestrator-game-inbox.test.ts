@@ -96,4 +96,33 @@ describe('orca game inbox', () => {
     const { client } = fakeClient(true)
     await expect(run(client, [])).rejects.toThrow(/does not keep game inbox yet/)
   })
+
+  // ORCA-1482: a row no reply can settle is settled with why, kept as the audit.
+  it('settles one message with its note, and refuses a settle without one', async () => {
+    const { client, calls } = fakeClient()
+    await expect(run(client, [['settle', 'msg_7']])).rejects.toThrow(/--note/)
+    expect(calls).toEqual([])
+
+    await run(client, [
+      ['settle', 'msg_7'],
+      ['note', 'Recorded on CIN-1']
+    ])
+
+    expect(calls).toEqual([
+      [
+        'game.inboxSettle',
+        { worktreeId: 'wt1', terminalHandle: 'term_lead', id: 'msg_7', note: 'Recorded on CIN-1' }
+      ]
+    ])
+  })
+
+  it('says the Orca host is too old to settle instead of a bare RPC error', async () => {
+    const { client } = fakeClient(true)
+    await expect(
+      run(client, [
+        ['settle', 'msg_7'],
+        ['note', 'why']
+      ])
+    ).rejects.toThrow(/does not keep game inbox settle yet/)
+  })
 })

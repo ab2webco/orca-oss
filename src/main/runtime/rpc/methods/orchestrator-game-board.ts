@@ -133,7 +133,7 @@ const GameOwnerQuestionsImportParams = z.object({
 })
 
 // Why from the transport, never a param: `game answer-owner` must not pass itself off as the Inbox.
-function ownerAnswerViaOf(context: RpcContext): GameOwnerAnswerVia {
+export function ownerAnswerViaOf(context: RpcContext): GameOwnerAnswerVia {
   if (context.clientKind === 'mobile') {
     return 'phone'
   }
