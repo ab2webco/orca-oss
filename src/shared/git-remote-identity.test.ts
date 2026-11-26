@@ -82,6 +82,23 @@ describe('deriveGitRemoteIdentity', () => {
       remoteName: 'mirror'
     })
   })
+
+  // Git prints a partial clone's filter after the fetch line (ORCA-1250).
+  it.each(['[blob:none]', '[tree:0]'])(
+    'reads a partial clone whose fetch line ends in %s',
+    (filter) => {
+      const stdout = [
+        `origin\thttps://github.com/ab2webco/orca-oss.git (fetch) ${filter}`,
+        'origin\thttps://github.com/ab2webco/orca-oss.git (push)'
+      ].join('\n')
+      expect(deriveGitRemoteIdentity(stdout)).toEqual({
+        canonicalKey: 'github.com/ab2webco/orca-oss',
+        remoteName: 'origin',
+        remoteUrl: 'https://github.com/ab2webco/orca-oss.git'
+      })
+      expect(deriveGitOwnRemoteKey(stdout)).toBe('github.com/ab2webco/orca-oss')
+    }
+  )
 })
 
 describe('deriveGitOwnRemoteKey (ORCA-1198)', () => {
