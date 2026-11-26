@@ -200,6 +200,38 @@ describe('SshRelaySession consumer recovery durability', () => {
     }
   })
 
+  // ORCA-1462: the startup Keychain read of the owner lease can finish after the session is built.
+  it('grants with the persisted identity when the owner lease unseals after the session is built', async () => {
+    const targetId = 'target-owner-lease-unsealed-late'
+    const deps = createMockDeps()
+    const session = new SshRelaySession(
+      targetId,
+      deps.getMainWindow,
+      deps.mockStore,
+      deps.mockPortForward
+    )
+    vi.mocked(deps.mockStore.getSshPtyConsumerRecovery).mockReturnValue({
+      targetId,
+      clientInstanceId: 'persisted-client',
+      serverBuildId: 'test-relay-build',
+      clientGeneration: 1,
+      ownerGeneration: 1,
+      ownerLease: 'persisted-owner'
+    })
+
+    await session.establish(deps.mockConn)
+
+    expect(openConsumerSessionMock).toHaveBeenCalledTimes(1)
+    expect(openConsumerSessionMock.mock.calls[0]?.[1]).toMatchObject({
+      clientInstanceId: 'persisted-client',
+      resume: { ownerGeneration: 1, ownerLease: 'persisted-owner' }
+    })
+    expect(deps.mockStore.upsertSshPtyConsumerRecovery).toHaveBeenCalledWith(
+      expect.objectContaining({ clientInstanceId: 'persisted-client' })
+    )
+    session.dispose()
+  })
+
   it('preserves persisted recovery while a superseding transport is still live', async () => {
     vi.useFakeTimers()
     try {
