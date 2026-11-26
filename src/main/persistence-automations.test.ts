@@ -521,6 +521,8 @@ describe('Store', () => {
     })
 
     // 120 later runs reach a final status while the first one is still dispatched.
+    // Why skip flush: each run mutation rewrites the state file, and 240 writes outran the 30 s budget on a loaded Linux disk (ORCA-1438); the cap and lookup live in memory.
+    const flushSpy = vi.spyOn(store, 'flush').mockImplementation(() => {})
     let firstCompletedId = ''
     for (let i = 1; i <= 120; i++) {
       const later = store.createAutomationRun(automation, base + i * 60_000)
@@ -532,6 +534,7 @@ describe('Store', () => {
         error: null
       })
     }
+    flushSpy.mockRestore()
 
     // The late completion must still find its row.
     const completed = store.updateAutomationRun({
