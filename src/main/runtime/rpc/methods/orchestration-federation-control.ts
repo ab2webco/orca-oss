@@ -153,7 +153,14 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
           processAction: 'none'
         }
       }
-      if (!observation.exact || !observation.terminal) {
+      // Why: an asleep pane runs no process but still holds a slot; closing it is the stop (ORCA-1433).
+      const handle =
+        observation.status === 'asleep'
+          ? observation.asleep
+          : observation.exact
+            ? observation.terminal?.handle
+            : null
+      if (!handle) {
         const attachment = db.markRemoteAttachmentStopUnknown(
           params.dispatchId,
           `The recorded worker process is ${observation.status}; no terminal was closed.`
@@ -167,7 +174,7 @@ export const ORCHESTRATION_FEDERATION_CONTROL_METHODS: RpcMethod[] = [
         }
       }
       try {
-        const close = await runtime.closeTerminal(observation.terminal.handle)
+        const close = await runtime.closeTerminal(handle)
         const attachment = db.settleRemoteAttachmentStop(params.dispatchId)
         return {
           dispatchId: params.dispatchId,

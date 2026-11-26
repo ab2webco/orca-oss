@@ -3,11 +3,9 @@ import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { defineMethod, type RpcMethod } from '../core'
 import { requiredString } from '../schemas'
 import { detachFederatedWorker } from './orchestration-federated-worker-detach'
-import { isHostDispatchNotFound } from './orchestration-federated-worker-gone'
-import {
-  inspectWorkerTerminal,
-  resolvePinnedFederatedServer
-} from './orchestration-worker-observation'
+import { stopFederatedWorker } from './orchestration-federated-worker-stop'
+import { inspectWorkerTerminal } from './orchestration-worker-observation'
+import { settledReceipt, unknownReceipt } from './orchestration-worker-stop-receipt'
 
 const WorkerDispatchParams = z.object({ dispatch: requiredString('Missing --dispatch') })
 
@@ -50,68 +48,11 @@ export const ORCHESTRATION_WORKER_STOP_METHODS: RpcMethod[] = [
             'Remote worker-stop requires a durable retry request.'
           )
         }
-        const server = resolvePinnedFederatedServer(runtime, federated)
-        const begun = db.beginWorkerStop(params.dispatch)
-        if (begun.disposition === 'already_settled') {
-          return settledReceipt(params.dispatch, begun.worker.state)
-        }
-        try {
-          const remote = (await runtime.callOrchestrationWorkerServer(
-            server.environmentId,
-            'orchestration.federationStop',
-            { dispatchId: params.dispatch },
-            30_000,
-            { orchestrationRequestId: orchestrationMutation.requestId }
-          )) as RemoteStopReceipt
-          if (remote.state === 'stopped') {
-            const worker = db.reconcileFederatedWorkerStop(params.dispatch)
-            return {
-              dispatchId: params.dispatch,
-              state: worker.state,
-              alreadySettled: remote.alreadySettled,
-              processAction: remote.processAction,
-              close: remote.close
-            }
-          }
-          if (remote.state === 'succeeded' || remote.state === 'failed') {
-            db.resumeFederatedWorkerForTerminalRelay(params.dispatch)
-            await runtime
-              .syncOrchestrationFederatedDispatchAfterCurrent(params.dispatch)
-              .catch(() => undefined)
-            return {
-              dispatchId: params.dispatch,
-              state: db.getWorkerDispatch(params.dispatch)?.state ?? remote.state,
-              alreadySettled: true,
-              processAction: 'none'
-            }
-          }
-          return unknownReceipt(
-            params.dispatch,
-            db.markWorkerStopUnknown(
-              params.dispatch,
-              remote.lastError ?? `The worker server returned ${remote.state}.`
-            ),
-            remote.processAction
-          )
-        } catch (error) {
-          // Why: the host holds nothing of it for this home, so no stop there can ever be proven (ORCA-864).
-          if (isHostDispatchNotFound(error)) {
-            const worker = db.reconcileFederatedWorkerStop(params.dispatch)
-            return {
-              dispatchId: params.dispatch,
-              state: worker.state,
-              alreadySettled: false,
-              processAction: 'none',
-              warning: `${server.name} has no record of this member for this Orca; nothing was closed there.`
-            }
-          }
-          const reason = error instanceof Error ? error.message : String(error)
-          return unknownReceipt(
-            params.dispatch,
-            db.markWorkerStopUnknown(params.dispatch, reason),
-            'unknown'
-          )
-        }
+        return await stopFederatedWorker({
+          runtime,
+          federated,
+          requestId: orchestrationMutation.requestId
+        })
       }
 
       const begun = db.beginWorkerStop(params.dispatch)
@@ -172,18 +113,6 @@ export const ORCHESTRATION_WORKER_STOP_METHODS: RpcMethod[] = [
   })
 ]
 
-type RemoteStopReceipt = {
-  state: string
-  alreadySettled: boolean
-  processAction: string
-  close?: unknown
-  lastError?: string | null
-}
-
-function settledReceipt(dispatchId: string, state: string) {
-  return { dispatchId, state, alreadySettled: true, processAction: 'none' }
-}
-
 function contextOnlyStopWarning(result: {
   state: string
   alreadySettled: boolean
@@ -195,18 +124,4 @@ function contextOnlyStopWarning(result: {
   return result.releasedCurrentTask
     ? 'The assignment was stopped without closing its unsupervised terminal process.'
     : 'The superseded assignment was stopped without changing the current Task or terminal process.'
-}
-
-function unknownReceipt(
-  dispatchId: string,
-  worker: { state: string; last_error: string | null },
-  processAction: string
-) {
-  return {
-    dispatchId,
-    state: worker.state,
-    alreadySettled: false,
-    processAction,
-    lastError: worker.last_error
-  }
 }

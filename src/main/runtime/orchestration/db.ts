@@ -5623,7 +5623,8 @@ export class OrchestrationDb {
     if (['succeeded', 'failed', 'stopped', 'abandoned'].includes(attachment.state)) {
       return attachment
     }
-    if (!['ready', 'start_unknown'].includes(attachment.state)) {
+    // Why stop_unknown: a stop that could not close the member is retried, re-reading its process (ORCA-1433).
+    if (!['ready', 'start_unknown', 'stop_unknown'].includes(attachment.state)) {
       throw new OrchestrationError(
         'dispatch_inactive',
         `Remote Dispatch ${dispatchId} cannot stop from ${attachment.state}.`
@@ -5634,7 +5635,7 @@ export class OrchestrationDb {
         `UPDATE remote_dispatch_attachments
          SET state = 'stopping', stage = 'stop_requested', capability_hash = NULL,
              updated_at = datetime('now')
-         WHERE dispatch_id = ? AND state IN ('ready', 'start_unknown')`
+         WHERE dispatch_id = ? AND state IN ('ready', 'start_unknown', 'stop_unknown')`
       )
       .run(dispatchId)
     return this.getRemoteDispatchAttachment(dispatchId) as RemoteDispatchAttachmentRow
@@ -6454,7 +6455,8 @@ export class OrchestrationDb {
   }
 
   beginWorkerStop(
-    dispatchId: string
+    dispatchId: string,
+    options: { retryStopUnknown?: boolean } = {}
   ):
     | { disposition: 'stopping'; worker: WorkerDispatchRow; dispatch: DispatchContextRow }
     | { disposition: 'already_settled'; worker: WorkerDispatchRow; dispatch: DispatchContextRow }
@@ -6483,7 +6485,12 @@ export class OrchestrationDb {
         this.db.exec('COMMIT')
         return { disposition: 'already_settled', worker, dispatch }
       }
-      if (!['ready', 'start_unknown'].includes(worker.state)) {
+      const stoppable = [
+        'ready',
+        'start_unknown',
+        ...(options.retryStopUnknown ? ['stop_unknown'] : [])
+      ]
+      if (!stoppable.includes(worker.state)) {
         throw new OrchestrationError(
           'dispatch_inactive',
           `Dispatch ${dispatchId} cannot stop from ${worker.state}.`
@@ -6493,9 +6500,9 @@ export class OrchestrationDb {
         .prepare(
           `UPDATE worker_dispatches
            SET state = 'stopping', stage = 'stop_requested', updated_at = datetime('now')
-           WHERE dispatch_id = ? AND state IN ('ready', 'start_unknown')`
+           WHERE dispatch_id = ? AND state = ?`
         )
-        .run(dispatchId)
+        .run(dispatchId, worker.state)
       this.db
         .prepare(
           `UPDATE dispatch_contexts

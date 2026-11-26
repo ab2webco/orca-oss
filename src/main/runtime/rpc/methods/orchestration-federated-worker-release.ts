@@ -4,6 +4,7 @@ import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { FederatedDispatchRow } from '../../orchestration/types'
 import { WORKER_SETTLED_STATES } from '../../orchestration/worker-terminal-ownership'
 import { assertFederationReleaseReceipt } from './orchestration-federation-release'
+import { stopFederatedWorker } from './orchestration-federated-worker-stop'
 import {
   isFederatedMemberGoneOnHost,
   isHostDispatchNotFound
@@ -202,11 +203,13 @@ async function releaseOneFederatedWorker(
       db.reconcileFederatedWorkerStop(dispatchId)
       return settleGone()
     }
-    return {
-      ...base,
-      state: 'retained',
-      reason: 'not_settled',
-      recovery: `Its stop on ${server.name} was not proven: its terminal or worktree is still there, or ${server.name} did not answer. Close its terminal on ${server.name}, then release again.`
+    if (!(await stoppedAgainOnHost(args, worker.state))) {
+      return {
+        ...base,
+        state: 'retained',
+        reason: 'not_settled',
+        recovery: `Its stop on ${server.name} was not proven: its terminal or worktree is still there, or ${server.name} did not answer. Close its terminal on ${server.name}, then release again.`
+      }
     }
   }
   const server = resolvePinnedFederatedServer(runtime, federated)
@@ -268,4 +271,14 @@ async function releaseOneFederatedWorker(
     processAction: remote.closedTerminals.length > 0 ? 'closed_agent_terminal' : 'none',
     remote: detail
   }
+}
+
+// Why: a host that can close an asleep pane frees an unproven stop here, in one command (ORCA-1433).
+async function stoppedAgainOnHost(args: FederatedReleaseArgs, state: string): Promise<boolean> {
+  if (state !== 'stop_unknown') {
+    return false
+  }
+  const requestId = args.requestId ? `${args.requestId}:stop` : undefined
+  const stopped = await stopFederatedWorker({ ...args, requestId }).catch(() => null)
+  return stopped?.state === 'stopped'
 }
