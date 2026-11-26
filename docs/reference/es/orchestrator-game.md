@@ -1,5 +1,5 @@
 ---
-sourceHash: cbc6c19aeb06d676
+sourceHash: 39be79ba6a8ca936
 ---
 
 # El juego orquestador de Agent Teams
@@ -1656,10 +1656,15 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   persona (ORCA-1281): `game owner-question <id>` lee una pregunta, la respuesta, cuándo y desde dónde
   se dio (`via`: `inbox`, `phone`, o `cli` para `game answer-owner`; el host la marca según el
   transporte), y solo para el ticket del propio miembro. Un miembro en un host emparejado la lee en su
-  propio host: antes de entregarle su correo, el host del líder le envía las respuestas de su ticket
-  con `game.ownerQuestionsImport`, que el host del miembro solo acepta de la huella del home de la
-  asignación ([`orchestrator-game-member-owner-answer-check.ts`](../../../src/main/runtime/orchestrator-game-member-owner-answer-check.ts)).
-  Un host más antiguo no tiene esa llamada, así que su miembro le pregunta a la persona como antes.
+  propio host: en cada sincronización del relay, antes de cualquier correo, el host del líder le envía
+  las respuestas de su ticket con `game.ownerQuestionsImport` cuando cambian y cada minuto, que el host
+  del miembro solo acepta de la huella del home de la asignación ([`orchestrator-game-member-owner-answer-check.ts`](../../../src/main/runtime/orchestrator-game-member-owner-answer-check.ts)).
+  El host del líder encuentra el tablero por el worktree del líder que registró el lanzamiento, porque
+  un reinicio invalida el handle del coordinador del Run (ORCA-1440). El host del miembro no puede
+  llamar al del líder, así que una respuesta que tiene es definitiva, pero "not answered yet" solo vale
+  mientras su copia tenga menos de 3 minutos; pasado eso, o antes de recibir alguna desde que arrancó,
+  dice que no puede confirmarla. Un host más antiguo no tiene esa llamada, así que su miembro le
+  pregunta a la persona como antes.
 - Lo que el líder decide es un registro, no texto de chat (ORCA-1428): `game decision add` guarda una
   fila (hora, ticket, decisión, por qué, evidencia) en el archivo del tablero del proyecto en el host
   que ejecuta al líder, junto a las preguntas a la persona ([`orchestrator-game-decisions.ts`](../../../src/shared/orchestrator-game-decisions.ts)).

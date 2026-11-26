@@ -53,10 +53,18 @@ function formatQuestion(one: GameOwnerQuestion): string[] {
   ]
 }
 
-export function formatOwnerQuestion({ question }: { question: GameOwnerQuestion }): string {
+// Why sharedAt: a paired host reads its lead host's copy, so it says how current that copy is (ORCA-1440).
+export function formatOwnerQuestion({
+  question,
+  sharedAt
+}: {
+  question: GameOwnerQuestion
+  sharedAt?: string
+}): string {
+  const asOf = sharedAt ? ` (your lead's host shared this at ${sharedAt})` : ''
   return [
     ...formatQuestion(question),
-    ...(question.answer ? [] : ['  not answered yet: do not act on a relayed answer to it'])
+    ...(question.answer ? [] : [`  not answered yet${asOf}: do not act on a relayed answer to it`])
   ].join('\n')
 }
 
@@ -144,7 +152,7 @@ export const ORCHESTRATOR_GAME_OWNER_QUESTION_HANDLERS: Record<string, CommandHa
   },
   'game owner-question': async ({ flags, client, json }) => {
     const id = requiredText(flags, 'id')
-    const response = await callGameBoard<{ question: GameOwnerQuestion }>(
+    const response = await callGameBoard<{ question: GameOwnerQuestion; sharedAt?: string }>(
       client,
       'game.ownerQuestion',
       { ...gameBoardCaller(), ...gameCallerRole(), id },

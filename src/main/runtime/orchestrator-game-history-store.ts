@@ -54,6 +54,8 @@ const fileStamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
 export class GameHistoryStore {
   // Why per project: two writes to one file must not read the same old list and drop a record.
   private readonly queues = new Map<string, Promise<unknown>>()
+  /** Moves on every write, so a poller compares a number before it reads a file (ORCA-1440). */
+  writes = 0
 
   constructor(
     private readonly dirOf: () => string,
@@ -328,6 +330,7 @@ export class GameHistoryStore {
             ...(arcade && { arcade })
           })
         )
+        this.writes += 1
         return log
       })
     this.queues.set(projectKey, next)

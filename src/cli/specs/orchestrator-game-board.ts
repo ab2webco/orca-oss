@@ -150,6 +150,7 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     positionalArgs: ['id'],
     notes: [
       "A member checks an owner answer its lead relays before a hard-to-undo step, instead of asking the person again. It reads only its own ticket's questions, from any host.",
+      "On a paired host it reads what the lead's host shares on each change and every minute; when that copy is over 3 minutes old it says it cannot confirm, instead of 'not answered yet'.",
       'Shows when and where it was answered: the Inbox, a phone, or `game answer-owner` in a terminal.'
     ],
     examples: [

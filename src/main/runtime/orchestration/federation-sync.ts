@@ -182,9 +182,10 @@ async function syncFederatedDispatchPages(
     db.getWorkerDispatch(dispatchId)?.state === 'ready'
       ? db.listPendingFederationRelay(dispatchId, 'to_worker')
       : []
+  // Why every sync, before any mail: an answer must reach the member's host even when no mail
+  // follows it, and be checkable when relayed mail does (ORCA-1281, ORCA-1440).
+  await runtime.shareGameOwnerAnswersWithRemoteMember(dispatchId)
   if (toWorker.length > 0) {
-    // Why first: a relayed owner answer must be checkable when the member reads it (ORCA-1281).
-    await runtime.shareGameOwnerAnswersWithRemoteMember(dispatchId)
     await importWorkerRelay(runtime, db, federated.environment_id, dispatchId, toWorker)
   }
   if (pulled.items.length === FEDERATION_PULL_PAGE_SIZE && remainingPages > 1) {

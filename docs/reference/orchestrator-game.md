@@ -1548,11 +1548,15 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
 - A member checks an answer its lead relays instead of asking the person again (ORCA-1281):
   `game owner-question <id>` reads one question, the answer, when and where it was given (`via`:
   `inbox`, `phone`, or `cli` for `game answer-owner`; the host stamps it from the transport), and only
-  for the member's own ticket. A member on a paired host reads it on its own host: before the lead's
-  host hands that member its mail, it sends the answers on the member's ticket with
-  `game.ownerQuestionsImport`, which the member's host accepts only from the attachment's home
-  fingerprint ([`orchestrator-game-member-owner-answer-check.ts`](../../src/main/runtime/orchestrator-game-member-owner-answer-check.ts)).
-  An older host lacks that call, so its member asks the person as before.
+  for the member's own ticket. A member on a paired host reads it on its own host: on each relay sync,
+  before any mail, the lead's host sends the answers on the member's ticket with
+  `game.ownerQuestionsImport` when they change and every minute, which the member's host accepts only
+  from the attachment's home fingerprint ([`orchestrator-game-member-owner-answer-check.ts`](../../src/main/runtime/orchestrator-game-member-owner-answer-check.ts)).
+  The lead's host finds the board by the lead worktree the launch recorded, since a restart fences the
+  Run's coordinator handle (ORCA-1440). The member's host cannot call the lead's, so an answer it holds
+  is final, but "not answered yet" holds only while its copy is under 3 minutes old; past that, or
+  before any share since it started, it says it cannot confirm. An older host lacks that call, so its
+  member asks the person as before.
 - What the lead decides is a record, not chat text (ORCA-1428): `game decision add` keeps a row
   (time, ticket, decision, why, evidence) in the project's board file on the host that runs the
   lead, beside the owner questions ([`orchestrator-game-decisions.ts`](../../src/shared/orchestrator-game-decisions.ts)).
