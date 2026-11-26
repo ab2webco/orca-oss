@@ -284,6 +284,8 @@ test('the Team tab shows the live lead and its members from the lead game state'
     await captureEvery(orcaPage, testInfo.outputPath.bind(testInfo), 'read-error-first', readError)
     // Why Retry while reads still fail: the panel also re-reads on its 20 s poll and on main's change
     // events, so once reads succeed it recovers on its own; the read within a second is Retry's (ORCA-1184).
+    // Why at least one, not exactly one: a poll or change event landing in that second adds a read
+    // that Retry's own read does not cancel (ORCA-1464).
     const readsBefore = await panelReads(electronApp)
     await panel.getByRole('button', { name: COPY.en.retry }).click()
     await expect
@@ -291,7 +293,7 @@ test('the Team tab shows the live lead and its members from the lead game state'
         timeout: 1_000,
         message: 'Retry made no game.state read'
       })
-      .toBe(readsBefore + 1)
+      .toBeGreaterThan(readsBefore)
     await expect(panel).toContainText(COPY.en.readError)
     await failPanelReads(electronApp, false)
 
