@@ -15,6 +15,8 @@ export type RuntimeClientEvent =
   | { type: 'gameOwnerQuestionsChanged' }
   | { type: 'gameInboxChanged' }
   | { type: 'gameAdvisorChanged' }
+  // Why: a paired desktop's open Team panel re-reads on a launch, release or state change (ORCA-1441).
+  | { type: 'gameFleetChanged' }
   // Why: a paired desktop showing the lead's worktree opens its Team panel (ORCA-1414).
   | { type: 'gameLeadStarted'; worktreeId: string }
   | ({ type: 'nativeChatLaunchDraftResolved' } & RuntimeNativeChatLaunchDraftResolution)

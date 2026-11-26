@@ -45,4 +45,23 @@ describe('GameFleetChangeSignal', () => {
 
     await expect(signal.wait(7, 20_000)).resolves.toEqual({ version: 0, changed: true })
   })
+
+  // Why: the open Team panel re-reads on the push instead of its 20 s poll (ORCA-1441).
+  it('pushes each new version once, after its burst', () => {
+    vi.useFakeTimers()
+    const onVersion = vi.fn()
+    const signal = new GameFleetChangeSignal(250, onVersion)
+
+    signal.changed()
+    signal.changed()
+    vi.advanceTimersByTime(249)
+    expect(onVersion).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(onVersion).toHaveBeenCalledTimes(1)
+
+    signal.changed()
+    vi.advanceTimersByTime(250)
+    expect(onVersion).toHaveBeenCalledTimes(2)
+    expect(signal.version()).toBe(2)
+  })
 })

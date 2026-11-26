@@ -8,6 +8,8 @@ import { useGameInboxAppState } from '@/components/game-inbox/game-inbox-app-sta
 import type { TeamPanelModelSource } from './use-team-panel-model'
 import { signalGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 import { signalGameAdvisorChanged } from './game-advisor-signal'
+import { signalGameFleetChanged } from './game-fleet-change-signal'
+import { toRuntimeExecutionHostId } from '../../../../shared/execution-host'
 
 const subscribe = vi.fn(() => () => {})
 const refresh = vi.fn()
@@ -500,5 +502,80 @@ describe('Team model refresh', () => {
     act(() => signalGameAdvisorChanged())
     expect(pushed).toBeNull()
     expect(refresh).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('Team model fleet changes (ORCA-1441)', () => {
+  const stubLocalFleetEvent = (): { push: () => void; subscribed: () => boolean } => {
+    let pushed: (() => void) | null = null
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        runtime: {
+          onGameFleetChanged: (callback: () => void) => {
+            pushed = callback
+            return () => {
+              pushed = null
+            }
+          }
+        }
+      }
+    })
+    return { push: () => act(() => pushed?.()), subscribed: () => pushed !== null }
+  }
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // Why: members launched right after a lead start showed up to 20 s late in the open panel.
+  it("re-reads the open panel on this computer's fleet change, at most once per 2 s", async () => {
+    vi.useFakeTimers()
+    const fleet = stubLocalFleetEvent()
+    await mount(() => {
+      useTeamPanelModel()
+      return null
+    })
+
+    fleet.push()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    fleet.push()
+    fleet.push()
+    expect(refresh).toHaveBeenCalledTimes(1)
+    await act(async () => vi.advanceTimersByTime(2_000))
+    expect(refresh).toHaveBeenCalledTimes(2)
+    act(() => signalGameFleetChanged('env-1'))
+    await act(async () => vi.advanceTimersByTime(2_000))
+    expect(refresh).toHaveBeenCalledTimes(2)
+
+    await act(async () => roots.splice(0).forEach((root) => root.unmount()))
+    expect(fleet.subscribed()).toBe(false)
+  })
+
+  it("re-reads a paired host's panel on that host's fleet change only", async () => {
+    const fleet = stubLocalFleetEvent()
+    appState = { ...baseState(), activeWorkspaceExecutionHostId: toRuntimeExecutionHostId('env-1') }
+    await mount(() => {
+      useTeamPanelModel()
+      return null
+    })
+
+    expect(fleet.subscribed()).toBe(false)
+    act(() => signalGameFleetChanged('env-2'))
+    expect(refresh).not.toHaveBeenCalled()
+    act(() => signalGameFleetChanged('env-1'))
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  // Why: the sidebar's rows alone keep the 20 s poll; only an open panel reads on each change.
+  it("leaves the sidebar's background run on its poll", async () => {
+    const fleet = stubLocalFleetEvent()
+    await mount(() => {
+      useTeamPanelModel({ background: true })
+      return null
+    })
+
+    expect(fleet.subscribed()).toBe(false)
+    act(() => signalGameFleetChanged('env-1'))
+    expect(refresh).not.toHaveBeenCalled()
   })
 })

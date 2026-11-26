@@ -147,4 +147,23 @@ describe('game fleet changes, through the runtime', () => {
       })
     ).toBe(1)
   })
+
+  // Why: the open Team panel re-reads on this push instead of its 20 s poll (ORCA-1441).
+  it('tells this window and paired clients once per new fleet version', async () => {
+    const { runtime, internals } = leadRuntime()
+    const gameFleetChanged = vi.fn()
+    runtime.setNotifier({ gameFleetChanged, worktreesChanged: vi.fn() } as never)
+    const events: unknown[] = []
+    runtime.onClientEvent((event) => events.push(event), { consumesTerminalSideEffects: false })
+
+    await fleetChangesOf(runtime, async () => {
+      internals.notifyWorktreesChanged('repo-1')
+      runtime.noteGameFleetChanged()
+    })
+
+    expect(gameFleetChanged).toHaveBeenCalledTimes(1)
+    expect(
+      events.filter((event) => (event as { type: string }).type === 'gameFleetChanged')
+    ).toEqual([{ type: 'gameFleetChanged' }])
+  })
 })

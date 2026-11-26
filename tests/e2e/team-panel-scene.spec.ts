@@ -6,7 +6,6 @@ import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endp
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
-import { closeLeadStartTeamPanel } from './helpers/team-tab-auto-open'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
@@ -299,7 +298,6 @@ test('the Team panel draws the live scene beside a member opened under its heade
         return registered.result.registered
       })
       .toBe(true)
-    await closeLeadStartTeamPanel(orcaPage)
 
     const endpoint = await readHookEndpoint(electronApp)
     // The lead's agent row is posted the way Orca's hooks do; main attaches its terminal handle.
@@ -386,12 +384,16 @@ test('the Team panel draws the live scene beside a member opened under its heade
       )
       .toBe(2)
 
+    // Why reopen: the lead start's panel drew the scene before the members came, and a member
+    // arriving mid-scene walks in; this spec judges a scene opened on a seated team.
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
+    const panel = orcaPage.getByTestId('team-panel')
+    await expect(panel).toHaveCount(0)
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
       state.setRightSidebarOpen(true)
       state.setRightSidebarTab('team')
     })
-    const panel = orcaPage.getByTestId('team-panel')
     const scene = panel.locator('[data-team-scene]')
     await expect(sceneCanvasIn(scene)).toBeVisible({ timeout: 90_000 })
     await expect.poll(() => paintedColors(orcaPage), { timeout: 30_000 }).toBeGreaterThan(8)

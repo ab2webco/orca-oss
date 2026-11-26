@@ -58,6 +58,7 @@ export type RuntimeApi = {
     onGameOwnerQuestionsChanged?: (callback: () => void) => () => void
     onGameInboxChanged?: (callback: () => void) => () => void
     onGameAdvisorChanged?: (callback: () => void) => () => void
+    onGameFleetChanged?: (callback: () => void) => () => void
     onGameLeadStarted?: (callback: (worktreeId: string) => void) => () => void
   }
   runtimeEnvironments: {

@@ -31,6 +31,8 @@ import { createTeamPanelNoTeamNotes } from './team-panel-no-team-breadcrumb'
 import { withAddedInboxQuestions } from './team-panel-inbox-overlay'
 import { onGameOwnerQuestionsChanged } from '@/components/game-inbox/game-owner-questions-signal'
 import { onGameAdvisorChanged } from './game-advisor-signal'
+import { onGameFleetChanged } from './game-fleet-change-signal'
+import { createTeamPanelFleetChangeRefresh } from './team-panel-fleet-change-refresh'
 import { useTeamPanelSoloModel } from './use-team-panel-solo-model'
 import { teamPanelProjectOf } from './team-panel-project'
 import { teamInboxAgentQuestionsOf } from './team-panel-inbox-agents'
@@ -48,6 +50,8 @@ export type TeamPanelModelSource = {
 
 // Why 20 s: the same cadence as the mobile Team drawer, which polls the same game.state cache.
 const TEAM_REFRESH_MS = 20_000
+// Why 2 s: a launch's burst lands within it, and a busy team must not turn the panel into a tight read loop.
+const TEAM_FLEET_CHANGE_GAP_MS = 2_000
 
 const useTeamPanelModelStore = create<{
   source: TeamPanelModelSource
@@ -199,6 +203,29 @@ export function useTeamPanelModel(options: { background?: boolean } = {}): TeamP
     ]
     return () => stops.forEach((stop) => stop?.())
   }, [scope])
+  // Why the shown panel only: the sidebar's rows alone keep the 20 s poll, which is the fallback here too.
+  useEffect(() => {
+    if (!scope || background) {
+      return
+    }
+    const fleet = createTeamPanelFleetChangeRefresh(
+      () => poller.refresh(),
+      TEAM_FLEET_CHANGE_GAP_MS
+    )
+    const { target } = scope
+    const stop =
+      target.kind === 'environment'
+        ? onGameFleetChanged((environmentId) => {
+            if (environmentId === target.environmentId) {
+              fleet.changed()
+            }
+          })
+        : window.api.runtime.onGameFleetChanged?.(fleet.changed)
+    return () => {
+      stop?.()
+      fleet.cancel()
+    }
+  }, [scope, background])
   const source = useTeamPanelModelStore((s) => s.source)
   const team =
     source.section.kind === 'ready' && source.section.value.kind === 'team'

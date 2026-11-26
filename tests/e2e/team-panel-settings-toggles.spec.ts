@@ -6,7 +6,6 @@ import { WIDTHS } from './helpers/settings-window'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { writeSettings } from './helpers/settings-write'
-import { closeLeadStartTeamPanel } from './helpers/team-tab-auto-open'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 
 const GB = 1024 ** 3
@@ -160,6 +159,8 @@ test('each panel setting changes the Team panel: PRs and Machines tabs, the merg
         paneKey: pane.paneKey
       })
     ).result.terminal.handle
+    // Why before the lead start: its auto-opened panel stays open, so its first read is overlaid too.
+    await overlayGameState(electronApp)
     await client.call('terminal.send', { terminal: lead, text: agent.command, enter: true })
     await expect
       .poll(async () => {
@@ -171,7 +172,6 @@ test('each panel setting changes the Team panel: PRs and Machines tabs, the merg
         return registered.result.registered
       })
       .toBe(true)
-    await closeLeadStartTeamPanel(orcaPage)
     await emitCodexHookStatus(await readHookEndpoint(electronApp), {
       paneKey: pane.paneKey,
       worktreeId,
@@ -182,7 +182,6 @@ test('each panel setting changes the Team panel: PRs and Machines tabs, the merg
       timeout: 15_000
     })
 
-    await overlayGameState(electronApp)
     await orcaPage.evaluate(() => {
       const state = window.__store!.getState()
       // Why plugins on: the panel draws no Jev row with the plugin system off.

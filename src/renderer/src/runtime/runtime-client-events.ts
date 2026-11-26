@@ -89,6 +89,7 @@ function isRuntimeClientEvent(
     message.type === 'gameOwnerQuestionsChanged' ||
     message.type === 'gameInboxChanged' ||
     message.type === 'gameAdvisorChanged' ||
+    message.type === 'gameFleetChanged' ||
     message.type === 'gameLeadStarted' ||
     message.type === 'nativeChatLaunchDraftResolved' ||
     message.type === 'terminalSideEffects' ||

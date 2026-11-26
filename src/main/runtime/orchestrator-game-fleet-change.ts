@@ -6,7 +6,11 @@ export class GameFleetChangeSignal {
   private timer: ReturnType<typeof setTimeout> | null = null
   private readonly waiters = new Set<() => void>()
 
-  constructor(private readonly delayMs = 250) {}
+  /** `onVersion`: each new version, pushed to the Team panels that would otherwise wait for their poll. */
+  constructor(
+    private readonly delayMs = 250,
+    private readonly onVersion?: () => void
+  ) {}
 
   version(): number {
     return this.current
@@ -23,6 +27,7 @@ export class GameFleetChangeSignal {
       for (const wake of this.waiters) {
         wake()
       }
+      this.onVersion?.()
     }, this.delayMs)
     this.timer.unref?.()
   }

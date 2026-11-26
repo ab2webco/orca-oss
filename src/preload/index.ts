@@ -4805,6 +4805,11 @@ const api = {
       ipcRenderer.on('runtime:gameAdvisorChanged', listener)
       return () => ipcRenderer.removeListener('runtime:gameAdvisorChanged', listener)
     },
+    onGameFleetChanged: (callback: () => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent) => callback()
+      ipcRenderer.on('runtime:gameFleetChanged', listener)
+      return () => ipcRenderer.removeListener('runtime:gameFleetChanged', listener)
+    },
     onGameLeadStarted: (callback: (worktreeId: string) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, worktreeId: string) =>
         callback(worktreeId)

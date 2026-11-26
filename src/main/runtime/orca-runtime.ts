@@ -2497,6 +2497,7 @@ type RuntimeNotifier = {
   gameOwnerQuestionsChanged?(): void
   gameInboxChanged?(): void
   gameAdvisorChanged?(): void
+  gameFleetChanged?(): void
   gameLeadStarted?(worktreeId: string): void
   activateWorktree(
     repoId: string,
@@ -4252,7 +4253,10 @@ export class OrcaRuntimeService {
     this.notifier?.gameInboxChanged?.()
     this.emitClientEvent({ type: 'gameInboxChanged' })
   })
-  private readonly gameFleetChange = new GameFleetChangeSignal()
+  private readonly gameFleetChange = new GameFleetChangeSignal(250, () => {
+    this.notifier?.gameFleetChanged?.()
+    this.emitClientEvent({ type: 'gameFleetChanged' })
+  })
   private readonly onTerminalSideEffects: ((batch: TerminalSideEffectBatch) => void) | null
   private terminalSideEffectLocalConsumerAvailable = false
   private terminalSideEffectConsumerAvailable = false
