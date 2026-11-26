@@ -1,15 +1,11 @@
 import { translate } from '@/i18n/i18n'
-import {
-  teamHostText,
-  teamLeadLiveText,
-  teamLiveText,
-  teamModelText
-} from '@/components/team-panel/team-card-text'
+import { teamHostText, teamModelText } from '@/components/team-panel/team-card-text'
+import { teamLeadCardLine, teamMemberCardLine } from '@/components/team-panel/team-card-line'
 import type { WorktreeCardProperty } from '../../../../shared/types'
 import type { SidebarTeamRow } from './sidebar-team-roster'
 
 export type SidebarTeamRowLines = {
-  /** V30's act-line; `asks` draws it in the question tone. */
+  /** V30's act-line; `asks` draws it in the question tone, where the Team card uses its attention tone. */
   activity: { text: string; asks: boolean } | null
   /** V30's second act-line: host, ports, account and model, each when shown. */
   extra: string | null
@@ -24,26 +20,12 @@ export type SidebarTeamRowLineOptions = {
   localHostName: string | null
 }
 
-/** What the agent does now; `asks` while a member waits on the person. */
+/** What the agent does now, worded and toned as its Team card (ORCA-1366). */
 export function sidebarTeamRowActivity(
   row: SidebarTeamRow
 ): NonNullable<SidebarTeamRowLines['activity']> {
-  if (row.role === 'lead') {
-    return {
-      text: teamLeadLiveText(row.card.liveAction, row.card.condition),
-      asks: false
-    }
-  }
-  // Why: as the Team panel's card, the question itself is only in Inbox.
-  return row.card.needsYou
-    ? {
-        text: translate('teamPanel.card.waitingForAnswer', 'Waiting for your answer'),
-        asks: true
-      }
-    : {
-        text: teamLiveText(row.card.liveAction, row.card.condition),
-        asks: false
-      }
+  const line = row.role === 'lead' ? teamLeadCardLine(row.card) : teamMemberCardLine(row.card)
+  return { text: line.text, asks: line.attention }
 }
 
 function extraOf(

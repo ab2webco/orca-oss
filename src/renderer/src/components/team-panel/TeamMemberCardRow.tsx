@@ -4,16 +4,14 @@ import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import type { TeamMemberCard } from '../../../../shared/team-panel-model-types'
-import { teamIdleCiOf } from '../../../../shared/team-member-shown-state'
 import {
   teamAgeText,
-  teamAskText,
   teamHelpersCountText,
-  teamMemberLiveText,
   teamModelText,
   teamPhaseText,
   teamTicketBesideName
 } from './team-card-text'
+import { teamMemberCardLine } from './team-card-line'
 import { TeamHostName } from './TeamHostName'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
@@ -99,6 +97,7 @@ export function TeamMemberCardRow({
   const shownName = showName ? card.name : (card.ticket?.identifier ?? card.name)
   // Why the pane: only its terminal can answer a prompt there, and the Inbox does not hold it (ORCA-1231).
   const inPane = card.ask?.kind === 'permission'
+  const line = teamMemberCardLine(card)
   const answer = !card.needsYou ? null : inPane ? (
     <Button size="xs" onClick={() => void openTeamSession(card, shownName)}>
       {translate('teamPanel.card.answerInTerminal', 'Answer in its terminal')}
@@ -175,13 +174,11 @@ export function TeamMemberCardRow({
             {/* Why: the line names what the tone shows; the question itself is only in Inbox. */}
             <span
               className={cn(
-                card.needsYou ? 'line-clamp-2 break-words text-status-attention' : 'truncate',
-                !card.needsYou && teamIdleCiOf(card) === 'failure' && 'text-status-attention'
+                card.needsYou ? 'line-clamp-2 break-words' : 'truncate',
+                line.attention && 'text-status-attention'
               )}
             >
-              {card.needsYou && card.ask !== null
-                ? teamAskText(card.ask)
-                : teamMemberLiveText(card)}
+              {line.text}
             </span>
           </span>
           <MetaLine
