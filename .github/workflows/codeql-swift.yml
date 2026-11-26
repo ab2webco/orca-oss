@@ -1,0 +1,59 @@
+name: CodeQL Swift
+
+# Why a separate workflow: Swift needs a macOS runner, and on 2026-11-24 and 11-25 five
+# CodeQL runs failed because no macOS arm64 runner took the job, so only Swift changes
+# (and the weekly run) wait for one.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.swift'
+      - '.github/workflows/codeql-swift.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**/*.swift'
+      - '.github/workflows/codeql-swift.yml'
+  schedule:
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-swift-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (swift)
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: swift
+          build-mode: manual
+
+      # Debug builds of the two shipped helpers; the expo-two-way-audio iOS sources need
+      # the Expo native toolchain and stay out.
+      - name: Build Swift helpers
+        run: |
+          swift build --package-path native/computer-use-macos
+          swiftc native/notification-status-macos/main.swift -o "$RUNNER_TEMP/orca-notification-status"
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:swift
