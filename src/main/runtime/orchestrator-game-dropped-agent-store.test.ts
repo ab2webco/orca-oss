@@ -41,4 +41,22 @@ describe('GameDroppedAgentStore', () => {
   it('reads a missing file as nothing dropped', async () => {
     expect(await storeIn().read('repo:repo1')).toEqual([])
   })
+
+  // Why by pane key: a removed member's sibling in the same worktree must stay listed (ORCA-1476).
+  it('keeps a removed member by its pane key beside the drops, across a new store', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-game-dropped-'))
+    await storeIn(dir).set('repo:repo1', { ...agent, name: 'ORCA-907' }, true)
+    await storeIn(dir).forget('repo:repo1', { paneKey: 'remote:ctx_1177', name: 'orca-1177' })
+    await storeIn(dir).set(
+      'repo:repo1',
+      { worktreeId: 'wt-2', environmentId: null, name: 'B' },
+      true
+    )
+
+    const hides = await storeIn(dir).readAll('repo:repo1')
+    expect(hides.forgotten).toEqual([
+      { paneKey: 'remote:ctx_1177', name: 'orca-1177', forgottenAt: AT }
+    ])
+    expect(hides.dropped.map((one) => one.name)).toEqual(['ORCA-907', 'B'])
+  })
 })

@@ -70,6 +70,12 @@ export const ORCHESTRATOR_GAME_HANDLER_GROUPS: readonly HandlerGroup[] = [
       (await import('./handlers/orchestrator-game-drop.js')).ORCHESTRATOR_GAME_DROP_HANDLERS
   },
   {
+    name: 'orchestrator-game-remove',
+    keys: ['game remove'],
+    load: async () =>
+      (await import('./handlers/orchestrator-game-remove.js')).ORCHESTRATOR_GAME_REMOVE_HANDLERS
+  },
+  {
     name: 'orchestrator-game-accounts',
     keys: ['game accounts'],
     load: async () =>
