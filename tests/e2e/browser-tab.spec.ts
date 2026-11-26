@@ -295,15 +295,20 @@ async function clickBrowserLink(
       if (!webview) {
         throw new Error(`Missing webview for browser tab ${targetBrowserTabId}`)
       }
+      // Why: a guest drops input sent before its first contentful paint (ORCA-1469), so wait for the paint as well as the link.
       const point = (await webview.executeJavaScript(`(async () => {
         const deadline = Date.now() + 5000
+        let painted = false
         while (Date.now() < deadline) {
+          painted = performance
+            .getEntriesByType('paint')
+            .some((entry) => entry.name === 'first-contentful-paint')
           const frame = ${JSON.stringify(frameSelector)}
             ? document.querySelector(${JSON.stringify(frameSelector)})
             : null
           const root = frame?.contentDocument ?? document
           const linkRect = root.querySelector(${JSON.stringify(targetSelector)})?.getBoundingClientRect()
-          if (linkRect) {
+          if (linkRect && painted) {
             const frameRect = frame?.getBoundingClientRect()
             return {
               x: (frameRect?.left ?? 0) + linkRect.left + linkRect.width / 2,
@@ -312,10 +317,10 @@ async function clickBrowserLink(
           }
           await new Promise((resolve) => setTimeout(resolve, 25))
         }
-        return null
-      })()`)) as { x: number; y: number } | null
-      if (!point) {
-        throw new Error(`Missing browser link ${targetSelector}`)
+        return { missing: painted ? 'link' : 'first contentful paint' }
+      })()`)) as { x: number; y: number } | { missing: string }
+      if ('missing' in point) {
+        throw new Error(`Browser link ${targetSelector}: no ${point.missing} within 5 s`)
       }
       await webview.sendInputEvent({ type: 'mouseMove', modifiers: inputModifiers, ...point })
       await webview.sendInputEvent({
