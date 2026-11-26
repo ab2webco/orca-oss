@@ -6,7 +6,6 @@ import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endp
 import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { writeSettings } from './helpers/settings-write'
-import { closeLeadStartTeamPanel } from './helpers/team-tab-auto-open'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { OrchestratorGameState } from '../../src/shared/orchestrator-game-state'
@@ -299,7 +298,6 @@ test('the Team panel draws the live scene beside a member opened under its heade
         return registered.result.registered
       })
       .toBe(true)
-    await closeLeadStartTeamPanel(orcaPage)
 
     const endpoint = await readHookEndpoint(electronApp)
     // The lead's agent row is posted the way Orca's hooks do; main attaches its terminal handle.

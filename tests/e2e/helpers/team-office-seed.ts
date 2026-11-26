@@ -3,7 +3,6 @@ import { expect } from './orca-app'
 import { emitCodexHookStatus, readHookEndpoint } from './agent-hook-endpoint'
 import { createStdinLoggingAgent } from './game-member-stdin-agent'
 import { setWindowWidth } from './settings-window'
-import { closeLeadStartTeamPanel } from './team-tab-auto-open'
 import { writeSettings } from './settings-write'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './terminal'
@@ -45,11 +44,13 @@ export async function seedOfficeTeam(app: ElectronApplication, team: SeededTeam)
       const scope = globalThis as unknown as { __officeTeam?: unknown }
       const first = scope.__officeTeam === undefined
       scope.__officeTeam = seeded
-      if (!first) {
-        // Why this event: the panel re-reads game.state on it now, not at its next 20 s poll.
+      // Why this event: the open panel re-reads game.state on it now, not at its next 20 s poll.
+      const reread = (): void =>
         BrowserWindow.getAllWindows().forEach((w) =>
           w.webContents.send('runtime:gameAdvisorChanged')
         )
+      if (!first) {
+        reread()
         return
       }
       const { _invokeHandlers: handlers } = ipcMain as unknown as {
@@ -96,6 +97,7 @@ export async function seedOfficeTeam(app: ElectronApplication, team: SeededTeam)
         const lead = line ? { ...leader, advisor: { ...jev, line } } : leader
         return { ...response, result: { ...result, agents: [lead, ...added] } }
       })
+      reread()
     },
     { seeded: team, jev: JEV } as unknown as Parameters<typeof app.evaluate>[1]
   )
@@ -161,7 +163,6 @@ async function launchOfficeTeam(
       return registered.result.registered
     })
     .toBe(true)
-  await closeLeadStartTeamPanel(orcaPage)
   const endpoint = await readHookEndpoint(electronApp)
   await emitCodexHookStatus(endpoint, {
     paneKey: pane.paneKey,

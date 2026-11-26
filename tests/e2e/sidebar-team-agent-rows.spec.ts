@@ -5,7 +5,6 @@ import { createStdinLoggingAgent } from './helpers/game-member-stdin-agent'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { writeSettings } from './helpers/settings-write'
-import { closeLeadStartTeamPanel } from './helpers/team-tab-auto-open'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { RuntimeTerminalListResult } from '../../src/shared/runtime-types'
 import { worktreeRow } from './worktree-row-locators'
@@ -224,8 +223,13 @@ test('the sidebar draws the lead and its members as V30 agent rows', async ({
         return registered.result.registered
       })
       .toBe(true)
-    // Why: shut the Team panel the lead start opened so the rows read alone.
-    await closeLeadStartTeamPanel(orcaPage)
+    // Why: the rows drop what an open Team tab already says, so shut the one the lead start opens.
+    await expect
+      .poll(() => orcaPage.evaluate(() => window.__store!.getState().rightSidebarOpen), {
+        message: 'the lead start never opened the Team panel'
+      })
+      .toBe(true)
+    await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarOpen(false))
     const endpoint = await readHookEndpoint(electronApp)
     await emitCodexHookStatus(endpoint, {
       paneKey: pane.paneKey,

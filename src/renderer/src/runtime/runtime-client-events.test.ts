@@ -194,6 +194,21 @@ describe('subscribeRuntimeClientEvents', () => {
     expect(onEvent).toHaveBeenCalledWith({ type: 'gameAdvisorChanged' })
   })
 
+  it("forwards a fleet change so a paired host's open Team panel reads again (ORCA-1441)", async () => {
+    let capturedOnResponse: ((response: unknown) => void) | undefined
+    const subscribe = vi.fn(async (_args, nextCallbacks) => {
+      capturedOnResponse = (nextCallbacks as { onResponse: (response: unknown) => void }).onResponse
+      return { unsubscribe: vi.fn(), sendBinary: vi.fn() }
+    })
+    const onEvent = vi.fn()
+    vi.stubGlobal('window', { api: { runtimeEnvironments: { subscribe } } })
+
+    await subscribeRuntimeClientEvents('env-1', onEvent)
+    capturedOnResponse?.({ ok: true, result: { type: 'gameFleetChanged' } })
+
+    expect(onEvent).toHaveBeenCalledWith({ type: 'gameFleetChanged' })
+  })
+
   it('forwards new orchestration mail so a paired Inbox refreshes its threads (ORCA-878)', async () => {
     let capturedOnResponse: ((response: unknown) => void) | undefined
     const subscribe = vi.fn(async (_args, nextCallbacks) => {
