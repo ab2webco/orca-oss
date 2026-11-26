@@ -114,7 +114,7 @@ export function gameHostLaunchOf(args: {
       reason: `${namedByUpstream.displayName} on ${host} names ${upstream}, the upstream every fork of it shares, so Orca cannot tell it is ${lead.displayName}'s clone. If it is, list ${upstream} in orchestratorGame.orchestrator.memberRepos.`
     }
   }
-  // Why not unregistered: a partial clone never gets a remote identity, so it may be this project (ORCA-1250).
+  // Why not unregistered: a repo whose identity is not read yet may be this project (ORCA-1250).
   const unidentified = repos.find((repo) => repo.remoteKey === null && !isFolderRepo(repo))
   if (unidentified) {
     return {
