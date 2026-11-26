@@ -1,0 +1,57 @@
+name: CodeQL
+
+# Advanced setup replacing GitHub's default CodeQL setup (ORCA-1436): GitHub refuses
+# these uploads while default setup is on, so an admin turns it off in repo settings.
+# Swift lives in codeql-swift.yml because it needs a macOS runner.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '27 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  # Why: a PR push supersedes its last run; each main commit keeps its own analysis.
+  group: codeql-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.timeout }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # A full main analysis took up to 61 min between 2026-11-20 and 2026-11-25.
+          - name: javascript-typescript
+            languages: javascript-typescript
+            timeout: 90
+          # Why one job: each takes about a minute, and the org shares 20 concurrent jobs.
+          - name: actions, csharp, python, ruby
+            languages: actions,csharp,python,ruby
+            timeout: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.languages }}
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
