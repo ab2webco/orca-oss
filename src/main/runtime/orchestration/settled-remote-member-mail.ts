@@ -11,6 +11,26 @@ export function namesRunHome(to: string | undefined): boolean {
   return typeof to === 'string' && /^run home\b/i.test(to.trim())
 }
 
+/**
+ * Whether --to/--run can only mean the lead of a remote member: Run home by name, or a Run this host
+ * does not hold (ORCA-1463). A remote member's host never learns its lead's run id, so `run:<id>`
+ * failed as "Run <id> was not found" here.
+ */
+export function addressesRunHome(
+  db: OrchestrationDb,
+  target: { to?: string; run?: string }
+): boolean {
+  const toRun = target.to?.startsWith('run:') ? target.to.slice('run:'.length) : undefined
+  if (target.to && !toRun && !namesRunHome(target.to)) {
+    return false
+  }
+  if (toRun && target.run && toRun !== target.run) {
+    return false
+  }
+  const runId = toRun ?? target.run
+  return runId ? !db.getRun(runId) : namesRunHome(target.to)
+}
+
 export type SettledMemberMail = {
   from: string
   to?: string
@@ -48,14 +68,16 @@ export function relaySettledRemoteMemberMail(
     hasLocalDispatch: () => boolean
   }
 ): RunHomeRelayResult | undefined {
-  const explicitHome = namesRunHome(mail.to)
-  if (mail.run || (mail.to && !explicitHome) || caller.hasLocalDispatch()) {
+  const explicitHome = Boolean(mail.to || mail.run) && addressesRunHome(db, mail)
+  if (((mail.to || mail.run) && !explicitHome) || caller.hasLocalDispatch()) {
     return undefined
   }
   const settled = db.findLatestSettledRemoteAttachmentForPane(caller.paneKey)
   if (!settled) {
-    if (explicitHome) {
-      throw runHomeUnreachable(mail.type, db.findLatestRemoteAttachmentForPane(caller.paneKey))
+    const latest = db.findLatestRemoteAttachmentForPane(caller.paneKey)
+    // Why a run: id from a pane that never held a remote Dispatch keeps "Run <id> was not found".
+    if (explicitHome && (latest || namesRunHome(mail.to))) {
+      throw runHomeUnreachable(mail.type, latest)
     }
     return undefined
   }
@@ -134,7 +156,7 @@ function runHomeUnreachable(
     : 'This pane holds no remote Dispatch, so nothing on this host relays to a lead.'
   return new OrchestrationError(
     'dispatch_inactive',
-    `Your ${type} was not sent: "Run home" is not a terminal on this host but the lead of a remote Dispatch. ${where} Print your report in this terminal for the lead to read there, and wait for the lead to re-engage it.`,
+    `Your ${type} was not sent: your lead's Run is not on this host; only a remote Dispatch relays to it. ${where} Print your report in this terminal for the lead to read there, and wait for the lead to re-engage it.`,
     latest ? { dispatchId: latest.dispatch_id } : undefined
   )
 }

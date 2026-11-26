@@ -6,6 +6,7 @@ import {
   LEGACY_CONTRACT_VERSION,
   type MessageType,
   type MessagePriority,
+  type OrchestrationDb,
   type TaskStatus
 } from '../../orchestration/db'
 import { MESSAGE_TYPES } from '../../orchestration/types'
@@ -45,7 +46,7 @@ import {
 } from '../../orchestration/dispatch-follow-up-renewal'
 import { reopenSettledRemoteAttachmentForAsk } from '../../orchestration/remote-member-reopen'
 import {
-  namesRunHome,
+  addressesRunHome,
   relaySettledRemoteMemberMail
 } from '../../orchestration/settled-remote-member-mail'
 import type { OrcaRuntimeService } from '../../orca-runtime'
@@ -460,9 +461,12 @@ function authenticateRemoteAwareSender(
   }
 }
 
-function rejectFederatedExplicitTarget(params: { to?: string; run?: string }): void {
-  // Why allow Run home: it is the lead handle the member's brief prints (ORCA-1345).
-  if ((params.to && !namesRunHome(params.to)) || params.run) {
+function rejectFederatedExplicitTarget(
+  db: OrchestrationDb,
+  params: { to?: string; run?: string }
+): void {
+  // Why allow Run home: it is the lead handle the brief prints (ORCA-1345), or the lead's run id (ORCA-1463).
+  if ((params.to || params.run) && !addressesRunHome(db, params)) {
     throw new OrchestrationError(
       'invalid_argument',
       'Federated Dispatch messages route to their Run home; omit --to and --run.'
@@ -504,7 +508,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         ? db.findActiveRemoteAttachmentForPane(senderPaneKey)
         : undefined
       if (remoteAttachment) {
-        rejectFederatedExplicitTarget(params)
+        rejectFederatedExplicitTarget(db, params)
         const processIncarnation =
           attestedCaller?.processIncarnation ?? runtime.getTerminalProcessIncarnation(from)
         const authority = {
@@ -1740,8 +1744,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       const reopenedRemoteAttachment =
         activeRemoteAttachment ||
         !paneKey ||
-        (params.to && !namesRunHome(params.to)) ||
-        params.run ||
+        ((params.to || params.run) && !addressesRunHome(db, params)) ||
         db.getActiveDispatchForIdentity(from, paneKey)
           ? undefined
           : reopenSettledRemoteAttachmentForAsk(db, {
@@ -1751,7 +1754,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             })
       const remoteAttachment = activeRemoteAttachment ?? reopenedRemoteAttachment
       if (remoteAttachment) {
-        rejectFederatedExplicitTarget(params)
+        rejectFederatedExplicitTarget(db, params)
         return askRemoteRunHome({
           params: { ...params, timeoutMs },
           runtime,
