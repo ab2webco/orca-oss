@@ -66,6 +66,10 @@ function buildPorts(overrides: PortOverrides = {}): {
       calls.push('verifyResumeObservability')
       return true
     },
+    trustTargetFolder: async () => {
+      calls.push('trustTargetFolder')
+      return true
+    },
     awaitSourceForeground: async () => {
       calls.push('awaitSourceForeground')
       return true
@@ -137,6 +141,7 @@ describe('runAtomicClaudeTerminalAccountSwitch preflight atomicity', () => {
       'stopSource',
       'begin',
       'verifyResumeObservability',
+      'trustTargetFolder',
       'writeLaunchCommand',
       'awaitExactSession',
       'commit',
@@ -173,6 +178,27 @@ describe('runAtomicClaudeTerminalAccountSwitch preflight atomicity', () => {
     // resume and there is no destination agent to interrupt.
     expect(writes).toHaveLength(1)
     expect(writes[0]).toContain('/vault/account-source/auth')
+    expect(calls).not.toContain('stopDestination')
+  })
+
+  it('rolls back at once, without launching the target, when its vault cannot trust the folder', async () => {
+    // ORCA-1347: an untrusted folder stops Claude on its trust dialog before the
+    // SessionStart hook, so launching anyway only waits out the 90 s verify.
+    let trustedIn: string | undefined
+    const { ports, calls, writes } = buildPorts({
+      trustTargetFolder: async ({ configDir }) => {
+        trustedIn = configDir
+        return false
+      }
+    })
+    const result = await runAtomicClaudeTerminalAccountSwitch(REQUEST, ports)
+    expect(trustedIn).toBe('/vault/account-target/auth')
+    expect(result.state).toBe('rolled-back')
+    expect(result.failure?.reason).toBe('target-folder-untrusted')
+    expect(writes).toHaveLength(1)
+    expect(writes[0]).toContain('/vault/account-source/auth')
+    // The only verification is the source's own restore.
+    expect(calls.filter((call) => call === 'awaitExactSession')).toHaveLength(1)
     expect(calls).not.toContain('stopDestination')
   })
 
@@ -507,6 +533,7 @@ describe('runAtomicClaudeTerminalAccountSwitch agent self-switch', () => {
       'stopSource',
       'begin',
       'verifyResumeObservability',
+      'trustTargetFolder',
       'writeLaunchCommand',
       'awaitExactSession',
       'commit',

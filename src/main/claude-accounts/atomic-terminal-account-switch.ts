@@ -92,6 +92,15 @@ export type AtomicClaudeTerminalAccountSwitchPorts = {
     configDir: string | null
   }): Promise<boolean>
   /**
+   * Accepts Claude's folder trust for the pane's cwd in `configDir`'s config.
+   * False means a launch there would stop on the trust dialog, which fires no
+   * SessionStart hook, so verification could only time out (ORCA-1347).
+   */
+  trustTargetFolder(args: {
+    capture: ClaudeTerminalSwitchCapture
+    configDir: string
+  }): Promise<boolean>
+  /**
    * Self-switch only: waits until the agent — not the tool subprocess it spawned
    * to ask for the switch — owns the terminal's foreground again.
    */
@@ -342,6 +351,11 @@ export async function runAtomicClaudeTerminalAccountSwitch(
   // last one before the destination Claude exists.
   if (!(await ports.verifyResumeObservability({ capture, configDir: begun.configDir }))) {
     return rollback(failure('resume-verification-unavailable'), { launched: false })
+  }
+  // Why: the spawn path seeds trust only in the vault it launched with; a target
+  // vault that never ran in this folder would hold the resume on the trust dialog.
+  if (!(await ports.trustTargetFolder({ capture, configDir: begun.configDir }))) {
+    return rollback(failure('target-folder-untrusted'), { launched: false })
   }
 
   transition('launching-target')

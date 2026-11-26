@@ -63,6 +63,8 @@ export type ClaudeTerminalAccountSwitchFailureReason =
    * including the rollback's re-verification (ORCA-168).
    */
   | 'resume-verification-unavailable'
+  /** The target account's Claude config could not be made to trust this terminal's folder. */
+  | 'target-folder-untrusted'
   | 'concurrent'
   | 'prepare-failed'
   /** Self-switch only: the invoking tool never gave the agent its foreground back. */
@@ -205,6 +207,8 @@ const FAILURE_MESSAGES: Record<ClaudeTerminalAccountSwitchFailureReason, string>
     'This session has no saved conversation yet, so there is nothing for the other account to pick up — send it a message first, then switch.',
   'resume-verification-unavailable':
     'Orca cannot observe a resumed Claude session in this terminal — the managed SessionStart hook is missing from the account’s Claude vault, so neither the switch nor its rollback could be verified. Relaunch the agent from Orca to reinstall it; if this keeps happening, that vault’s settings.json is not writable.',
+  'target-folder-untrusted':
+    "Orca could not mark this terminal's folder as trusted in the selected account's Claude config, so the resumed agent would stop on Claude's trust prompt.",
   concurrent: 'Another account switch is already running for this terminal.',
   'prepare-failed': 'Could not prepare the selected account for this terminal.',
   'source-busy':
