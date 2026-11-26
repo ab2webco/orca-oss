@@ -25,6 +25,7 @@ import { FederationAttachStartParams } from './orchestration-federation-start-sc
 import { failFederatedAttachmentWithReceipt } from './orchestration-federation-start-receipt'
 import { holdSlotForSetup } from './orchestration-worker-setup-queue'
 import { prepareFederationAttachmentWorkerStart } from './orchestration-worker-start-validation'
+import { RUN_HOME_COORDINATOR_HANDLE } from '../../orchestration/settled-remote-member-mail'
 
 export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
   defineMethod({
@@ -251,7 +252,7 @@ export const ORCHESTRATION_FEDERATION_ATTACH_METHODS: RpcMethod[] = [
             taskId: params.taskId,
             dispatchId: params.dispatchId,
             taskSpec: params.taskSpec,
-            coordinatorHandle: 'Run home (relayed by Orca Lab)',
+            coordinatorHandle: RUN_HOME_COORDINATOR_HANDLE,
             workerHandle: terminalHandle,
             dispatchCapability: capability,
             devMode: params.devMode,

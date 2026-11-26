@@ -41,6 +41,10 @@ import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
 import { renewDispatchForMemberAsk } from '../../orchestration/dispatch-follow-up-renewal'
 import { reopenSettledRemoteAttachmentForAsk } from '../../orchestration/remote-member-reopen'
+import {
+  namesRunHome,
+  relaySettledRemoteMemberMail
+} from '../../orchestration/settled-remote-member-mail'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
@@ -454,7 +458,8 @@ function authenticateRemoteAwareSender(
 }
 
 function rejectFederatedExplicitTarget(params: { to?: string; run?: string }): void {
-  if (params.to || params.run) {
+  // Why allow Run home: it is the lead handle the member's brief prints (ORCA-1345).
+  if ((params.to && !namesRunHome(params.to)) || params.run) {
     throw new OrchestrationError(
       'invalid_argument',
       'Federated Dispatch messages route to their Run home; omit --to and --run.'
@@ -597,6 +602,33 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           },
           ...(lifecycle ? { lifecycle } : {})
         }
+      }
+      const settledRelay = senderPaneKey
+        ? relaySettledRemoteMemberMail(
+            db,
+            {
+              from,
+              to: params.to,
+              run: params.run,
+              type: params.type ?? 'status',
+              subject: params.subject,
+              body: params.body,
+              priority: params.priority,
+              threadId: params.threadId,
+              payload: params.payload
+            },
+            {
+              paneKey: senderPaneKey,
+              capability: orchestrationCapability,
+              processIncarnation:
+                attestedCaller?.processIncarnation ?? runtime.getTerminalProcessIncarnation(from),
+              hasLocalDispatch: () =>
+                db.getActiveDispatchForIdentity(from, senderPaneKey) !== undefined
+            }
+          )
+        : undefined
+      if (settledRelay) {
+        return settledRelay
       }
       // Why (ORCA-976): a remote member's handle names no pane here, so plain mail would never be
       // delivered; its Dispatch relays the message to the member's host instead.
@@ -1689,7 +1721,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
       const reopenedRemoteAttachment =
         activeRemoteAttachment ||
         !paneKey ||
-        params.to ||
+        (params.to && !namesRunHome(params.to)) ||
         params.run ||
         db.getActiveDispatchForIdentity(from, paneKey)
           ? undefined

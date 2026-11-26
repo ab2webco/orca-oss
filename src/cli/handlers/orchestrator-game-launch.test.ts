@@ -177,6 +177,10 @@ describe('orca game launch', () => {
       'Send worker_done once, with `--dispatch-capability`'
     )
     expect(GAME_MEMBER_REPORT_RULES).toContain('never resend worker_done')
+    // Why: a paired-host member's host refuses a settled member's report without its capability (ORCA-1345).
+    expect(GAME_MEMBER_REPORT_RULES).toContain(
+      '`orca orchestration send --to <lead handle> --dispatch-capability <yours> --type escalation --subject report`'
+    )
     expect(GAME_MEMBER_REPORT_RULES).toContain(
       'name the failing job, its run id and the cause, propose who fixes it'
     )
