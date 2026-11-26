@@ -35,6 +35,14 @@ const stewardAfter = (moves: number): GameMemberSteward => {
   }
 }
 
+// Peach's card after `moves` visits: the stage's own move, then up and down in turn.
+const movedText = (moves: number): string =>
+  moves === 0
+    ? 'Haiku 5.5 → Sonnet 5.5 · medium'
+    : moves % 2 === 1
+      ? 'Sonnet 5.5 → Opus 5.5 · high'
+      : 'Opus 5.5 → Haiku 5.5 · low'
+
 const team = (moves: number): SeededMember[] => [
   { name: 'Mario · ORCA-401 Code', state: 'idle' },
   { name: 'Luigi · ORCA-402 Code', state: 'idle' },
@@ -56,7 +64,13 @@ test('the Orca steward visits the member whose model it moved, in every style an
   try {
     const panel = orcaPage.getByTestId('team-panel')
     let moves = 0
+    const peachModel = panel.locator('article', { hasText: 'Peach' }).locator('[data-team-model]')
     const visit = async (style: string, name: string): Promise<void> => {
+      // Why: a member the scene first meets with the move already made only joins, unvisited, so
+      // the move goes out once the scene holds Peach as the last move left her (ORCA-1466).
+      await expect(peachModel).toHaveText(movedText(moves), { timeout: 30_000 })
+      // Why: a read still marked updating sets no baseline, so the next read would be the first.
+      await expect(panel.getByText('Updating the team…')).toBeHidden({ timeout: 30_000 })
       moves += 1
       await seedOfficeTeam(electronApp, { members: team(moves) })
       const scene = panel.locator(`[data-team-scene="${style}"]`).first()
@@ -86,7 +100,14 @@ test('the Orca steward visits the member whose model it moved, in every style an
           state.setRightSidebarWidth(640)
         }
       }, width === 1440)
-      await expect(panel.locator(`[data-team-scene="${style}"]`).first()).toBeVisible()
+      // Why the canvas: Office and Figures hold a placeholder while art decodes, and the canvas
+      // mounting after the next move would take that move as its opening team, with no visit.
+      await expect(
+        panel
+          .locator(`[data-team-scene="${style}"]`)
+          .first()
+          .getByRole('img', { name: 'Live team scene' })
+      ).toBeVisible()
     }
 
     for (const style of ['office', 'figures', 'pixel'] as const) {
