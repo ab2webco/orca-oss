@@ -199,6 +199,14 @@ host (decision O3).
   with `dispatch_inactive` naming `worker-start --on <host> --worktree … --terminal …`, and a
   `worker-start --on --terminal` that fails `agent_readiness` on a settled member's pane names the
   `send --to dispatch:<id>` follow-up.
+- Built in ORCA-1345, no new capability: a settled, unreleased remote member's `send` with no
+  `--to`, or with `--to "Run home"` (the lead handle its brief prints), relays as the same
+  `to_home` kinds an active member sends, which the home's 10 s settled-member pull from ORCA-856
+  already imports into the lead's Run. Before, it fell through to the host's own inbox and was
+  stored for a handle nobody reads. The host refuses instead, naming why, when the attachment is
+  released, the capability or process does not match (the lead also gets the refusal notice), the
+  type is `question` (`ask` reopens), or the home is below protocol 4 and would never pull it.
+  The member's host must run the fix; an older host still stores the mail locally.
 - Precedent: `ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY` exists because an older host drops
   `setupAdmission` (`src/shared/protocol-version.ts:70-72`).
 - The wire harness covers only the terminal stream. Child 2 adds its own cross-version test for the

@@ -5736,17 +5736,22 @@ export class OrchestrationDb {
     return rows.find((row) => row.pane_key && isEquivalentPaneKey(row.pane_key, paneKey))
   }
 
-  /** The pane's newest attachment, only when it succeeded and its member is still here. */
-  findLatestSettledRemoteAttachmentForPane(
-    paneKey: string
-  ): RemoteDispatchAttachmentRow | undefined {
+  /** The pane's newest attachment in any state. */
+  findLatestRemoteAttachmentForPane(paneKey: string): RemoteDispatchAttachmentRow | undefined {
     const rows = this.db
       .prepare(
         `SELECT * FROM remote_dispatch_attachments
          WHERE pane_key IS NOT NULL ORDER BY rowid DESC`
       )
       .all() as RemoteDispatchAttachmentRow[]
-    const latest = rows.find((row) => row.pane_key && isEquivalentPaneKey(row.pane_key, paneKey))
+    return rows.find((row) => row.pane_key && isEquivalentPaneKey(row.pane_key, paneKey))
+  }
+
+  /** The pane's newest attachment, only when it succeeded and its member is still here. */
+  findLatestSettledRemoteAttachmentForPane(
+    paneKey: string
+  ): RemoteDispatchAttachmentRow | undefined {
+    const latest = this.findLatestRemoteAttachmentForPane(paneKey)
     return latest?.state === 'succeeded' && latest.stage !== 'released' ? latest : undefined
   }
 
