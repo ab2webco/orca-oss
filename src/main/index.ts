@@ -1720,7 +1720,7 @@ function openMainWindow(options: { revealOnDidFinishLoad?: boolean } = {}): Brow
         preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store }),
       updateInstallMode: resolveUpdateInstallMode(isServeMode),
       onWorktreeLifecycle: (event) => {
-        runtime?.noteIpcWorktreeLifecycle(event)
+        void runtime?.noteIpcWorktreeLifecycle(event)
         emitPluginWorktreeLifecycle(event)
         warmSonarIndexOnWorktreeCreate(event)
       }

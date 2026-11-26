@@ -6723,31 +6723,36 @@ export class OrcaRuntimeService {
   // notifier (the renderer already applied them optimistically), but remote
   // clients hold no optimistic copy and need the invalidation event.
   // Why: desktop IPC creates and removes worktrees without the runtime, whose scan cache would hide them from CLI selectors.
-  noteIpcWorktreeLifecycle(event: RuntimeWorktreeLifecycleEvent): void {
+  /** Settles once a removed worktree's saved members are freed or the failure is logged. */
+  noteIpcWorktreeLifecycle(event: RuntimeWorktreeLifecycleEvent): Promise<void> {
     const repoId = splitWorktreeIdForFilesystem(event.worktreeId)?.repoId
     if (repoId) {
       this.invalidateWorktreeScanCacheForRepo(repoId)
     }
     this.invalidateResolvedWorktreeCache()
-    if (event.kind === 'removed') {
-      this.freeGameMembersOfRemovedWorktree(event.worktreeId)
-    }
+    return event.kind === 'removed'
+      ? this.freeGameMembersOfRemovedWorktree(event.worktreeId)
+      : Promise.resolve()
   }
 
   // Why: a paused member of a removed worktree has nothing left to resume, and only discard freed it.
-  private freeGameMembersOfRemovedWorktree(worktreeId: string): void {
+  private async freeGameMembersOfRemovedWorktree(worktreeId: string): Promise<void> {
     const repoId = splitWorktreeIdForFilesystem(worktreeId)?.repoId
     if (!repoId) {
       return
     }
-    void this.gamePausedMembers
-      .forgetWorktree(`repo:${repoId}`, worktreeId)
-      .then((tickets) => {
-        if (tickets.length > 0) {
-          this.gameFleetChange.changed()
-        }
+    try {
+      const tickets = await this.gamePausedMembers.forgetWorktree(`repo:${repoId}`, worktreeId)
+      if (tickets.length > 0) {
+        this.gameFleetChange.changed()
+      }
+    } catch (error) {
+      // Why logged, not thrown: the next fleet read's gone-worktree sweep still frees the member.
+      console.warn('[orchestrator-game] the removed worktree did not free its members', {
+        worktreeId,
+        error
       })
-      .catch(() => undefined)
+    }
   }
 
   notifyWorktreesChangedForRemoteClients(repoId: string): void {
@@ -28404,7 +28409,7 @@ export class OrcaRuntimeService {
         worktreeId: removalTarget.id,
         path: removalTarget.path
       })
-      this.freeGameMembersOfRemovedWorktree(removalTarget.id)
+      void this.freeGameMembersOfRemovedWorktree(removalTarget.id)
       return result
     } finally {
       if (this.removeManagedWorktreeInFlight.get(removalTarget.id)?.promise === removal) {
