@@ -42,13 +42,20 @@ export async function readBrowserGuestState(
         webContentsId: null
       }
     }
+    let deadlineTimer: number | undefined
     try {
       const webContentsId = webview.getWebContentsId()
-      const guest = (await webview.executeJavaScript(`({
+      const read = webview.executeJavaScript(`({
         formValue: document.querySelector('#recovery-state')?.value ?? null,
         marker: document.querySelector('#recovery-marker')?.textContent ?? null,
         url: location.href
-      })`)) as { formValue: string | null; marker: string | null; url: string }
+      })`) as Promise<{ formValue: string | null; marker: string | null; url: string }>
+      // Why: Electron drops a read sent while a crashed guest's frame is disposed ("Render
+      // frame was disposed") and never settles it, which would hang the caller's expect.poll.
+      const deadline = new Promise<never>((_resolve, reject) => {
+        deadlineTimer = window.setTimeout(() => reject(new Error('guest read dropped')), 2_000)
+      })
+      const guest = await Promise.race([read, deadline])
       return { chromePresent, ...guest, webContentsId }
     } catch {
       return {
@@ -58,6 +65,8 @@ export async function readBrowserGuestState(
         url: null,
         webContentsId: null
       }
+    } finally {
+      window.clearTimeout(deadlineTimer)
     }
   }, browserTabId)
 }
