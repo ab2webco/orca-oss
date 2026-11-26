@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   ORCHESTRATION_WORKER_LAUNCH_CHOSEN_BY_RUNTIME_CAPABILITY,
   ORCHESTRATION_WORKER_LAUNCH_PREFERENCES_RUNTIME_CAPABILITY
@@ -89,6 +89,17 @@ describe('gameKindLaunchParamsOf', () => {
 
 // ORCA-1425: the brief links the kind's playbook; the host still gets a model kind it knows.
 describe('--kind playbooks through game launch', () => {
+  const saved = { ...process.env }
+  // Why: an Orca pane exports these, so the test must set them or it passes only there.
+  beforeEach(() => {
+    process.env.ORCA_WORKTREE_ID = 'wt1'
+    process.env.ORCA_TERMINAL_HANDLE = 'h1'
+    process.env.ORCA_PANE_KEY = 'tab:leaf'
+  })
+  afterEach(() => {
+    process.env = { ...saved }
+  })
+
   const launched = async (lead: Record<string, unknown>, kind: string) => {
     const { client, calls } = fakeClient(
       stateWith({ lead: { ...stateWith().lead, ...lead } }),
