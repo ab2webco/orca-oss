@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/orca-app'
-import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
+import {
+  ensureTerminalVisible,
+  getAllWorktreeIds,
+  waitForActiveWorktree,
+  waitForSessionReady
+} from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 import type { SleepingAgentSessionRecord } from '../../src/shared/agent-session-resume'
@@ -78,13 +83,13 @@ async function waitForSleepingRow(
 async function expectGoneAfterNextPersist(
   page: Page,
   client: RuntimeClient,
-  worktreeId: string,
+  sleptWorktreeId: string,
   closedPaneKey: string
 ): Promise<void> {
   await expect.poll(() => rendererHasRecord(page, closedPaneKey)).toBe(false)
   const witnessPaneKey = `${randomUUID()}:${randomUUID()}`
   // Why worktree-sleep: only it is listed with no tab; a tab-less live record was closed (ORCA-718).
-  await seedSleepingRecord(page, worktreeId, witnessPaneKey, 'worktree-sleep')
+  await seedSleepingRecord(page, sleptWorktreeId, witnessPaneKey, 'worktree-sleep')
   await waitForSleepingRow(client, witnessPaneKey)
   const listed = await listTerminals(client)
   expect(listed.some((terminal) => paneKeyOf(terminal) === closedPaneKey)).toBe(false)
@@ -93,33 +98,42 @@ async function expectGoneAfterNextPersist(
 test.describe('closing a sleeping row through the runtime', () => {
   let client: RuntimeClient
   let worktreeId: string
+  // Why: the active worktree's one-time startup resume (Terminal.tsx) wakes any worktree-sleep
+  // record it finds; on a slow runner it ran after the seed and woke the row into a Claude tab
+  // (ORCA-1470). A worktree-sleep record belongs to a worktree that is not open anyway.
+  let sleptWorktreeId: string
 
   test.beforeEach(async ({ orcaPage, electronApp }) => {
     await waitForSessionReady(orcaPage)
     worktreeId = await waitForActiveWorktree(orcaPage)
+    const otherWorktreeId = (await getAllWorktreeIds(orcaPage)).find((id) => id !== worktreeId)
+    expect(otherWorktreeId, 'the seeded repo has no second worktree').toBeDefined()
+    sleptWorktreeId = otherWorktreeId!
     const userDataDir = await electronApp.evaluate(({ app }) => app.getPath('userData'))
     client = new RuntimeClient(userDataDir, 30_000, null, null)
     // Why: main lists sleeping rows only for worktrees it has resolved; on a slow CI
     // runner a record seeded right after boot stayed unlisted past the poll timeout.
-    await expect
-      .poll(
-        async () =>
-          (
-            await client.call<{ worktrees: { id: string }[] }>('worktree.list', {})
-          ).result.worktrees.some((worktree) => worktree.id === worktreeId),
-        { timeout: 30_000, message: `main never resolved worktree ${worktreeId}` }
-      )
-      .toBe(true)
+    for (const id of [worktreeId, sleptWorktreeId]) {
+      await expect
+        .poll(
+          async () =>
+            (
+              await client.call<{ worktrees: { id: string }[] }>('worktree.list', {})
+            ).result.worktrees.some((worktree) => worktree.id === id),
+          { timeout: 30_000, message: `main never resolved worktree ${id}` }
+        )
+        .toBe(true)
+    }
   })
 
   test('an orphaned sleeping row closed with --tab stays gone', async ({ orcaPage }) => {
     const paneKey = `${randomUUID()}:${randomUUID()}`
-    await seedSleepingRecord(orcaPage, worktreeId, paneKey, 'worktree-sleep')
+    await seedSleepingRecord(orcaPage, sleptWorktreeId, paneKey, 'worktree-sleep')
     const row = await waitForSleepingRow(client, paneKey)
 
     await client.call('terminal.closeTab', { terminal: row.handle })
 
-    await expectGoneAfterNextPersist(orcaPage, client, worktreeId, paneKey)
+    await expectGoneAfterNextPersist(orcaPage, client, sleptWorktreeId, paneKey)
   })
 
   test('a live agent tab closed with --tab leaves no sleeping row', async ({ orcaPage }) => {
@@ -134,6 +148,6 @@ test.describe('closing a sleeping row through the runtime', () => {
 
     await client.call('terminal.closeTab', { terminal: resolved.result.terminal.handle })
 
-    await expectGoneAfterNextPersist(orcaPage, client, worktreeId, paneKey)
+    await expectGoneAfterNextPersist(orcaPage, client, sleptWorktreeId, paneKey)
   })
 })
