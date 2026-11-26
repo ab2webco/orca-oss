@@ -366,6 +366,32 @@ describe('a cloud session merge during a refresh save', () => {
       }
     })
   })
+
+  it('does not hand a read a save that went stale while it encrypts', async () => {
+    const store = await load<typeof ProfileCloudSessionStoreModule>(
+      './orca-profiles/profile-cloud-session-store'
+    )
+    const held = deferred<Buffer<ArrayBuffer>>()
+    safeStorageMock.encryptStringAsync.mockImplementationOnce(() => held.promise)
+    let current = true
+    const save = store.saveOrcaCloudSession(
+      'p',
+      tempHome,
+      {
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: 1,
+        capabilities: { flags: {}, refreshedAt: 1 }
+      },
+      () => current
+    )
+    await vi.waitFor(() => expect(safeStorageMock.encryptStringAsync).toHaveBeenCalled())
+    expect(store.readOrcaCloudSession('p', tempHome).status).toBe('found')
+    current = false
+    expect(store.readOrcaCloudSession('p', tempHome).status).toBe('missing')
+    held.resolve(Buffer.from('v10:late'))
+    expect(await save).toBeNull()
+  })
 })
 
 describe('a delete while a save encrypts', () => {

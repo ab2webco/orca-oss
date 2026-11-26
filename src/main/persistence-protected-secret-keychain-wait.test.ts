@@ -376,4 +376,27 @@ describe('protected secrets at startup when the Keychain prompts', () => {
     expect(decode(Buffer.from(persistedBlobs().cookie, 'base64'))).toBe('cookie-set-before-quit')
     expect(keychain.syncCalls).toBe(0)
   })
+
+  it('a quit flush with an encrypt that never settles writes the rest of the state at the bound', async () => {
+    await seedEncryptedProfile()
+    useAsyncKeychain(async (ciphertext) => ({ result: decode(ciphertext), shouldReEncrypt: false }))
+    const store = await createStore()
+    await store.unsealProtectedSecrets()
+    const before = persistedBlobs()
+    safeStorageMock.encryptStringAsync = () => new Promise(() => {})
+    store.updateSettings({ opencodeSessionCookie: 'never-encrypts', httpProxyBypassRules: 'kept' })
+    let settled = false
+    const quit = store.flushAsync().then(() => {
+      settled = true
+    })
+    await vi.advanceTimersByTimeAsync(1_999)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(2)
+    await quit
+
+    const state = JSON.parse(readFileSync(join(testState.dir, 'orca-data.json'), 'utf-8'))
+    expect(state.settings.httpProxyBypassRules).toBe('kept')
+    expect(persistedBlobs().cookie).toBe(before.cookie)
+    expect(keychain.syncCalls).toBe(0)
+  })
 })
