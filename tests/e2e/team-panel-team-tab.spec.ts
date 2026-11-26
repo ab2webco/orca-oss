@@ -296,6 +296,10 @@ test('the Team tab shows the live lead and its members from the lead game state'
       .toBeGreaterThan(readsBefore)
     await expect(panel).toContainText(COPY.en.readError)
     await failPanelReads(electronApp, false)
+    // Why wait for the error to clear: the kept cards pass the checks below before any read succeeds,
+    // and an unbroken failure streak turns the reopen's first miss into the error (ORCA-1465).
+    await expect(panel).not.toContainText(COPY.en.readError, { timeout: 60_000 })
+    await expect(panel.getByRole('status').filter({ hasText: COPY.en.updating })).toHaveCount(0)
 
     await expect(panel.locator('[data-team-card="lead"]')).toContainText(COPY.en.lead, {
       timeout: 90_000
@@ -321,8 +325,17 @@ test('the Team tab shows the live lead and its members from the lead game state'
 
     // Reopening the panel starts a new read; a host that stopped answering must not cost the team.
     await failPanelReads(electronApp, true)
+    const readsBeforeReopen = await panelReads(electronApp)
     await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('explorer'))
+    // Why wait for the unmount: Explorer's lazy chunk suspends the switch, and a switch back before
+    // it lands keeps the same panel, which starts no read (ORCA-1465).
+    await expect(panel).toHaveCount(0)
     await orcaPage.evaluate(() => window.__store!.getState().setRightSidebarTab('team'))
+    await expect
+      .poll(() => panelReads(electronApp), {
+        message: 'the reopened panel made no game.state read'
+      })
+      .toBeGreaterThan(readsBeforeReopen)
     await updatingQuietly('read-updating-team-kept')
     await expect(panel.locator('[data-team-card="lead"]')).toBeVisible()
     await expect(cards).toHaveCount(2)
