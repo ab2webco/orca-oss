@@ -1370,7 +1370,8 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         body: params.body,
         threadId,
         senderPaneKey: sender.paneKey,
-        runId: original.run_id
+        runId: original.run_id,
+        replyTo: original.id
       })
 
       if (relayed) {

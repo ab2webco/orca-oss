@@ -267,6 +267,8 @@ export type MessageRow = {
   created_at: string
   delivered_at: string | null
   sender_pane_key: string | null
+  /** The message `orchestration reply` answered; null for other mail and replies older builds wrote. */
+  reply_to?: string | null
 }
 
 export type TaskRow = {
