@@ -295,27 +295,40 @@ async function clickBrowserLink(
       if (!webview) {
         throw new Error(`Missing webview for browser tab ${targetBrowserTabId}`)
       }
+      // Why: a guest drops input sent before it renders a frame (ORCA-1469); paint-timing entries are not emitted on every navigation, so wait two animation frames.
       const point = (await webview.executeJavaScript(`(async () => {
         const deadline = Date.now() + 5000
-        while (Date.now() < deadline) {
+        const locate = () => {
           const frame = ${JSON.stringify(frameSelector)}
             ? document.querySelector(${JSON.stringify(frameSelector)})
             : null
           const root = frame?.contentDocument ?? document
           const linkRect = root.querySelector(${JSON.stringify(targetSelector)})?.getBoundingClientRect()
-          if (linkRect) {
-            const frameRect = frame?.getBoundingClientRect()
-            return {
-              x: (frameRect?.left ?? 0) + linkRect.left + linkRect.width / 2,
-              y: (frameRect?.top ?? 0) + linkRect.top + linkRect.height / 2
-            }
+          if (!linkRect) {
+            return null
+          }
+          const frameRect = frame?.getBoundingClientRect()
+          return {
+            x: (frameRect?.left ?? 0) + linkRect.left + linkRect.width / 2,
+            y: (frameRect?.top ?? 0) + linkRect.top + linkRect.height / 2
+          }
+        }
+        while (!locate()) {
+          if (Date.now() >= deadline) {
+            return { missing: 'link' }
           }
           await new Promise((resolve) => setTimeout(resolve, 25))
         }
-        return null
-      })()`)) as { x: number; y: number } | null
-      if (!point) {
-        throw new Error(`Missing browser link ${targetSelector}`)
+        const rendered = await Promise.race([
+          new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)))
+          ),
+          new Promise((resolve) => setTimeout(() => resolve(false), Math.max(0, deadline - Date.now())))
+        ])
+        return rendered ? (locate() ?? { missing: 'link' }) : { missing: 'rendered frame' }
+      })()`)) as { x: number; y: number } | { missing: string }
+      if ('missing' in point) {
+        throw new Error(`Browser link ${targetSelector}: no ${point.missing} within 5 s`)
       }
       await webview.sendInputEvent({ type: 'mouseMove', modifiers: inputModifiers, ...point })
       await webview.sendInputEvent({
