@@ -124,7 +124,8 @@ import {
   detachSshPtyConsumerRecovery,
   forgetSshPtyConsumerRecovery,
   getSshPtyConsumerRecovery,
-  rememberSshPtyConsumerRecovery
+  rememberSshPtyConsumerRecovery,
+  settleSshPtyConsumerIdentity
 } from './ssh-pty-consumer-recovery'
 import { classifySshPtyFrameRejection, SshPtyFrameRejectionLog } from './ssh-pty-frame-rejection'
 import { SshPtyTargetedReattachQueue } from './ssh-pty-targeted-reattach-queue'
@@ -353,7 +354,7 @@ export class SshRelaySession {
     SSH_PTY_REATTACH_MAX_CONCURRENCY
   )
   private readonly ptyFrameRejectionLog = new SshPtyFrameRejectionLog()
-  private readonly ptyConsumerClientInstanceId: string
+  private ptyConsumerClientInstanceId: string
   private ptyConsumerSessionState: SshPtyConsumerSessionState | null = null
   private activeCompatibilityAttachmentIds = new Set<string>()
 
@@ -1145,6 +1146,11 @@ export class SshRelaySession {
     serverBuildId: string | undefined,
     ownsAttempt: () => boolean
   ): Promise<SshPtyConsumerSessionState> {
+    this.ptyConsumerClientInstanceId = settleSshPtyConsumerIdentity(
+      this.targetId,
+      this.ptyConsumerClientInstanceId,
+      this.store
+    )
     const previousOwner = this.recoverablePtyConsumerOwner(serverBuildId)
     const options: OpenSshPtyConsumerSessionOptions = {
       clientInstanceId: this.ptyConsumerClientInstanceId,

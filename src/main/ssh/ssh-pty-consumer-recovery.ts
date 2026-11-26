@@ -8,6 +8,8 @@ import type { SshPtyConsumerOwnerState } from './ssh-pty-consumer-session'
 export type SshPtyConsumerRecoveryState = {
   clientInstanceId: string
   detached: boolean
+  // Minted with no readable row (the owner lease may still be sealed); settled at the first grant.
+  provisional?: boolean
   serverBuildId?: string
   owner?: SshPtyConsumerOwnerState
   checkpointsByAppPtyId: Map<string, SshPtyAcceptedSourceCheckpoint>
@@ -40,6 +42,7 @@ export function claimSshPtyConsumerRecovery(
   const created: SshPtyConsumerRecoveryState = {
     clientInstanceId: persisted?.clientInstanceId ?? randomUUID(),
     detached: false,
+    ...(!current && !persisted ? { provisional: true } : {}),
     ...(persisted
       ? { serverBuildId: persisted.serverBuildId, owner: ownerFromPersisted(persisted) }
       : {}),
@@ -48,6 +51,29 @@ export function claimSshPtyConsumerRecovery(
   }
   recoveryByTarget.set(targetId, created)
   return created
+}
+
+// Why (ORCA-1462): a session built while the startup Keychain read of the owner lease is pending
+// sees no row and mints an id; if the read lands before the first grant, the persisted identity
+// must win or the relay hands this app a new consumer and the PTYs the old one owns are orphaned.
+export function settleSshPtyConsumerIdentity(
+  targetId: string,
+  clientInstanceId: string,
+  store: Store
+): string {
+  const current = recoveryByTarget.get(targetId)
+  if (!current?.provisional || current.clientInstanceId !== clientInstanceId) {
+    return clientInstanceId
+  }
+  delete current.provisional
+  const persisted = current.owner ? null : store.getSshPtyConsumerRecovery(targetId)
+  if (!persisted) {
+    return clientInstanceId
+  }
+  current.clientInstanceId = persisted.clientInstanceId
+  current.serverBuildId = persisted.serverBuildId
+  current.owner = ownerFromPersisted(persisted)
+  return current.clientInstanceId
 }
 
 export function getSshPtyConsumerRecovery(
