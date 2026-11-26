@@ -22,6 +22,7 @@ import {
   type GameRemotePlacement
 } from './orchestrator-game-launch-options'
 import { gameKindEffortPlanSeedOf, gameMemberModelParamsOf } from './orchestrator-game-launch-kind'
+import { gamePlaybookBriefLine } from '../../shared/orchestrator-game-playbook'
 import {
   globalLoginHolderOf,
   remoteGlobalLoginOf,
@@ -186,7 +187,8 @@ async function startGameMember(
           title: item?.title ?? '',
           url: item?.url ?? '',
           status: item?.status
-        })
+        }),
+        gamePlaybookBriefLine(lead.playbooks, args.overrides ?? {}, item?.title ?? '')
       ),
       await gameLessonBriefFor(client, item?.id ?? ticket)
     ),

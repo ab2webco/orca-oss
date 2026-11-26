@@ -41,7 +41,7 @@ describe('gameLeadBriefOf', () => {
   // ORCA-851: without Jev, the ticket's kind is what picks a member's model.
   it('tells the lead to name each ticket kind at launch', () => {
     expect(gameLeadBriefOf(DEFAULT_GAME_LEAD, 'cineco')).toContain(
-      'Pass `--kind audit|implement|review|captures` to every game launch'
+      'Pass `--kind audit|bug-fix|feature|review|live-check` to every game launch'
     )
   })
 

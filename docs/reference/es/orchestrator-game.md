@@ -1,5 +1,5 @@
 ---
-sourceHash: 39be79ba6a8ca936
+sourceHash: a7d5c6005b71057d
 ---
 
 # El juego orquestador de Agent Teams
@@ -782,7 +782,7 @@ orchestratorGame:
 Un líder es una sesión que coordina y nunca trabaja un ticket: cada ticket va a un miembro en su
 propio worktree y pestaña, que reporta de vuelta mediante la orquestación de Orca. Las claves se
 resuelven una por una a través de las mismas capas ([`orchestrator-game-lead.ts`](../../../src/shared/orchestrator-game-lead.ts));
-los Settings del proyecto editan todas salvo los dos prompts, `rules` y `mcpServers`, que viven en
+los Settings del proyecto editan todas salvo los dos prompts, `rules`, `mcpServers` y `playbooks`, que viven en
 `orca.yaml` (**Lead buttons** es `actions`).
 
 Sin un líder en marcha, el panel Team nativo se abre como **Your work** y lo encabeza **Start a team**:
@@ -812,6 +812,7 @@ orchestratorGame:
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
     mcpServers: [tambora, claude.ai Gmail] # optional: MCP servers every member needs
     memberRepos: [github.com/koombea/cineco-frontend] # optional: other repos members may work in
+    playbooks: docs/playbooks # optional: a repo folder with one playbook per task kind, linked from each brief
 ```
 
 Un placeholder sin valor queda vacío; uno desconocido descarta la clave con una advertencia.
@@ -922,6 +923,12 @@ launch` se niega antes de iniciar nada, salvo que el PR del propio ticket sea un
     desconocido se rechaza. Un agente distinto del del líder no hereda el `model`/`effort` del líder.
   - `--model <id>`, `--effort <level>` — los mismos valores que toman `orchestrator.model`/`effort`;
     `--effort` necesita un modelo.
+  - `--kind <audit|implement|review|captures|bug-fix|feature|live-check>` — el tipo del ticket,
+    que elige el modelo de un miembro Claude cuando nada más lo hace. `bug-fix` y `feature` se lanzan
+    como `implement`, `live-check` como `captures`. Con `playbooks` definido, el brief enlaza
+    `<playbooks>/<kind>.md` para `bug-fix`, `feature`, `review` y `live-check` (`review` y
+    `captures` también desde el título), si no la carpeta; nunca copia el texto (ORCA-1425,
+    [`orchestrator-game-playbook.ts`](../../../src/shared/orchestrator-game-playbook.ts)).
   - `--account <email|id|auto>` — la cuenta gestionada en la que corre el miembro, asignada a
     `--claude-account` o `--codex-account` de worker-start según el agente. Solo `claude` y `codex`
     tienen cuentas gestionadas; la cuenta de otro proveedor, o una cuenta para cualquier otro agente,

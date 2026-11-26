@@ -269,6 +269,10 @@ sesión real y valen para cualquiera que trabaje acá, humano o agente:
 Los agentes sirven para abarcar (explorar en paralelo, resolver lotes disjuntos de conflictos,
 revisar con lentes distintos). No sirven para confiar sin revisar:
 
+- Un member sigue el playbook que su brief enlaza según `game launch --kind`: bug fix, feature,
+  review o live check, en [`playbooks/`](./playbooks/README.md). Cada paso dice qué guarda lo
+  hace cumplir, o que nada lo hace.
+
 - Dales archivos **disjuntos** cuando trabajen en paralelo sobre el mismo árbol.
 - Pediles que declaren las dudas en vez de resolver en silencio.
 - **Verificá centralmente**: typecheck, lint y tests después de que todos terminen. En una sesión

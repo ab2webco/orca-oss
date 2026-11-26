@@ -8,6 +8,7 @@ import type { GameOtherProjectsState } from './orchestrator-game-host-load'
 import { GAME_MCP_SERVER_NAME_MAX } from './orchestrator-game-member-mcp'
 import { parseMemberRoster, type GameMemberName } from './orchestrator-game-member-names'
 import { memberRepoKeyOf } from './orchestrator-game-member-repo-scope'
+import { parsePlaybooksDir } from './orchestrator-game-playbook'
 
 /** How the project's lead orchestrates: what it launches, how many at once, and its own rules. */
 export type OrchestratorGameLead = {
@@ -44,6 +45,8 @@ export type OrchestratorGameLead = {
   mcpServers?: string[]
   /** Other repos members may launch into, as canonical git remotes; the lead's own is always allowed. */
   memberRepos?: string[]
+  /** The repo folder holding one playbook per task kind, linked from each member's brief (ORCA-1425). */
+  playbooks?: string
 }
 
 /** What a lead's state says about panes other than its own. */
@@ -111,8 +114,8 @@ export const GAME_MEMBER_REPORT_RULES = [
   "When your lead relays the person's answer, check its `oq_` id with `orca game owner-question <id>` before a hard-to-undo step (merge, deploy, release). Ask the person again only when that record is missing, not answered, or does not cover the step."
 ].join('\n')
 
-export const withGameMemberNotes = (spec: string): string =>
-  `${spec}\n\n${GAME_MEMBER_CI_NOTE}\n\n${GAME_MEMBER_REPORT_RULES}`
+export const withGameMemberNotes = (spec: string, playbookLine: string | null = null): string =>
+  `${spec}\n\n${playbookLine ? `${playbookLine}\n\n` : ''}${GAME_MEMBER_CI_NOTE}\n\n${GAME_MEMBER_REPORT_RULES}`
 
 const at = (key: string): string => `orchestratorGame.orchestrator.${key}`
 
@@ -209,6 +212,12 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
       keys.every((one) => one !== null)
       ? { memberRepos: [...new Set(keys as string[])] }
       : `${at('memberRepos')} must be a list of 1 to ${GAME_MEMBER_REPOS_MAX} git remotes like github.com/org/repo`
+  },
+  playbooks: (value) => {
+    const dir = parsePlaybooksDir(value)
+    return dir === null
+      ? `${at('playbooks')} must be a folder inside the repo, like docs/playbooks`
+      : { playbooks: dir }
   },
   memberNames: (value) => {
     const { roster, problems } = parseMemberRoster(value)
