@@ -112,7 +112,7 @@ describe('fleet phase names its evidence (ORCA-1103 items 1 and 5)', () => {
     ).map((one) => one.line)
 
     expect(lines.filter((line) => line.includes('idle with no PR'))).toEqual([
-      'CIN-6 idle with no PR: push'
+      'CIN-6 idle with no PR (no branch read): push'
     ])
   })
 })

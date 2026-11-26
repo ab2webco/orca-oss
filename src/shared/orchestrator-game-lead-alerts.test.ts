@@ -87,8 +87,8 @@ describe('gameLeadAlertsOf: members (ORCA-1214)', () => {
       expect.stringMatching(
         /^CIN-1 gone from imac: .*\. Compare its host worktree head with the pushed branch first\.$/
       ),
-      'CIN-4 idle with no PR: push',
-      'CIN-5 CI red on #45 open: give it its next step now.',
+      'CIN-4 idle with no PR (no branch read): push',
+      'CIN-5 CI red on #45 open, merge state unread: give it its next step now.',
       expect.stringMatching(
         /^CIN-6 PR #46 merged: ticket to done with a comment, remove its worktree and branch, free it/
       )
@@ -383,7 +383,7 @@ describe('gameLeadAlertsOf: open PRs past the cap (ORCA-1301)', () => {
 
 describe('gameLeadAlertsOf: a member waiting on the lead (ORCA-1154, folded into ORCA-1301)', () => {
   const sqliteAt = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ')
-  const waitingFor = (minutes: number, replyAlertMinutes?: number) =>
+  const waitingFor = (minutes: number, replyAlertMinutes?: number, from = 'ORCA-1299') =>
     stateOf([], {
       lead: { ...DEFAULT_GAME_LEAD, cap: 6, ...(replyAlertMinutes ? { replyAlertMinutes } : {}) },
       inboxes: [
@@ -394,7 +394,7 @@ describe('gameLeadAlertsOf: a member waiting on the lead (ORCA-1154, folded into
           waiting: [
             {
               id: 'relay_887',
-              from: 'ORCA-1299',
+              from,
               subject: 'Which look?',
               at: sqliteAt(NOW - minutes * MIN)
             }
@@ -406,7 +406,7 @@ describe('gameLeadAlertsOf: a member waiting on the lead (ORCA-1154, folded into
   it('alerts once a question has waited past 10 min, with its age and the reply to give', () => {
     expect(linesOf(waitingFor(9))).toEqual([])
     expect(linesOf(waitingFor(12))).toEqual([
-      'ORCA-1299 waiting on you 12m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+      'ORCA-1299 waiting on you 12m, no reply threads it: "Which look?". Answer it: orca orchestration reply --id relay_887'
     ])
   })
 
@@ -419,17 +419,95 @@ describe('gameLeadAlertsOf: a member waiting on the lead (ORCA-1154, folded into
     expect(newLines(waitingFor(12))).toHaveLength(1)
     expect(newLines(waitingFor(15))).toEqual([])
     expect(newLines(waitingFor(21))).toEqual([
-      'ORCA-1299 waiting on you 21m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+      'ORCA-1299 waiting on you 21m, no reply threads it: "Which look?". Answer it: orca orchestration reply --id relay_887'
     ])
     expect(newLines(waitingFor(202))).toEqual([
-      'ORCA-1299 waiting on you 3h22m: "Which look?". Answer it: orca orchestration reply --id relay_887'
+      'ORCA-1299 waiting on you 3h22m, no reply threads it: "Which look?". Answer it: orca orchestration reply --id relay_887'
     ])
     expect(newLines(stateOf([]))).toEqual([])
     expect(printed.size).toBe(0)
   })
 
+  it('words an owner answer as one to record and ack, not one to answer (ORCA-1431)', () => {
+    expect(linesOf(waitingFor(12, undefined, 'owner'))).toEqual([
+      'owner answer unread 12m, no reply threads it: "Which look?". Record it, then ack its delivery or reply: orca orchestration reply --id relay_887'
+    ])
+  })
+
   it("waits the project's replyAlertMinutes when orca.yaml sets one", () => {
     expect(linesOf(waitingFor(12, 30))).toEqual([])
     expect(linesOf(waitingFor(31, 30))).toHaveLength(1)
+  })
+})
+
+describe('gameLeadAlertsOf: CI red only for a check a rule requires (ORCA-1431)', () => {
+  const red = (mergeState?: GameReview['mergeState']) =>
+    member('ORCA-1462', {
+      state: 'idle',
+      review: { ...review(1462, 'open', 'failure'), ...(mergeState ? { mergeState } : {}) }
+    })
+
+  it('stays quiet when GitHub says every required check passed', () => {
+    expect(linesOf(stateOf([red('unstable')]))).toEqual([])
+    expect(linesOf(stateOf([red('clean')]))).toEqual([])
+  })
+
+  it('stays quiet for a PR already in the merge queue, whose own alerts cover its run', () => {
+    expect(linesOf(stateOf([red('blocked')], {}, [entry(1462, 'waiting')]))).toEqual([])
+  })
+
+  it('names the merge state it read when a required check can be the red one', () => {
+    expect(linesOf(stateOf([red('blocked')]))).toEqual([
+      'ORCA-1462 CI red on #1462 open, merge state blocked: give it its next step now.'
+    ])
+  })
+
+  it('stops once GitHub reads the red checks as optional', () => {
+    const printed = new Set<string>()
+    const newLines = (agent: GameAgent) =>
+      newGameLeadAlertsOf(
+        gameLeadAlertsOf(stateOf([agent]), emptyGameLeadAlertMemory(), NOW),
+        printed
+      )
+    expect(newLines(red('blocked'))).toHaveLength(1)
+    expect(newLines(red('unstable'))).toEqual([])
+    expect(printed.size).toBe(0)
+  })
+})
+
+describe('gameLeadAlertsOf: idle with no PR only when no PR names the ticket (ORCA-1431)', () => {
+  const idle = member('ORCA-1406', {
+    state: 'idle',
+    worktree: { id: 'wt', branch: 'fabolivark/orca-1406', displayName: 'orca-1406' }
+  })
+  const pr = (n: number) => ({
+    id: `#${n}`,
+    title: `fix(secrets): encrypt off the main thread (ORCA-1406)`,
+    url: `https://github.com/o/r/pull/${n}`
+  })
+
+  it('stays quiet while the merge queue holds a PR naming its ticket', () => {
+    const queued = { ...entry(1470, 'checks'), title: pr(1470).title }
+    expect(linesOf(stateOf([idle], {}, [queued]))).toEqual([])
+  })
+
+  it('stays quiet while an open PR names its ticket', () => {
+    const reviews = { provider: 'github', total: 1, url: null, items: [pr(1470)] }
+    expect(linesOf(stateOf([idle], { project: { reviews, todo: null } }))).toEqual([])
+  })
+
+  it('names the branch and the lists it read when none names the ticket', () => {
+    const reviews = {
+      provider: 'github',
+      total: 1,
+      url: null,
+      items: [{ ...pr(1471), title: 'fix: ORCA-14060 other work' }]
+    }
+    const state = stateOf([idle], {
+      project: { reviews, todo: null, queue: { provider: 'github', entries: [] } }
+    })
+    expect(linesOf(state)).toEqual([
+      'ORCA-1406 idle with no PR (none for fabolivark/orca-1406, none naming ORCA-1406 in open PRs or merge queue): push'
+    ])
   })
 })

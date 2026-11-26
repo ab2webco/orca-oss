@@ -1,4 +1,4 @@
-import type { GameWaitingMessage } from './orchestrator-game-inbox'
+import { GAME_OWNER_HANDLE, type GameWaitingMessage } from './orchestrator-game-inbox'
 
 /** Minutes a member's question, escalation or decision gate waits on the lead before the watch alerts. */
 export const GAME_LEAD_REPLY_ALERT_MINUTES = 10
@@ -26,6 +26,14 @@ export function waitingOnYouNextOf(question: GameWaitingMessage, now = Date.now(
   return `waiting on you${age ? ` ${age}` : ''}: orchestration reply --id ${question.id}`
 }
 
+// Why the evidence: the lead can tell a missed reply from a watch that misread it (ORCA-1431).
+function waitLineOf(wait: GameWaitingMessage, age: string | null): string {
+  if (wait.from === GAME_OWNER_HANDLE) {
+    return `owner answer unread ${age}, no reply threads it: "${wait.subject}". Record it, then ack its delivery or reply: orca orchestration reply --id ${wait.id}`
+  }
+  return `${wait.from} waiting on you ${age}, no reply threads it: "${wait.subject}". Answer it: orca orchestration reply --id ${wait.id}`
+}
+
 /**
  * One alert per wait past the budget, keyed by its doubling step so it prints again at 2x, 4x, ...
  * the budget until the lead replies (ORCA-1154). Folded into ORCA-1301.
@@ -45,7 +53,7 @@ export function leadWaitAlertsOf(
     return [
       {
         key: `lead-wait:${wait.id}:${step}`,
-        line: `${wait.from} waiting on you ${waitAgeLabelOf(wait.at, now)}: "${wait.subject}". Answer it: orca orchestration reply --id ${wait.id}`
+        line: waitLineOf(wait, waitAgeLabelOf(wait.at, now))
       }
     ]
   })

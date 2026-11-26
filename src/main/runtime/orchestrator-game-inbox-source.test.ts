@@ -72,8 +72,31 @@ describe('gameInboxSourceOf', () => {
       'dispatch:d1',
       'dispatch:d1b',
       'term_9',
-      'dispatch:d9'
+      'dispatch:d9',
+      'owner'
     ])
+  })
+
+  // Why (ORCA-1431): the reply went to the owner, so a watch reading only lead and member mail alerted for 8 h.
+  it("drops an owner answer from the lead's waiting list once the lead's reply to the owner threads it", () => {
+    const { db } = fakeDb()
+    const answer = {
+      ...row('msg_5', 'term_lead'),
+      from_handle: 'owner',
+      type: 'escalation',
+      subject: 'Owner answered ORCA-1430: which?'
+    }
+    const reply = { ...row('msg_6', 'owner'), from_handle: 'term_lead', thread_id: 'msg_5' }
+    db.listPendingQuestions = () => []
+    db.getAllMessagesForHandle = (handle) =>
+      handle === 'term_lead' ? [answer] : handle === 'owner' ? [reply] : []
+
+    const [lead] = gameInboxesOf(
+      gameInboxSourceOf(db, { handle: 'term_lead', paneKey: 'tab:lead' }),
+      {}
+    )
+
+    expect(lead?.waiting).toEqual([])
   })
 
   it('names a member with no ticket, like an adopted agent, so its mail and questions have a home (ORCA-1136)', () => {

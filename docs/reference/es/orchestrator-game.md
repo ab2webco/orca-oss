@@ -1,5 +1,5 @@
 ---
-sourceHash: dd312bc9213da8d6
+sourceHash: cbc6c19aeb06d676
 ---
 
 # El juego orquestador de Agent Teams
@@ -1200,7 +1200,11 @@ fijan el criterio:
   y `orca game watch --lead`. Esta imprime `alert <línea>` una vez por cada situación que pide actuar:
   un miembro que desapareció de su host, limitado, que te necesita, huérfano, inactivo sin PR, con CI
   rojo, con su PR mergeado, en pausa, o con un lanzamiento en cola 20+ min; una entrada de la merge
-  queue que falló, salió, se mergeó, esperó 3 h o lleva 1 h en checks. Una alerta que se resuelve y
+  queue que falló, salió, se mergeó, esperó 3 h o lleva 1 h en checks. Cada línea nombra su evidencia.
+  El CI rojo solo alerta mientras el PR está fuera de la merge queue y el merge state de GitHub no es
+  `clean` ni `unstable` (ambos significan que solo están en rojo checks que ninguna regla exige);
+  inactivo sin PR se omite mientras un PR abierto o en cola nombra el ticket; una respuesta del owner
+  deja de alertar cuando el líder hace ack de su entrega o le responde. Una alerta que se resuelve y
   vuelve se imprime otra vez. Lee `game.state`, el mismo estado en caché que lee la banda, en cada
   cambio de la flota y como mucho una vez por minuto si no, así que no agrega sondeo a GitHub; los
   relojes que GitHub no da (los checks de una corrida, un lanzamiento en cola) empiezan cuando la

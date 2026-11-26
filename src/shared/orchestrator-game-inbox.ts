@@ -31,6 +31,8 @@ export type GameInboxSource = {
   answeredQuestions?: readonly GameAnsweredQuestionMail[]
   /** Addresses of members game stop released, that no live member shares: nobody can act on an answer. */
   releasedSenders?: readonly string[]
+  /** Mail to the owner: the lead's replies to owner answers, read only for the threads they close (ORCA-1431). */
+  ownerReplies?: readonly GameInboxMail[]
 }
 
 export type GameAnsweredQuestionMail = GameInboxMail & {
@@ -79,6 +81,9 @@ export type GameInboxSummary = {
 }
 
 const WAITS_ON_LEAD: ReadonlySet<string> = new Set(['escalation', 'decision_gate'])
+
+/** The handle Orca sends the person's answers to the lead from. */
+export const GAME_OWNER_HANDLE = 'owner'
 
 // Why 50: a lead's turn reads it whole; older mail stays in `orca orchestration inbox`.
 export const GAME_INBOX_MESSAGES_MAX = 50
@@ -207,7 +212,14 @@ export function gameInboxesOf(
   ]
   const pending = source.pendingQuestions ?? []
   // Why: an escalation or gate a member sent waits on the lead like a question until a reply threads it (ORCA-1154).
-  const replied = new Set(allOldestFirst.flatMap((row) => (row.thread_id ? [row.thread_id] : [])))
+  const replied = new Set(
+    [...allOldestFirst, ...(source.ownerReplies ?? [])].flatMap((row) =>
+      row.thread_id ? [row.thread_id] : []
+    )
+  )
+  // Why (ORCA-1431): an owner answer asks for no reply, so the lead acking its delivery settles it.
+  const settledOwnerAnswer = (row: GameInboxMail): boolean =>
+    row.from_handle === GAME_OWNER_HANDLE && row.read !== 0
   const fromReleased = releasedSenderOf(source)
   return inboxes.map(({ key, addresses }) => {
     const to = new Set(addresses)
@@ -216,7 +228,11 @@ export function gameInboxesOf(
     const unanswered =
       key === 'lead'
         ? rows.filter(
-            (row) => WAITS_ON_LEAD.has(row.type) && !replied.has(row.id) && !fromReleased(row)
+            (row) =>
+              WAITS_ON_LEAD.has(row.type) &&
+              !replied.has(row.id) &&
+              !fromReleased(row) &&
+              !settledOwnerAnswer(row)
           )
         : []
     const waiting = [...new Map([...pending, ...unanswered].map((row) => [row.id, row])).values()]

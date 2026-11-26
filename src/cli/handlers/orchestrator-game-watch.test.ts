@@ -124,7 +124,7 @@ describe('orca game watch', () => {
 
       await expect(runLead(client)).rejects.toBe(GONE)
 
-      expect(output).toEqual(['ready 1', 'alert CIN-1 idle with no PR: push'])
+      expect(output).toEqual(['ready 1', 'alert CIN-1 idle with no PR (no branch read): push'])
     })
 
     it('reads the state on each fleet change, and on a quiet fleet once a minute at most', async () => {

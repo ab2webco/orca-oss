@@ -1,5 +1,6 @@
 import type { OrchestrationDb } from './orchestration/db'
 import type { GameBoardLead, GameLeadNote } from './orchestrator-game-board'
+import { GAME_OWNER_HANDLE } from '../../shared/orchestrator-game-inbox'
 
 /** Mail from the person to the lead's terminal; escalation is a type the lead's watch already passes. */
 export function tellGameLead(
@@ -26,7 +27,7 @@ export function tellGameLead(
           })
         : undefined)
     const message = db.insertMessage({
-      from: 'owner',
+      from: GAME_OWNER_HANDLE,
       to: lead.handle,
       subject: note.subject,
       body: note.body,
