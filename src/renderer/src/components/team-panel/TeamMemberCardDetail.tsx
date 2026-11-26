@@ -231,12 +231,15 @@ export function TeamMemberCardDetail({
   card,
   now,
   answer,
-  hostWorktreeMissing = false
+  hostWorktreeMissing = false,
+  remove = null
 }: {
   card: TeamMemberCard
   now: number
   answer: ReactNode
   hostWorktreeMissing?: boolean
+  /** The card's Remove action, last so it never sits where Open or a PR is reached for. */
+  remove?: ReactNode
 }): React.JSX.Element {
   // Why not the summary: it is the last message's subject ("Re: Question"); the text is in Inbox.
   const title = card.ticket?.title ?? card.pr?.title ?? null
@@ -276,6 +279,7 @@ export function TeamMemberCardDetail({
       ) : null}
       <HelpersList paneKey={card.paneKey} />
       {card.account ? <AccountUsage account={card.account} now={now} /> : null}
+      {remove}
     </div>
   )
 }

@@ -16634,7 +16634,10 @@
         "claude": "Claude",
         "codex": "Codex"
       },
-      "noTerminal": "Este agente todavía no tiene una terminal que abrir."
+      "noTerminal": "Este agente todavía no tiene una terminal que abrir.",
+      "remove": "Quitar",
+      "removeConfirm": "¿Quitar a {{name}}? Orca detiene su sesión si corre; si no, lo olvida. Ningún otro miembro se toca.",
+      "removeCancel": "Cancelar"
     },
     "activity": {
       "state": "Estado",

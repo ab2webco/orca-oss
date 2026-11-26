@@ -8,6 +8,11 @@ import {
   withoutDroppedGameAgent
 } from './orchestrator-game-dropped-agents'
 import type { GameAgent } from './orchestrator-game-state'
+import {
+  parseGameForgottenAgents,
+  withForgottenGameAgent,
+  withoutForgottenGameAgents
+} from './orchestrator-game-forgotten-agents'
 
 const agent = (over: Partial<GameAgent>): GameAgent => ({
   paneKey: 'tab:leaf',
@@ -70,5 +75,28 @@ describe('dropped game agents', () => {
       parseGameDroppedAgents(JSON.stringify({ version: 1, dropped: [{ worktreeId: 4 }, ...list] }))
     ).toEqual(list)
     expect(parseGameDroppedAgents('not json')).toEqual([])
+  })
+})
+
+describe('forgotten game agents (ORCA-1476)', () => {
+  it('hides only the removed pane, never a sibling in its worktree or the lead', () => {
+    const sibling = agent({ paneKey: 'tab:other', worktree: local.worktree })
+    const lead = agent({ paneKey: 'tab:leaf', isLeader: true })
+    const forgotten = withForgottenGameAgent([], {
+      paneKey: 'tab:leaf',
+      name: 'x',
+      forgottenAt: AT
+    })
+
+    expect(withoutForgottenGameAgents([lead, local, sibling], forgotten)).toEqual([lead, sibling])
+  })
+
+  it('reads entries beside the drops, and an older file without them forgets nothing', () => {
+    const forgotten = [{ paneKey: 'remote:ctx_1', name: 'orca-1', forgottenAt: AT }]
+    const text = serializeGameDroppedAgents([], forgotten)
+
+    expect(parseGameForgottenAgents(text)).toEqual(forgotten)
+    expect(parseGameDroppedAgents(text)).toEqual([])
+    expect(parseGameForgottenAgents(serializeGameDroppedAgents([]))).toEqual([])
   })
 })

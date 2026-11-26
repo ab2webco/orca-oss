@@ -152,4 +152,18 @@ describe('releasing a remote member whose terminal and worktree are gone on its 
     expect(released).toMatchObject({ ok: true, result: { state: 'released' } })
     expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
   })
+
+  // Why: a member removed while its host is away must not keep its home dispatch open (ORCA-1475 C6).
+  it('settles a removed member at home while its host does not answer, also after worker_done', async () => {
+    const { run, dispatch } = await startRemoteMember()
+    homeDb.completeDispatch(dispatch.id)
+    expect(listRemoteGameMemberSources(homeDb, run.id)).toHaveLength(1)
+    hostDown = true
+
+    expect(homeRuntime.settleForgottenRemoteMember(dispatch.id)).toBe(dispatch.id)
+
+    expect(homeDb.getWorkerDispatch(dispatch.id)?.state).toBe('stopped')
+    expect(listRemoteGameMemberSources(homeDb, run.id)).toEqual([])
+    expect(homeRuntime.settleForgottenRemoteMember('ctx_not_remote')).toBeNull()
+  })
 })

@@ -1095,6 +1095,19 @@ matches …` (ORCA-866).
   dispatch at home only once the host answers that it detached it, so a dropped connection leaves
   the member live in the fleet. The host's later release keeps a detached member's pane and
   worktree. An older host is refused, naming the host and its Orca version.
+- `orca game remove <dispatch-id|name>` — removes one member from the fleet and the Team panel
+  (ORCA-1476). It names one row by a remote member's dispatch id, a local dispatch's terminal, the
+  pane key the member card sends, or the exact name; never by ticket or worktree, which a stale row
+  and a new member can share, and a name several rows share is refused with each one's key. A live
+  session is stopped first through `game stop`'s path with no worktree fallback: its own dispatch
+  and terminal, or on a paired host stop and release there. A failed stop of a session that still
+  runs refuses the removal. Then `game.fleetForget` keeps its pane key in the project's drops file,
+  so the row stays out also when the host no longer has its terminal or worktree; a host that did
+  not answer is named, since its agent may still run there. A remote member's home dispatch is
+  settled there too, without the host's proof and also after `worker_done` (ORCA-1475 C6), so no
+  alert or slot waits on it. Another member in the same worktree,
+  folder or ticket is never touched. The member card's Remove asks first, then sends the lead this
+  command.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each member is

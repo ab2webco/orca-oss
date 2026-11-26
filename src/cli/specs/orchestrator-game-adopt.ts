@@ -1,7 +1,7 @@
 import type { CommandSpec } from '../args'
 import { GLOBAL_FLAGS } from '../args'
 
-/** The lead choosing which agents are in its fleet: adopt one, or drop one without killing it (ORCA-943). */
+/** The lead choosing which agents are in its fleet: adopt one, drop one without killing it (ORCA-943), or remove one (ORCA-1476). */
 export const ORCHESTRATOR_GAME_ADOPT_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'adopt'],
@@ -28,5 +28,20 @@ export const ORCHESTRATOR_GAME_ADOPT_COMMAND_SPECS: CommandSpec[] = [
       'A member on this machine whose dispatch still reports to the lead is detached first: the dispatch ends, its pane keeps running. One on a paired host is detached there the same way; a host whose Orca cannot is refused by name and version.'
     ],
     examples: ['orca game drop ORCA-915', 'orca game drop orca-907 --json']
+  },
+  {
+    path: ['game', 'remove'],
+    aliases: [['game', 'rm']],
+    summary:
+      "Remove one member from the lead's fleet and the Team panel: stop it if its session runs, otherwise forget it",
+    usage: 'orca game remove <dispatch-id|name> [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'member'],
+    positionalArgs: ['member'],
+    notes: [
+      "Names one member by its dispatch id, its pane key (what the Team card sends) or its exact name, never by ticket or worktree: a name several members share is refused with each one's key.",
+      'A live session is stopped first: its own dispatch, found by its terminal, and its terminal; a member on a paired host is stopped and released there. Another member in the same worktree, folder or ticket is never touched.',
+      'Then Orca forgets it, also when its host no longer has its terminal or worktree or does not answer; a host that did not answer is named, since its agent may still run there.'
+    ],
+    examples: ['orca game remove ctx_1a2b3c4d5e6f', 'orca game remove Ginebra --json']
   }
 ]

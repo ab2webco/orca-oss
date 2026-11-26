@@ -17,6 +17,7 @@ import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
 import { TeamMemberCardDetail } from './TeamMemberCardDetail'
 import { TeamOpenTerminalButton } from './TeamOpenTerminalButton'
+import { TeamMemberRemoveAction } from './TeamMemberRemoveAction'
 import type { SelectTeamPanelTab } from './team-panel-tab-definition'
 import { openTeamSession } from './team-session-open'
 import { teamHostWorktreeMissing } from './team-session-host-worktree'
@@ -204,6 +205,7 @@ export function TeamMemberCardRow({
           now={now}
           answer={answer}
           hostWorktreeMissing={hostWorktreeMissing}
+          remove={<TeamMemberRemoveAction card={card} />}
         />
       ) : null}
     </article>

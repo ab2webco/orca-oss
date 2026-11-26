@@ -1,5 +1,5 @@
 ---
-sourceHash: a7d5c6005b71057d
+sourceHash: 21a4c32c83ac3c71
 ---
 
 # El juego orquestador de Agent Teams
@@ -1157,6 +1157,20 @@ matches …` (ORCA-866).
   dispatch en casa sólo cuando el host responde que lo desvinculó, así que una conexión caída deja
   al miembro vivo en la flota. La liberación posterior del host conserva el pane y el worktree de un
   miembro desvinculado. Un host más viejo se rechaza, nombrando el host y su versión de Orca.
+- `orca game remove <dispatch-id|nombre>` — quita a un miembro de la flota y del panel Team
+  (ORCA-1476). Nombra una fila por el id de dispatch de un miembro remoto, la terminal de un dispatch
+  local, la clave de pane que manda la tarjeta del miembro o el nombre exacto; nunca por ticket ni
+  worktree, que una fila vieja y un miembro nuevo pueden compartir, y un nombre que comparten varias
+  filas se rechaza con la clave de cada una. Una sesión viva se detiene primero por el camino de
+  `game stop` sin recurrir al worktree: su propio dispatch y su terminal, o en un host emparejado se
+  detiene y se libera allí. Si la detención falla y la sesión sigue corriendo, no se quita. Después
+  `game.fleetForget` guarda su clave de pane en el archivo de descartes del proyecto, así que la
+  fila queda fuera también cuando el host ya no tiene su terminal ni su worktree; un host que no
+  respondió se nombra, porque su agente puede seguir corriendo allí. El dispatch en casa de un
+  miembro remoto también se cierra allí, sin prueba del host y también después de `worker_done`
+  (ORCA-1475 C6), así que ninguna alerta ni ningún lugar espera por él. Otro miembro en el mismo
+  worktree, carpeta o ticket nunca se toca. El Quitar de la tarjeta pregunta primero y luego le
+  manda este comando al líder.
 - `orca game stop [<ticket>,... | --all]` — termina los miembros nombrados, o todos, para que ningún
   agente miembro siga corriendo: cada dispatch vivo se detiene y luego se cierra la terminal del
   miembro cuando la detención no la cerró (un dispatch detenido puede dejar su terminal retenida).

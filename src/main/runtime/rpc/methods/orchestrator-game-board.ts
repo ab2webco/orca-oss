@@ -50,6 +50,11 @@ const GameFleetDropParams = z.object({
   dropped: z.boolean()
 })
 
+const GameFleetForgetParams = z.object({
+  ...Caller,
+  agent: z.object({ paneKey: z.string().min(1).max(400), name: z.string().min(1).max(400) })
+})
+
 // Why set optional: without it the call only reads, so the mod can poll it like game.state.
 const GameStopSwitchParams = z.object({ ...Caller, set: z.boolean().optional() })
 
@@ -212,6 +217,11 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
     name: 'game.fleetDrop',
     params: GameFleetDropParams,
     handler: async (params, { runtime }) => runtime.setGameAgentDropped(params)
+  }),
+  defineMethod({
+    name: 'game.fleetForget',
+    params: GameFleetForgetParams,
+    handler: async (params, { runtime }) => runtime.forgetGameAgent(params)
   }),
   defineMethod({
     name: 'game.inbox',

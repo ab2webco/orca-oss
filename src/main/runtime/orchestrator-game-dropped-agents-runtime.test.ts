@@ -32,6 +32,9 @@ const agentRow = (paneKey: string) => ({
   updatedAt: 0
 })
 
+// Why members: worktree.ps lists one found session per worktree, but every member the lead launched there.
+const memberRow = (paneKey: string) => ({ ...agentRow(paneKey), parentPaneKey: 'tab-1:lead' })
+
 const HANDLES: Record<string, string> = { 'tab-1:lead': 'term_lead', 'tab-2:found': 'term_found' }
 
 // Why the casts: these lookups are private, and real ones need live PTYs.
@@ -97,5 +100,47 @@ describe('a lead drops an agent from its fleet, through the runtime (ORCA-943)',
     const restored = await leadState(runtimeWith())
     expect(paneKeys(restored.agents)).toContain('tab-2:found')
     expect(restored.droppedAgents).toBeUndefined()
+  })
+})
+
+// Why by pane key: a drop by worktree would also hide the sibling session that shares it (ORCA-1476).
+describe('a lead removes one agent from its fleet, through the runtime (ORCA-1476)', () => {
+  it('hides only that agent, also after a restart, and keeps its sibling in the same worktree', async () => {
+    const withSibling = (): OrcaRuntimeService => {
+      const runtime = runtimeWith()
+      vi.spyOn(runtime, 'getWorktreePs').mockResolvedValue({
+        worktrees: [
+          {
+            worktreeId: 'wt-lead',
+            repoId: 'repo-1',
+            branch: 'main',
+            displayName: 'lead',
+            agents: [agentRow('tab-1:lead')]
+          },
+          {
+            worktreeId: 'wt-914',
+            repoId: 'repo-1',
+            branch: 'fabolivark/orca-914',
+            displayName: 'orca-914',
+            agents: [memberRow('tab-2:found'), memberRow('tab-3:sibling')]
+          }
+        ]
+      } as never)
+      return runtime
+    }
+    expect(paneKeys((await leadState(withSibling())).agents)).toEqual(
+      expect.arrayContaining(['tab-2:found', 'tab-3:sibling'])
+    )
+
+    const forgot = await withSibling().forgetGameAgent({
+      worktreeId: 'wt-lead',
+      agent: { paneKey: 'tab-2:found', name: 'orca-914' }
+    })
+
+    expect(forgot).toEqual({ forgotten: true, count: 1 })
+    const restarted = await leadState(withSibling())
+    expect(paneKeys(restarted.agents)).not.toContain('tab-2:found')
+    expect(paneKeys(restarted.agents)).toContain('tab-3:sibling')
+    expect(restarted.droppedAgents).toBeUndefined()
   })
 })

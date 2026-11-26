@@ -17592,7 +17592,10 @@
         "claude": "Claude",
         "codex": "Codex"
       },
-      "noTerminal": "This agent has no terminal to open yet."
+      "noTerminal": "This agent has no terminal to open yet.",
+      "remove": "Remove",
+      "removeConfirm": "Remove {{name}}? Orca stops its session if it runs, otherwise forgets it. No other member is touched.",
+      "removeCancel": "Cancel"
     },
     "activity": {
       "state": "State",

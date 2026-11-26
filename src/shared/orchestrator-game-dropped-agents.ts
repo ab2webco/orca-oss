@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { GameAgent } from './orchestrator-game-state'
+import type { GameForgottenAgent } from './orchestrator-game-forgotten-agents'
 
 /** An agent the lead dropped from its fleet: hidden, never killed, until `orca game adopt` (ORCA-943). */
 export type GameDroppedAgent = {
@@ -48,8 +49,11 @@ export function parseGameDroppedAgents(text: string): GameDroppedAgent[] {
   }
 }
 
-export const serializeGameDroppedAgents = (dropped: readonly GameDroppedAgent[]): string =>
-  `${JSON.stringify({ version: VERSION, dropped }, null, 2)}\n`
+export const serializeGameDroppedAgents = (
+  dropped: readonly GameDroppedAgent[],
+  forgotten: readonly GameForgottenAgent[] = []
+): string =>
+  `${JSON.stringify({ version: VERSION, dropped, ...(forgotten.length > 0 ? { forgotten } : {}) }, null, 2)}\n`
 
 export function withDroppedGameAgent(
   dropped: readonly GameDroppedAgent[],

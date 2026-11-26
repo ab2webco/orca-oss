@@ -10,9 +10,16 @@ import {
   type GameDropTarget,
   type GameDroppedAgent
 } from '../../shared/orchestrator-game-dropped-agents'
+import {
+  parseGameForgottenAgents,
+  withForgottenGameAgent,
+  type GameForgottenAgent
+} from '../../shared/orchestrator-game-forgotten-agents'
 import type { GameStoreNaming } from './orchestrator-game-store-names'
 
-/** The agents each project's lead dropped from its fleet, one file per project (ORCA-943). */
+type GameFleetHides = { dropped: GameDroppedAgent[]; forgotten: GameForgottenAgent[] }
+
+/** The agents each project's lead dropped or removed from its fleet, one file per project (ORCA-943). */
 export class GameDroppedAgentStore {
   // Why per project: two writes to one file must not read the same old list and lose a drop.
   private readonly queues = new Map<string, Promise<unknown>>()
@@ -24,10 +31,15 @@ export class GameDroppedAgentStore {
   ) {}
 
   async read(projectKey: string): Promise<GameDroppedAgent[]> {
+    return (await this.readAll(projectKey)).dropped
+  }
+
+  async readAll(projectKey: string): Promise<GameFleetHides> {
     try {
-      return parseGameDroppedAgents(await readFile(this.fileOf(projectKey), 'utf8'))
+      const text = await readFile(this.fileOf(projectKey), 'utf8')
+      return { dropped: parseGameDroppedAgents(text), forgotten: parseGameForgottenAgents(text) }
     } catch {
-      return []
+      return { dropped: [], forgotten: [] }
     }
   }
 
@@ -36,31 +48,42 @@ export class GameDroppedAgentStore {
     target: GameDropTarget & { name: string },
     drop: boolean
   ): Promise<GameDroppedAgent[]> {
-    return this.update(projectKey, (dropped) =>
-      drop
+    return this.update(projectKey, ({ dropped, forgotten }) => ({
+      dropped: drop
         ? withDroppedGameAgent(dropped, { ...target, at: this.now() })
-        : withoutDroppedGameAgent(dropped, target)
-    )
+        : withoutDroppedGameAgent(dropped, target),
+      forgotten
+    })).then((hides) => hides.dropped)
+  }
+
+  forget(
+    projectKey: string,
+    member: Pick<GameForgottenAgent, 'paneKey' | 'name'>
+  ): Promise<GameForgottenAgent[]> {
+    return this.update(projectKey, ({ dropped, forgotten }) => ({
+      dropped,
+      forgotten: withForgottenGameAgent(forgotten, { ...member, forgottenAt: this.now() })
+    })).then((hides) => hides.forgotten)
   }
 
   private update(
     projectKey: string,
-    change: (dropped: GameDroppedAgent[]) => GameDroppedAgent[]
-  ): Promise<GameDroppedAgent[]> {
+    change: (hides: GameFleetHides) => GameFleetHides
+  ): Promise<GameFleetHides> {
     const previous = this.queues.get(projectKey) ?? Promise.resolve()
     const next = previous
       .catch(() => undefined)
       .then(async () => {
-        const dropped = change(await this.read(projectKey))
+        const hides = change(await this.readAll(projectKey))
         await mkdir(this.dirOf(), { recursive: true })
         const file = this.fileOf(projectKey)
         // Why durable: the drop must hold through the restart it exists for.
         await writeFileDurable(
           durableWriteTempPath(file),
           file,
-          serializeGameDroppedAgents(dropped)
+          serializeGameDroppedAgents(hides.dropped, hides.forgotten)
         )
-        return dropped
+        return hides
       })
     this.queues.set(projectKey, next)
     return next
