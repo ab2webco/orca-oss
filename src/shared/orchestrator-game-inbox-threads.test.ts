@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameInboxMail, GameInboxSource } from './orchestrator-game-inbox'
+import { gameInboxesOf, type GameInboxMail, type GameInboxSource } from './orchestrator-game-inbox'
 import { gameInboxThreadsOf } from './orchestrator-game-inbox-threads'
 
 let sequence = 0
@@ -105,7 +105,7 @@ describe('gameInboxThreadsOf', () => {
     sequence = 0
     const question = mail('run:run_1', 'dispatch:d1', { type: 'question', body: 'Which port?' })
     const answeredGate = mail('term_lead', 'term_2', { type: 'decision_gate' })
-    const reply = mail('term_2', 'term_lead')
+    const reply = mail('term_2', 'term_lead', { thread_id: answeredGate.id })
     const openGate = mail('term_lead', 'term_1', { type: 'decision_gate', body: 'Ship it?' })
 
     const { waiting, threads } = gameInboxThreadsOf(
@@ -136,6 +136,27 @@ describe('gameInboxThreadsOf', () => {
     expect(threads.find((thread) => thread.ticket === 'CIN-2')?.waiting).toBe(0)
   })
 
+  // ORCA-1482: the Waiting list is the set `game watch --lead` alerts on, escalations and owner answers included.
+  it('lists as Waiting exactly what the lead inbox waits on, and no plain send settles a gate', () => {
+    sequence = 0
+    const gate = mail('term_lead', 'term_1', { type: 'decision_gate', body: 'Ship it?' })
+    const plainSend = mail('term_1', 'term_lead', { body: 'Keep going' })
+    const escalation = mail('run:run_1', 'term_1', { type: 'escalation', body: 'CI is red' })
+    const fromOwner = mail('term_lead', 'owner', { type: 'escalation', body: 'Answer: Yes' })
+    const all = source([gate, plainSend, escalation, fromOwner])
+
+    const { waiting, answered } = gameInboxThreadsOf(all)
+
+    const lead = gameInboxesOf(all, {}).find((inbox) => inbox.key === 'lead')?.waiting ?? []
+    expect(waiting.map((one) => one.id)).toEqual(lead.map((one) => one.id))
+    expect(waiting.map((one) => [one.id, one.kind])).toEqual([
+      [gate.id, 'decision_gate'],
+      [escalation.id, 'escalation'],
+      [fromOwner.id, 'escalation']
+    ])
+    expect(answered).toEqual([])
+  })
+
   it("does not list a released member's open gate as Waiting (ORCA-1267)", () => {
     sequence = 0
     const gate = mail('term_lead', 'term_1', { type: 'decision_gate' })
@@ -149,7 +170,7 @@ describe('gameInboxThreadsOf', () => {
     sequence = 0
     const first = mail('run:run_1', 'dispatch:d1', { type: 'question', body: 'Which port?' })
     const gate = mail('term_lead', 'term_2', { type: 'decision_gate', body: 'Ship it?' })
-    const gateReply = mail('term_2', 'term_lead', { body: 'Yes, ship it.' })
+    const gateReply = mail('term_2', 'term_lead', { body: 'Yes, ship it.', thread_id: gate.id })
     const second = mail('run:run_1', 'dispatch:d2', { type: 'question', body: 'Rebase?' })
 
     const { answered } = gameInboxThreadsOf(
