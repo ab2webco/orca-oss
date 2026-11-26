@@ -343,6 +343,15 @@ describe('federation relay acknowledgments', () => {
     ])
   })
 
+  it('shares owner answers on a sync with no mail for the member, so an answer needs no mail (ORCA-1440)', async () => {
+    const { runtime } = createIdleSyncHarness()
+    const share = vi.spyOn(runtime, 'shareGameOwnerAnswersWithRemoteMember')
+
+    await runtime.syncOrchestrationFederatedDispatch('dispatch_remote')
+
+    expect(share).toHaveBeenCalledWith('dispatch_remote')
+  })
+
   it('acknowledges only new progress until remote runtime identity changes', async () => {
     const { runtime, remoteCall, advanceCursor, restartRemote } = createIdleSyncHarness()
     const ackCalls = () =>

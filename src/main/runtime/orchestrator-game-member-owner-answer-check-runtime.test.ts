@@ -86,7 +86,7 @@ describe("a member on a paired host checks its lead host's owner answer (ORCA-12
 
     await expect(
       runtime.readGameOwnerQuestion({ terminalHandle: 'term_member', role: 'member', id: 'oq_1' })
-    ).resolves.toEqual({ question: answered })
+    ).resolves.toEqual({ question: answered, sharedAt: expect.any(String) })
     expect(board).not.toHaveBeenCalled()
   })
 
@@ -107,6 +107,89 @@ describe("a member on a paired host checks its lead host's owner answer (ORCA-12
     ).rejects.toThrow(/not found for this lead's host/)
     await expect(
       runtime.readGameOwnerQuestion({ terminalHandle: 'term_member', role: 'member', id: 'oq_1' })
-    ).rejects.toThrow(/No question oq_1 for your ticket reached this host/)
+    ).rejects.toThrow(/cannot confirm oq_1: your lead's host has not shared/)
+  })
+
+  it('reads an unanswered question as current only after its lead host shared it (ORCA-1440)', async () => {
+    const runtime = memberHost()
+    const open = { ...answered, answer: null }
+
+    await runtime.keepGameOwnerAnswersFromLeadHost(
+      { dispatchId: 'ctx_member', ticket: 'CIN-1', questions: [open] },
+      'fp_lead_host'
+    )
+
+    await expect(
+      runtime.readGameOwnerQuestion({ terminalHandle: 'term_member', role: 'member', id: 'oq_1' })
+    ).resolves.toEqual({ question: open, sharedAt: expect.any(String) })
+  })
+})
+
+describe("a lead host shares a remote member's answers after a restart fenced its Run handle (ORCA-1440)", () => {
+  const databases: OrchestrationDb[] = []
+  afterEach(() => {
+    for (const database of databases.splice(0)) {
+      database.close()
+    }
+    vi.restoreAllMocks()
+  })
+
+  const answeredOnLead = { ...answered, id: 'oq_0893ebc4eb50', ticket: 'CIN-614' }
+
+  async function leadHost() {
+    userData.dir = mkdtempSync(join(tmpdir(), 'orca-lead-owner-answers-'))
+    dirs.push(userData.dir)
+    const runtime = new OrcaRuntimeService(null)
+    const db = new OrchestrationDb(':memory:')
+    databases.push(db)
+    runtime.setOrchestrationDb(db)
+    // Why a handle and pane nothing answers for: the lead runs on in a new pane after a restart.
+    const run = db.createRun({
+      objective: 'lead',
+      coordinatorHandle: 'term_lead_before_restart',
+      coordinatorPaneKey: 'tab-gone:leaf-gone'
+    })
+    const task = db.createTask({ spec: 'payments', taskTitle: 'CIN-614 payments', runId: run.id })
+    const started = db.createStartingWorkerDispatch({
+      taskId: task.id,
+      startOptions: { on: 'env_m1', serverName: 'm1', leadWorktreeId: 'repo-cin::/work/cineco' },
+      federation: {
+        environmentId: 'env_m1',
+        environmentName: 'm1',
+        peerFingerprint: 'fp_m1',
+        protocolVersion: 3
+      }
+    })
+    const worktrees = new Map([['repo-cin::/work/cineco', { repoId: 'repo-cin' }]])
+    vi.spyOn(
+      runtime as unknown as { getResolvedWorktreeMap: () => Promise<unknown> },
+      'getResolvedWorktreeMap'
+    ).mockResolvedValue(worktrees)
+    // Why the cast: the lead's board file is private; `game answer-owner` writes it on a lead host.
+    const history = Reflect.get(runtime, 'gameHistory') as {
+      changeOwnerQuestions: (
+        key: string,
+        change: () => { list: unknown[]; result: null }
+      ) => Promise<null>
+    }
+    await history.changeOwnerQuestions('repo:repo-cin', () => ({
+      list: [answeredOnLead],
+      result: null
+    }))
+    const send = vi.spyOn(runtime, 'callOrchestrationWorkerServer').mockResolvedValue({ kept: 1 })
+    return { runtime, send, dispatchId: started.dispatch.id }
+  }
+
+  it("finds the lead's board by the worktree the launch recorded, not the fenced handle", async () => {
+    const { runtime, send, dispatchId } = await leadHost()
+
+    await runtime.shareGameOwnerAnswersWithRemoteMember(dispatchId)
+
+    expect(send).toHaveBeenCalledWith(
+      'env_m1',
+      'game.ownerQuestionsImport',
+      { dispatchId, ticket: 'CIN-614', questions: [answeredOnLead] },
+      15_000
+    )
   })
 })

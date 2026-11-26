@@ -893,8 +893,11 @@ import {
   readBoardOwnerAnswer,
   readRemoteMemberOwnerAnswer,
   shareOwnerAnswersWithRemoteMember,
+  type OwnerAnswerShareMark,
   type RemoteMemberOwnerAnswers
 } from './orchestrator-game-member-owner-answer-check'
+import { leadWorktreeIdOfStartOptions } from './orchestrator-game-dispatch-start-repo'
+import { GameBranchReviews } from './orchestrator-game-branch-reviews'
 import { withProjectLead } from './orchestrator-game-project-lead'
 import { GameArcadeLedger } from './orchestrator-game-arcade-ledger'
 import { GameTeamXpLedger } from './orchestrator-game-team-xp-ledger'
@@ -3950,6 +3953,9 @@ export class OrcaRuntimeService {
     { refreshInBackground: true }
   )
   // Why TTL 0 otherwise: each pane's own review stays fresh until the GitHub budget runs low (ORCA-877).
+  private readonly gameBranchReviews = new GameBranchReviews<
+    NonNullable<Awaited<ReturnType<typeof withGameReviewFacts>>>
+  >()
   private readonly gameReviews = new GameReadCache<Awaited<ReturnType<typeof withGameReviewFacts>>>(
     () => (gameGitHubPollStretch() > 1 ? 300_000 : 0)
   )
@@ -22554,15 +22560,26 @@ export class OrcaRuntimeService {
   }
 
   // Why: only the game reads these facts, so the sidebar's hot review path stays one call.
+  // Why `fallbackGitHubPR` apart: worktree.ps takes it from the renderer's PR cache, and as a linked
+  // number it skipped the branch lookup, so a closed PR hid the branch's open one (ORCA-1435).
   private async getGameReviewForBranch(
     args: Parameters<OrcaRuntimeService['getHostedReviewForBranch']>[0]
   ): ReturnType<typeof withGameReviewFacts> {
-    return this.gameReviews.read(JSON.stringify(args), async () => {
-      const review = await this.getHostedReviewForBranch(args)
-      return review
-        ? withGameReviewFacts(review, await this.resolveRepoSelector(args.repoSelector))
-        : null
-    })
+    const { fallbackGitHubPR, ...exact } = args
+    const withFacts = async (review: HostedReviewInfo | null) =>
+      review ? withGameReviewFacts(review, await this.resolveRepoSelector(args.repoSelector)) : null
+    const fallback = exact.linkedGitHubPR == null ? fallbackGitHubPR : null
+    // Why the linked number in the key: it asks for one exact PR, a different question (ORCA-1170).
+    const branchKey = JSON.stringify([args.repoSelector, args.branch, exact.linkedGitHubPR ?? null])
+    return this.gameReviews.read(JSON.stringify(args), () =>
+      this.gameBranchReviews.read(branchKey, {
+        byBranch: async () => withFacts(await this.getHostedReviewForBranch(exact)),
+        ...(fallback != null && {
+          byNumber: async () =>
+            withFacts(await this.getHostedReviewForBranch({ ...exact, linkedGitHubPR: fallback }))
+        })
+      })
+    )
   }
 
   // Why: a retired worker_done must not hide a member whose PR still waits for the lead (ORCA-824).
@@ -31716,9 +31733,11 @@ export class OrcaRuntimeService {
   }
 
   // Why: what each remote member's host last received from this lead's host (ORCA-1281).
-  private readonly sharedOwnerAnswers = new Map<string, string>()
+  private readonly sharedOwnerAnswers = new Map<string, OwnerAnswerShareMark>()
+  // Why: on a member's host, when its lead's host last shared, so a stale copy is not read as current.
+  private readonly keptOwnerAnswersAt = new Map<string, number>()
 
-  /** Before a remote member's mail goes out, its host gets the person's answers on its ticket (ORCA-1281). */
+  /** On each relay sync of a remote member, its host gets the person's answers on its ticket (ORCA-1281, ORCA-1440). */
   shareGameOwnerAnswersWithRemoteMember(dispatchId: string): Promise<void> {
     const deps = {
       memberOf: async (id: string) => {
@@ -31726,13 +31745,12 @@ export class OrcaRuntimeService {
         const federated = db.getFederatedDispatch(id)
         const dispatch = db.getDispatchContextById(id)
         const task = dispatch ? db.getTask(dispatch.task_id) : undefined
-        const lead = dispatch ? db.getRun(dispatch.run_id)?.coordinator_handle : null
         const ticket = ticketInText(task?.task_title ?? task?.display_name)
-        if (!federated || !ticket || !lead) {
+        if (!federated || !dispatch || !ticket) {
           return null
         }
-        const { key } = await this.gameBoardProjectOf({ terminalHandle: lead })
-        return { ticket, projectKey: key, environmentId: federated.environment_id }
+        const projectKey = await this.gameProjectKeyOfRemoteMember(id, dispatch.run_id)
+        return projectKey ? { ticket, projectKey, environmentId: federated.environment_id } : null
       },
       questionsOf: (key: string) => this.gameHistory.ownerQuestions(key),
       send: (environmentId: string, shared: RemoteMemberOwnerAnswers) =>
@@ -31742,9 +31760,35 @@ export class OrcaRuntimeService {
           shared,
           15_000
         ),
+      version: () => this.gameHistory.writes,
+      now: () => Date.now(),
       sent: this.sharedOwnerAnswers
     }
     return shareOwnerAnswersWithRemoteMember(deps, dispatchId)
+  }
+
+  // Why the launch's lead worktree first: a restart fences the Run's coordinator handle, and that
+  // handle alone resolved to no project, so the member's host stopped getting answers (ORCA-1440).
+  private async gameProjectKeyOfRemoteMember(
+    dispatchId: string,
+    runId: string
+  ): Promise<string | null> {
+    const db = this.getOrchestrationDb()
+    const worktreesById = await this.getResolvedWorktreeMap()
+    const run = db.getRun(runId)
+    const leadPaneWorktree = run?.coordinator_pane_key
+      ? this.getTerminalWorktreeIdForPaneKey(run.coordinator_pane_key)
+      : null
+    const byWorktree =
+      this.gameProjectKeyOfWorktree(
+        leadWorktreeIdOfStartOptions(db.getWorkerDispatch(dispatchId)?.start_options),
+        worktreesById
+      ) ?? this.gameProjectKeyOfWorktree(leadPaneWorktree, worktreesById)
+    if (byWorktree || !run?.coordinator_handle) {
+      return byWorktree
+    }
+    const { key } = await this.gameBoardProjectOf({ terminalHandle: run.coordinator_handle })
+    return key === 'no-project' ? null : key
   }
 
   /** On a member's host: keeps what its lead's paired host shared; any other caller is refused. */
@@ -31756,7 +31800,9 @@ export class OrcaRuntimeService {
     if (!attachment || attachment.home_peer_fingerprint !== callerFingerprint) {
       throw new Error(`Remote Dispatch ${shared.dispatchId} was not found for this lead's host.`)
     }
-    return keepRemoteMemberOwnerAnswers(this.gameHistory, shared)
+    const kept = await keepRemoteMemberOwnerAnswers(this.gameHistory, shared)
+    this.keptOwnerAnswersAt.set(shared.dispatchId, Date.now())
+    return kept
   }
 
   /** One owner answer by id: from the lead's board here, or what a remote member's lead host shared. */
@@ -31765,7 +31811,7 @@ export class OrcaRuntimeService {
     terminalHandle?: string
     role?: 'member'
     id: string
-  }): Promise<{ question: GameOwnerQuestion }> {
+  }): Promise<{ question: GameOwnerQuestion; sharedAt?: string }> {
     const paneKey = args.terminalHandle ? this.getTerminalPaneKey(args.terminalHandle) : null
     const db = paneKey ? this.getOrchestrationDbIfAvailable() : null
     const remote =
@@ -31774,7 +31820,10 @@ export class OrcaRuntimeService {
           db.findLatestSettledRemoteAttachmentForPane(paneKey))
         : undefined
     return remote
-      ? readRemoteMemberOwnerAnswer(this.gameHistory, remote.dispatch_id, args.id)
+      ? readRemoteMemberOwnerAnswer(this.gameHistory, remote.dispatch_id, args.id, {
+          keptAt: this.keptOwnerAnswersAt.get(remote.dispatch_id),
+          now: Date.now()
+        })
       : readBoardOwnerAnswer(this.gameHistory, await this.gameBoardProjectOf(args), args)
   }
 
@@ -32983,7 +33032,7 @@ export class OrcaRuntimeService {
               ? await this.getGameReviewForBranch({
                   repoSelector: `id:${member.repoId}`,
                   branch: memberSummary.branch,
-                  linkedGitHubPR: memberSummary.linkedPR?.number ?? null,
+                  fallbackGitHubPR: memberSummary.linkedPR?.number ?? null,
                   linkedGitLabMR: memberSummary.linkedGitLabMR ?? null
                 })
               : null
@@ -33090,7 +33139,7 @@ export class OrcaRuntimeService {
           ? await this.getGameReviewForBranch({
               repoSelector: `id:${worktree.repoId}`,
               branch: summary.branch,
-              linkedGitHubPR: summary.linkedPR?.number ?? null,
+              fallbackGitHubPR: summary.linkedPR?.number ?? null,
               linkedGitLabMR: summary.linkedGitLabMR ?? null
             })
           : null,
