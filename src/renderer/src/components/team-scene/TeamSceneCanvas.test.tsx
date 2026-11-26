@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TeamSceneInput } from '../../../../shared/team-scene/team-scene-types'
 import { TeamSceneCanvas } from './TeamSceneCanvas'
+import { useTeamSceneHover } from './team-scene-hit'
 import type { TeamSceneFrame, TeamScenePainter } from './team-scene-painter'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -75,6 +76,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  useTeamSceneHover.setState({ key: null })
   vi.restoreAllMocks()
 })
 
@@ -370,6 +372,30 @@ describe('TeamSceneCanvas', () => {
     expect(host.querySelector('[data-scene-bubble="advisor"]')?.textContent).toBe('Raised effort')
     runUntil(6300)
     expect(host.querySelector('[data-scene-bubble="advisor"]')).toBeNull()
+  })
+
+  // ORCA-1260: a floor whose frame loop had stopped kept a stale label and never lit a row's member.
+  it('lights and clears a member hovered in the Team list while no frame runs', () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      setTransform() {},
+      save() {},
+      beginPath() {},
+      roundRect() {},
+      stroke() {},
+      restore() {}
+    } as unknown as CanvasRenderingContext2D)
+    const members = new Map([['a', { title: 'Mario', detail: 'ORCA-501', open: () => {} }]])
+    const p = painter()
+    render(
+      <TeamSceneCanvas input={input(['a'])} painter={p.value} leadLine={null} members={members} />
+    )
+    const who = () => host.querySelector('[data-scene-who="a"]')
+    act(() => useTeamSceneHover.getState().set('a'))
+    expect(who()?.textContent).toContain('Mario')
+    act(() => useTeamSceneHover.getState().set(null))
+    expect(who()).toBeNull()
   })
 
   it('releases the canvas, the frame and the painter on close', () => {

@@ -224,10 +224,13 @@ export function TeamSceneCanvas({
     [painter, members, colors]
   )
 
-  // Why: under reduced motion no frame runs, so a member lit from the Team list repaints here.
+  // Why every motion mode: a floor's frames can be paused or starved, and a lit member must still show (ORCA-1260).
   useEffect(
-    () => (reducedMotion && members ? useTeamSceneHover.subscribe(() => paint(0)) : undefined),
-    [reducedMotion, members, paint]
+    () =>
+      members
+        ? useTeamSceneHover.subscribe((now, before) => now.key !== before.key && paint(0))
+        : undefined,
+    [members, paint]
   )
 
   useEffect(() => {
