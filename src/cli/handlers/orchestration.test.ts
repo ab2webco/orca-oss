@@ -720,7 +720,10 @@ describe('orchestration task-list brief output', () => {
     vi.mocked(printResult).mockClear()
 
     await ORCHESTRATION_HANDLERS['orchestration task-list']({
-      flags: new Map([['brief', true]]),
+      flags: new Map<string, string | boolean>([
+        ['brief', true],
+        ['from', 'term_coord']
+      ]),
       client: { call: callMock },
       json: true
     } as never)
@@ -744,7 +747,10 @@ describe('orchestration task-list brief output', () => {
     vi.mocked(printResult).mockClear()
 
     await ORCHESTRATION_HANDLERS['orchestration task-list']({
-      flags: new Map([['brief', true]]),
+      flags: new Map<string, string | boolean>([
+        ['brief', true],
+        ['from', 'term_coord']
+      ]),
       client: { call: callMock },
       json: true
     } as never)
