@@ -1,5 +1,5 @@
 ---
-sourceHash: 21a4c32c83ac3c71
+sourceHash: 09b678d0c6328dc5
 ---
 
 # El juego orquestador de Agent Teams
@@ -1143,8 +1143,9 @@ matches …` (ORCA-866).
   ya no corre. Adoptar un agente que ya es miembro reutiliza su dispatch. Un agente encontrado local
   de otro repo nunca se adopta. Un agente descartado con `game drop` primero se trae de vuelta a la
   flota.
-- `orca game drop <name|ticket>` — saca a un agente de la flota del líder sin detenerlo ni tocar su
-  terminal ni su worktree (ORCA-943). El descarte se guarda por proyecto, según el host y el worktree
+- `orca game drop <dispatch-id|name|ticket>` — saca a un agente de la flota del líder sin detenerlo
+  ni tocar su terminal ni su worktree (ORCA-943). Nombra a un solo agente: un nombre o ticket que
+  comparten varios se rechaza con la clave de cada uno (ORCA-1477). El descarte se guarda por proyecto, según el host y el worktree
   del agente (un reinicio cambia su clave de pane, no esos), así que el agente queda fuera de
   `game fleet` y del Panel entre refrescos y reinicios, y su entrada de miembro guardada se elimina
   para que un reinicio no lo reanude, hasta que `game adopt` lo traiga de vuelta. Un miembro en esta
@@ -1171,9 +1172,14 @@ matches …` (ORCA-866).
   (ORCA-1475 C6), así que ninguna alerta ni ningún lugar espera por él. Otro miembro en el mismo
   worktree, carpeta o ticket nunca se toca. El Quitar de la tarjeta pregunta primero y luego le
   manda este comando al líder.
-- `orca game stop [<ticket>,... | --all]` — termina los miembros nombrados, o todos, para que ningún
+- `orca game stop [<key>,... | --all]` — termina los miembros nombrados, o todos, para que ningún
   agente miembro siga corriendo: cada dispatch vivo se detiene y luego se cierra la terminal del
   miembro cuando la detención no la cerró (un dispatch detenido puede dejar su terminal retenida).
+  Cada clave nombra a un miembro: su id de dispatch, su clave de pane, o el único miembro con ese
+  ticket o nombre; un ticket o nombre que comparten varios se rechaza con la clave de cada uno, sin
+  tocar a ninguno. Un miembro con terminal se detiene solo por el dispatch de esa terminal; uno sin
+  terminal se busca por su worktree solo cuando ahí hay exactamente un dispatch vivo que no es de
+  otro miembro (ORCA-1477).
   Cada miembro se reporta como detenido, ya detenido o fallido; el líder y los worktrees nunca se
   tocan. `--all --hold` primero fija el STOP persistente del proyecto y luego detiene a todos los
   miembros; las reglas del líder le dicen que lo ejecute de inmediato cuando la persona detiene a

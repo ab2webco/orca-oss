@@ -57,12 +57,14 @@ export const isOurGameAgentNamed = (
   agent: GameAgent,
   name: string,
   leadWorktreeId: string | null
-): boolean =>
+): boolean => isOurGameAgent(agent, leadWorktreeId) && isGameAgentNamed(agent, name)
+
+/** A non-lead agent of this project: on a paired host (listed per project), or in this repo. */
+export const isOurGameAgent = (agent: GameAgent, leadWorktreeId: string | null): boolean =>
   !agent.isLeader &&
   // Why remote without a worktree: a host that no longer knows its member shows no branch (ORCA-1196).
   (agent.remote !== undefined ||
-    (agent.worktree !== undefined && isSameGameProject(agent.worktree.id, leadWorktreeId))) &&
-  isGameAgentNamed(agent, name)
+    (agent.worktree !== undefined && isSameGameProject(agent.worktree.id, leadWorktreeId)))
 
 /** The found agent's terminal on its paired host, read there, or why it cannot be adopted. */
 async function hostSeatOf(

@@ -240,7 +240,7 @@ describe('orca game drop (ORCA-943)', () => {
     expect(output()).toMatchObject({
       dropped: false,
       host: 'm1',
-      refusal: expect.stringContaining('orca game stop ORCA-915')
+      refusal: expect.stringContaining('orca game stop ctx_915')
     })
     expect(process.exitCode).toBe(1)
   })
@@ -266,6 +266,36 @@ describe('orca game drop (ORCA-943)', () => {
 
     await expect(drop(client, 'ORCA-907')).rejects.toThrow(/No agent named ORCA-907/)
     await expect(drop(client, 'Lead')).rejects.toThrow(/No agent named Lead/)
+  })
+
+  // Why: a stale row and the member launched after it share the ticket and the worktree (ORCA-1477).
+  it('refuses a ticket two agents share, and drops the one its pane key names, detaching only its dispatch', async () => {
+    const stale = agent({ paneKey: 'tab-6:leaf-6', terminalHandle: undefined })
+    const workers = [
+      {
+        dispatchId: 'ctx_907',
+        workerState: 'ready',
+        agentTerminalHandle: 'term_local_7',
+        resource: { worktreeId: 'repo1::/wt/orca-907' }
+      }
+    ]
+    const shared = clientWith({ agents: [LEAD, stale, agent({})] }, workers)
+
+    await drop(shared.client, 'ORCA-907')
+
+    expect(drops(shared.calls)).toEqual([])
+    expect(output().matches.map((one: { key: string }) => one.key)).toEqual([
+      'tab-6:leaf-6',
+      'tab-7:leaf-7'
+    ])
+    expect(process.exitCode).toBe(1)
+
+    const exact = clientWith({ agents: [LEAD, stale, agent({})] }, workers)
+    await drop(exact.client, 'tab-6:leaf-6')
+
+    expect(exact.calls.map(([method]) => method)).not.toContain('orchestration.workerDetach')
+    expect(output()).toMatchObject({ dropped: true })
+    expect(output()).not.toHaveProperty('detached')
   })
 
   it('refuses outside a lead', async () => {

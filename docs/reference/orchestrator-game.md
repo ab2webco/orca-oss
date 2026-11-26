@@ -1082,8 +1082,9 @@ matches …` (ORCA-866).
   agent leads a Run on its host or its terminal no longer runs. Adopting an agent that is already a
   member reuses its dispatch. A local found agent of another repo is never adopted. An agent dropped
   with `game drop` is brought back into the fleet first.
-- `orca game drop <name|ticket>` — takes an agent out of the lead's fleet without stopping it or
-  touching its terminal or worktree (ORCA-943). The drop is kept per project, by the agent's host
+- `orca game drop <dispatch-id|name|ticket>` — takes an agent out of the lead's fleet without
+  stopping it or touching its terminal or worktree (ORCA-943). It names one agent: a name or ticket
+  several agents share is refused with each one's key (ORCA-1477). The drop is kept per project, by the agent's host
   and worktree (a restart changes its pane key, not those), so the agent stays out of `game fleet`
   and the Panel across refreshes and restarts, and its saved member entry is removed so a restart
   does not resume it, until `game adopt` brings it back. A member on this machine whose dispatch
@@ -1108,9 +1109,13 @@ matches …` (ORCA-866).
   alert or slot waits on it. Another member in the same worktree,
   folder or ticket is never touched. The member card's Remove asks first, then sends the lead this
   command.
-- `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member
+- `orca game stop [<key>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
-  stop did not close it (a stopped dispatch can leave its terminal retained). Each member is
+  stop did not close it (a stopped dispatch can leave its terminal retained). Each key names one
+  member: its dispatch id, its pane key, or the one member with that ticket or name; a ticket or
+  name several members share is refused with each one's key, and none of them is touched. A member
+  with a terminal is stopped only through that terminal's dispatch; one without is matched by its
+  worktree only when exactly one live dispatch there belongs to no other member (ORCA-1477). Each member is
   reported stopped, already stopped or failed; the lead and the worktrees are never touched.
   `--all --hold` first sets the project's persistent STOP, then stops every member; the lead's rules
   tell it to run that at once when the person stops everyone ("detén todo y que no sigan").
