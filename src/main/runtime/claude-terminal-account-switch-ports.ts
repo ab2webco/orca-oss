@@ -24,6 +24,12 @@ import {
   type ClaudeSessionFailoverDeps
 } from '../claude-accounts/session-failover'
 import { claudeUniverseReportsResumedSession } from '../claude-accounts/claude-resume-observability'
+import {
+  claudeConfigFilePathOf,
+  claudeFolderTrustPathsOf,
+  isClaudeFolderTrusted,
+  markClaudeFolderTrusted
+} from '../claude-accounts/claude-folder-trust'
 import { resolveOwnedClaudeManagedAuthPath } from '../claude-accounts/managed-auth-path'
 import { isManagedClaudeVaultAuthenticated } from '../claude-accounts/managed-vault-authentication'
 import { ClaudeRuntimePathResolver } from '../claude-accounts/runtime-paths'
@@ -158,6 +164,18 @@ export function buildClaudeTerminalAccountSwitchPorts(
       // Why not a refusal: an unpinned source runs in the shared universe, whose
       // instrumentation the app owns and repairs on every launch.
       return universe === null ? true : claudeUniverseReportsResumedSession(universe)
+    },
+    trustTargetFolder: async ({ configDir }) => {
+      const configFilePath = claudeConfigFilePathOf({ CLAUDE_CONFIG_DIR: configDir })
+      try {
+        await markClaudeFolderTrusted({ configFilePath, folderPath: capture.cwd })
+      } catch {
+        // Best-effort: the read-back below is what decides.
+      }
+      return isClaudeFolderTrusted({
+        configFilePath,
+        folderPaths: claudeFolderTrustPathsOf(capture.cwd)
+      })
     },
     awaitSourceForeground: () => awaitClaudeTerminalSourceForeground(runtime, capture),
     stopSource: () => stopClaudeTerminalForegroundAgent(runtime, capture),
