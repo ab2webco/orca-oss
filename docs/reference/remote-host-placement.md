@@ -207,6 +207,11 @@ host (decision O3).
   released, the capability or process does not match (the lead also gets the refusal notice), the
   type is `question` (`ask` reopens), or the home is below protocol 4 and would never pull it.
   The member's host must run the fix; an older host still stores the mail locally.
+- Built in ORCA-1463, no new field or capability: the member's host never learns its lead's run id,
+  so `--to run:<id>` or `--run <id>` naming a Run the host does not hold now means Run home, for an
+  active member and for a settled one, through the same relay and refusals as above. A Run the host
+  does hold, or `--to run:<a> --run <b>`, is still refused or kept local. An older host still
+  answers `Run <id> was not found`: an error, not a silent drop.
 - Precedent: `ORCHESTRATION_WORKER_SETUP_QUEUE_RUNTIME_CAPABILITY` exists because an older host drops
   `setupAdmission` (`src/shared/protocol-version.ts:70-72`).
 - The wire harness covers only the terminal stream. Child 2 adds its own cross-version test for the

@@ -48,26 +48,33 @@ describe('orchestration federated message targeting', () => {
     })
     db.markRemoteAttachmentReady(dispatchId)
     const dispatcher = new RpcDispatcher({ runtime, methods: ORCHESTRATION_METHODS })
+    // Why these targets: a Run this host does not hold now means the member's lead (ORCA-1463).
+    const hostRun = db.createRun({
+      objective: 'A Run of the host itself',
+      coordinatorHandle: 'term_host_lead',
+      coordinatorPaneKey: 'tab_host_lead:leaf_host_lead'
+    })
     const requests: RpcRequest[] = [
       request('send_to', capability, 'orchestration.send', {
         from: 'term_remote_worker',
-        to: 'run:explicit',
+        to: 'term_other',
         subject: 'Wrong explicit target'
       }),
       request('send_run', capability, 'orchestration.send', {
         from: 'term_remote_worker',
-        run: 'run_explicit',
+        run: hostRun.id,
         subject: 'Wrong explicit Run'
       }),
       request('ask_to', capability, 'orchestration.ask', {
         from: 'term_remote_worker',
-        to: 'run:explicit',
+        to: `run:${hostRun.id}`,
         question: 'Wrong explicit target?'
       }),
       request('ask_run', capability, 'orchestration.ask', {
         from: 'term_remote_worker',
-        run: 'run_explicit',
-        question: 'Wrong explicit Run?'
+        to: 'run:run_lead',
+        run: 'run_other',
+        question: 'Two different Runs?'
       })
     ]
 

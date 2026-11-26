@@ -117,11 +117,12 @@ describe('remote member mail to its Run home after worker_done', () => {
     )
   }
 
-  async function reportDone(member: Omit<Member, 'runId'>) {
+  async function reportDone(member: Omit<Member, 'runId'>, params: Record<string, unknown> = {}) {
     const pending = workerDb.listPendingFederationRelay(member.dispatchId, 'to_home').length
     const sent = workerCall(
       'orchestration.send',
       {
+        ...params,
         subject: 'Done',
         body: 'Finished the audit.',
         type: 'worker_done',
@@ -217,6 +218,58 @@ describe('remote member mail to its Run home after worker_done', () => {
     expect(homeDb.getDispatchContextById(member.dispatchId)?.status).toBe('completed')
   })
 
+  // ORCA-1463: the host holds no record of the lead's run id, so these failed as "Run ... was not found".
+  it.each([
+    ['--to run:<lead run id>', (runId: string) => ({ to: `run:${runId}` })],
+    ['--run <lead run id>', (runId: string) => ({ to: undefined, run: runId })]
+  ])("reaches the lead's inbox with %s", async (_label, target) => {
+    const member = await settledMember()
+    expect(workerDb.getRun(member.runId)).toBeUndefined()
+
+    await expect(report(member.capability, target(member.runId))).resolves.toMatchObject({
+      ok: true,
+      result: { relay: { dispatchId: member.dispatchId, destination: 'run_home', accepted: true } }
+    })
+
+    expect(strandedOnHost()).toEqual([])
+    expect((await leadInbox(member)).map((message) => message.body)).toEqual([
+      'ORCA-1414: the second fix is pushed at 63b0ff4ad4.'
+    ])
+  })
+
+  it("refuses a second worker_done to run:<lead run id>, naming the report's route", async () => {
+    const member = await settledMember()
+
+    await expect(
+      report(member.capability, {
+        to: `run:${member.runId}`,
+        type: 'worker_done',
+        payload: JSON.stringify({ dispatchId: member.dispatchId, outcome: 'succeeded' })
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: 'dispatch_inactive',
+        message: expect.stringContaining('--type escalation --subject report')
+      }
+    })
+    expect(workerDb.listPendingFederationRelay(member.dispatchId, 'to_home')).toHaveLength(0)
+  })
+
+  it('refuses run:<lead run id> on the host, naming why, once the member is released', async () => {
+    const member = await settledMember()
+    workerDb.markRemoteAttachmentReleased(member.dispatchId)
+
+    await expect(report(member.capability, { to: `run:${member.runId}` })).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: 'dispatch_inactive',
+        message: expect.stringContaining(`Dispatch ${member.dispatchId} on this pane is released`)
+      }
+    })
+    expect(workerDb.listPendingFederationRelay(member.dispatchId, 'to_home')).toHaveLength(0)
+  })
+
   it('reaches the lead after a follow-up and a second worker_done, as on m1', async () => {
     const member = await settledMember()
     await expect(
@@ -264,6 +317,24 @@ describe('remote member mail to its Run home after worker_done', () => {
     expect(homeDb.getUnreadMessages(`run:${run.id}`).map((message) => message.body)).toContain(
       'ORCA-1414: the second fix is pushed at 63b0ff4ad4.'
     )
+  })
+
+  it('settles an active member whose worker_done names --to run:<lead run id>', async () => {
+    const run = homeDb.createRun({
+      objective: 'Mac to Windows',
+      coordinatorHandle: 'term_coord',
+      coordinatorPaneKey: 'tab_coord:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    })
+    const task = homeDb.createTask({ spec: 'Audit Windows behavior', runId: run.id })
+    expect(await homeDispatcher.dispatch(startRequest(task.id))).toMatchObject({ ok: true })
+    homeRuntime.stopOrchestrationFederationRelay()
+    const dispatchId = homeDb.getDispatchContext(task.id)!.id
+    const prompt = vi.mocked(workerRuntime.sendTerminalAgentPrompt).mock.calls[0]?.[1] ?? ''
+    const capability = prompt.match(/--dispatch-capability (dcap_[A-Za-z0-9_-]+)/)?.[1] as string
+
+    await reportDone({ taskId: task.id, dispatchId, capability }, { to: `run:${run.id}` })
+
+    expect(homeDb.getDispatchContextById(dispatchId)?.status).toBe('completed')
   })
 
   it('lets ask --to Run home reopen a settled member like a bare ask', async () => {
