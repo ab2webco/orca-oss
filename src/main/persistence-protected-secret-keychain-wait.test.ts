@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const testState = { dir: '' }
+const openStores: { waitForPendingWrite(): Promise<void> }[] = []
 const { startupMilestones } = vi.hoisted(() => ({
   startupMilestones: [] as { event: string; details: Record<string, unknown> }[]
 }))
@@ -68,7 +69,9 @@ async function createStore() {
   vi.resetModules()
   const { Store, initDataPath } = await import('./persistence')
   initDataPath()
-  return new Store()
+  const store = new Store()
+  openStores.push(store)
+  return store
 }
 
 function persistedBlobs(): ProtectedBlobs {
@@ -133,7 +136,10 @@ describe('protected secrets at startup when the Keychain prompts', () => {
     vi.useFakeTimers()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Why (ORCA-1471): a save the fake clock fired keeps writing after the test, and removing the
+    // directory under it failed with ENOTEMPTY.
+    await Promise.all(openStores.splice(0).map((store) => store.waitForPendingWrite()))
     vi.useRealTimers()
     setPlatform(ORIGINAL_PLATFORM)
     rmSync(testState.dir, { recursive: true, force: true })
