@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { TeamLeadCard } from '../../../../shared/team-panel-model-types'
-import { teamConditionText, teamLeadLiveText, teamLiveText, teamModelText } from './team-card-text'
+import { teamConditionText, teamLiveText, teamModelText } from './team-card-text'
+import { teamLeadCardLine } from './team-card-line'
 import { TeamHostName } from './TeamHostName'
 import { TeamStatusMark } from './TeamStatusMark'
 import { TeamCardFace } from './TeamCardFace'
@@ -112,6 +113,7 @@ export function TeamLeadCardRow({
   const setupLabel = translate('teamPanel.lead.nameSetup', 'Name your lead')
   // Why 'lead': the 3D scenes key the lead's figure so, as its card face does.
   const { lit, rowProps } = useTeamSceneHoverRow('lead')
+  const line = teamLeadCardLine(lead)
   return (
     <article
       data-team-card="lead"
@@ -159,19 +161,13 @@ export function TeamLeadCardRow({
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <TeamStatusMark status={lead.status} />
-            {lead.ownerAsk ? (
-              <span className="line-clamp-2 break-words text-status-attention">
-                {lead.ownerAsk.ticket
-                  ? translate('teamPanel.lead.asksOn', 'Waiting for you · Question on {{ticket}}', {
-                      ticket: lead.ownerAsk.ticket
-                    })
-                  : translate('teamPanel.lead.asks', 'Waiting for you')}
-              </span>
-            ) : (
-              <span className="truncate">
-                {teamLeadLiveText(lead.liveAction, lead.condition, lead.waitingOn)}
-              </span>
-            )}
+            <span
+              className={
+                line.attention ? 'line-clamp-2 break-words text-status-attention' : 'truncate'
+              }
+            >
+              {line.text}
+            </span>
           </span>
           {sceneLine ? (
             <span

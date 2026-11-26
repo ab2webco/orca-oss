@@ -128,6 +128,67 @@ describe('sidebarTeamRowLines (V30 drawLeft)', () => {
     })
   })
 
+  it("says the lead's open question as its Team card does, in the question tone", () => {
+    const card: TeamLeadCard = {
+      ...lead,
+      status: 'attention',
+      ownerAsk: { ticket: 'ORCA-2003' }
+    }
+    expect(sidebarTeamRowLines({ role: 'lead', card }, base).activity).toEqual({
+      text: 'Waiting for you · Question on ORCA-2003',
+      asks: true
+    })
+    const unticketed = { ...card, ownerAsk: { ticket: null } }
+    expect(sidebarTeamRowLines({ role: 'lead', card: unticketed }, base).activity).toEqual({
+      text: 'Waiting for you',
+      asks: true
+    })
+  })
+
+  it('names a permission prompt instead of an answer the Inbox does not hold', () => {
+    const card = member({
+      status: 'attention',
+      needsYou: true,
+      condition: 'waiting',
+      ask: { kind: 'permission', tool: 'Bash' },
+      liveAction: null
+    })
+    expect(sidebarTeamRowLines({ role: 'member', card }, base).activity).toEqual({
+      text: 'Permission prompt: Bash',
+      asks: true
+    })
+  })
+
+  it("says a stopped member's red CI instead of Idle", () => {
+    const card = member({
+      status: 'failed',
+      condition: 'idle',
+      liveAction: null,
+      pr: {
+        provider: 'github',
+        number: 912,
+        title: 'Fix the tooltip',
+        url: 'https://example.test/pr/912',
+        state: 'open',
+        ci: 'failure',
+        verdict: null,
+        perfectMerge: null
+      }
+    })
+    expect(sidebarTeamRowLines({ role: 'member', card }, base).activity).toEqual({
+      text: 'CI failing',
+      asks: true
+    })
+  })
+
+  it('says what a lead whose turn ended waits on, as its Team card does', () => {
+    const card: TeamLeadCard = { ...lead, condition: 'idle', liveAction: null, waitingOn: 2 }
+    expect(sidebarTeamRowLines({ role: 'lead', card }, base).activity).toEqual({
+      text: 'Waiting on 2 agents',
+      asks: false
+    })
+  })
+
   it("leads the lead's line with its verb and never adds an extra line", () => {
     const lines = sidebarTeamRowLines({ role: 'lead', card: lead }, { ...base, flat: true })
     expect(lines.activity).toEqual({
