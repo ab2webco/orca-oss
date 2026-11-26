@@ -39,7 +39,10 @@ import { ORCHESTRATION_WORKER_METHODS } from './orchestration-worker-methods'
 import { ORCHESTRATION_FEDERATION_METHODS } from './orchestration-federation-methods'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { recordTurnAcceptanceInBackground } from '../../orchestration/dispatch-turn-acceptance'
-import { renewDispatchForMemberAsk } from '../../orchestration/dispatch-follow-up-renewal'
+import {
+  renewDispatchForLeadMail,
+  renewDispatchForMemberAsk
+} from '../../orchestration/dispatch-follow-up-renewal'
 import { reopenSettledRemoteAttachmentForAsk } from '../../orchestration/remote-member-reopen'
 import {
   namesRunHome,
@@ -824,6 +827,22 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
           return msg.type === 'worker_done'
             ? { message: msg, lifecycle: reconciled }
             : { message: msg }
+        }
+        if (!to.includes(':')) {
+          try {
+            renewDispatchForLeadMail(db, {
+              type: msg.type,
+              sender: { handle: from, paneKey: senderPaneKey },
+              recipient: {
+                handle: to,
+                paneKey: runtime.getTerminalPaneKey(to) ?? undefined,
+                processIncarnation: runtime.getTerminalProcessIncarnation(to)
+              }
+            })
+          } catch (error) {
+            // Why: the mail is already stored; a failed renewal must not report it as unsent.
+            console.warn('[orchestration] lead mail dispatch renewal failed', { error })
+          }
         }
         runtime.notifyMessageArrived(to, msg.type)
         return { message: msg }

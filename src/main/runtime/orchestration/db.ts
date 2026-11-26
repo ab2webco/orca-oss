@@ -79,7 +79,7 @@ import {
 } from './mutation-receipt-capacity'
 
 // Why: leaf UUID is the remint-stable pane identity (tab half changes on break-out); exact match covers legacy/unparseable keys.
-function isEquivalentPaneKey(a: string, b: string): boolean {
+export function isEquivalentPaneKey(a: string, b: string): boolean {
   if (a === b) {
     return true
   }
