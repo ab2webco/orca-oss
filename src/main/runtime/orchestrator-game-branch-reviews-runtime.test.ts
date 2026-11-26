@@ -38,14 +38,18 @@ function memberHost() {
       }
     ]
   } as never)
-  vi.spyOn(runtime, 'resolveRepoSelector').mockResolvedValue({
+  vi.spyOn(
+    runtime as unknown as { resolveRepoSelector: () => Promise<unknown> },
+    'resolveRepoSelector'
+  ).mockResolvedValue({
     id: 'repo-cin',
     path
   } as never)
   const hosted = vi
     .spyOn(runtime, 'getHostedReviewForBranch')
-    .mockImplementation(async (args) =>
-      args.linkedGitHubPR === 1179 ? review(1179, 'closed') : review(1266, 'open')
+    .mockImplementation(
+      async (args) =>
+        (args.linkedGitHubPR === 1179 ? review(1179, 'closed') : review(1266, 'open')) as never
     )
   return { runtime, hosted, worktreeId: worktree.id }
 }
