@@ -47,8 +47,42 @@ function syncDirectorySync(directory: string): void {
  * themselves and need the rename made durable.
  */
 export async function renameDurable(tmpPath: string, finalPath: string): Promise<void> {
-  await rename(tmpPath, finalPath)
+  await renameUnlessSuperseded(tmpPath, finalPath, () => true)
   await syncDirectory(dirname(finalPath))
+}
+
+// Why: on Windows a rename over a file another handle holds open (a reader in this process,
+// antivirus, an indexer) fails with EPERM, EACCES or EBUSY until it closes (ORCA-1442).
+const WINDOWS_RENAME_RETRY_DELAYS_MS = [50, 100, 150, 200, 250]
+
+function isWindowsRenameLock(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code
+  return process.platform === 'win32' && (code === 'EPERM' || code === 'EACCES' || code === 'EBUSY')
+}
+
+/** Returns false when `isCurrent` turned false while it waited out a lock. */
+async function renameUnlessSuperseded(
+  tmpPath: string,
+  finalPath: string,
+  isCurrent: () => boolean
+): Promise<boolean> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rename(tmpPath, finalPath)
+      return true
+    } catch (error) {
+      if (!isWindowsRenameLock(error) || attempt >= WINDOWS_RENAME_RETRY_DELAYS_MS.length) {
+        throw error
+      }
+    }
+    await new Promise<void>((resolve) =>
+      setTimeout(resolve, WINDOWS_RENAME_RETRY_DELAYS_MS[attempt])
+    )
+    // Why: a newer writer may have committed during the wait; this snapshot must not replace it.
+    if (!isCurrent()) {
+      return false
+    }
+  }
 }
 
 /** Write `payload` to `tmpPath`, fsync it, then rename onto `finalPath` and fsync the directory. */
@@ -85,8 +119,10 @@ export async function writeFileDurableIfCurrent(
     if (!isCurrent()) {
       return false
     }
-    await rename(tmpPath, finalPath)
-    renamed = true
+    renamed = await renameUnlessSuperseded(tmpPath, finalPath, isCurrent)
+    if (!renamed) {
+      return false
+    }
     await syncDirectory(dirname(finalPath))
     return true
   } finally {

@@ -164,9 +164,12 @@ export class GamePausedMembers {
   /** Frees the members saved for a worktree Orca just removed; returns their tickets. */
   async forgetWorktree(projectKey: string, worktreeId: string): Promise<string[]> {
     const read = await this.deps.store.read(projectKey)
-    const tickets = read.ok
-      ? read.members.filter((one) => one.worktreeId === worktreeId).map((one) => one.ticket)
-      : []
+    if (!read.ok) {
+      throw new Error(`Members of ${worktreeId} not freed: ${read.reason}`)
+    }
+    const tickets = read.members
+      .filter((one) => one.worktreeId === worktreeId)
+      .map((one) => one.ticket)
     if (tickets.length > 0) {
       await this.deps.store.remove(projectKey, tickets)
     }
