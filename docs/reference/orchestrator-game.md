@@ -1103,7 +1103,9 @@ matches …` (ORCA-866).
   and terminal, or on a paired host stop and release there. A failed stop of a session that still
   runs refuses the removal. Then `game.fleetForget` keeps its pane key in the project's drops file,
   so the row stays out also when the host no longer has its terminal or worktree; a host that did
-  not answer is named, since its agent may still run there. Another member in the same worktree,
+  not answer is named, since its agent may still run there. A remote member's home dispatch is
+  settled there too, without the host's proof and also after `worker_done` (ORCA-1475 C6), so no
+  alert or slot waits on it. Another member in the same worktree,
   folder or ticket is never touched. The member card's Remove asks first, then sends the lead this
   command.
 - `orca game stop [<ticket>,... | --all]` — ends the named members, or all of them, so no member

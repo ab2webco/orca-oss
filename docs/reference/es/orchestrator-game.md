@@ -1,5 +1,5 @@
 ---
-sourceHash: d337fff244a4908c
+sourceHash: 21a4c32c83ac3c71
 ---
 
 # El juego orquestador de Agent Teams
@@ -1166,7 +1166,9 @@ matches …` (ORCA-866).
   detiene y se libera allí. Si la detención falla y la sesión sigue corriendo, no se quita. Después
   `game.fleetForget` guarda su clave de pane en el archivo de descartes del proyecto, así que la
   fila queda fuera también cuando el host ya no tiene su terminal ni su worktree; un host que no
-  respondió se nombra, porque su agente puede seguir corriendo allí. Otro miembro en el mismo
+  respondió se nombra, porque su agente puede seguir corriendo allí. El dispatch en casa de un
+  miembro remoto también se cierra allí, sin prueba del host y también después de `worker_done`
+  (ORCA-1475 C6), así que ninguna alerta ni ningún lugar espera por él. Otro miembro en el mismo
   worktree, carpeta o ticket nunca se toca. El Quitar de la tarjeta pregunta primero y luego le
   manda este comando al líder.
 - `orca game stop [<ticket>,... | --all]` — termina los miembros nombrados, o todos, para que ningún

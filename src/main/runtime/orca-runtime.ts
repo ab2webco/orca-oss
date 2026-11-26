@@ -847,6 +847,7 @@ import { GameMemberSessionStore } from './orchestrator-game-member-session-store
 import { GameDroppedAgentStore } from './orchestrator-game-dropped-agent-store'
 import { splitDroppedGameAgents } from '../../shared/orchestrator-game-dropped-agents'
 import { withoutForgottenGameAgents } from '../../shared/orchestrator-game-forgotten-agents'
+import { gameRemoveKeyOf } from '../../shared/orchestrator-game-remove-target'
 import { GamePausedMembers } from './orchestrator-game-paused-members'
 import { GameHostCapacityReader } from './orchestrator-game-host-capacity-reader'
 import {
@@ -33320,14 +33321,28 @@ export class OrcaRuntimeService {
     worktreeId?: string
     terminalHandle?: string
     agent: { paneKey: string; name: string }
-  }): Promise<{ forgotten: true; count: number }> {
+  }): Promise<{ forgotten: true; count: number; settled?: string }> {
     const project = await this.gameBoardProjectOf(args)
     if (project.isMember || project.key === 'no-project') {
       throw new Error('Only the lead removes members from its fleet.')
     }
     const list = await this.gameDroppedAgents.forget(project.key, args.agent)
+    const settled = args.agent.paneKey.startsWith('remote:')
+      ? this.settleForgottenRemoteMember(gameRemoveKeyOf(args.agent.paneKey))
+      : null
     this.noteGameFleetChanged()
-    return { forgotten: true, count: list.length }
+    return { forgotten: true, count: list.length, ...(settled ? { settled } : {}) }
+  }
+
+  /** A removed remote member settles at home without its host's proof, also after worker_done (ORCA-1475 C6). */
+  settleForgottenRemoteMember(dispatchId: string): string | null {
+    const db = this._orchestrationDb
+    if (!db?.getFederatedDispatch(dispatchId)) {
+      return null
+    }
+    db.settleGoneFederatedWorker(dispatchId)
+    this.notifyMessageArrived(`dispatch:${dispatchId}`, 'status')
+    return dispatchId
   }
 
   private async withRemoteGameMembers(

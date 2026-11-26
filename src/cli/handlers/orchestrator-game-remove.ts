@@ -21,6 +21,8 @@ export type GameRemoveResult = {
   /** Its host did not answer: Orca forgot it here and cannot tell whether it still runs there. */
   unproven?: true
   refusal?: string
+  /** Its home dispatch, settled without its host's proof (ORCA-1475 C6). */
+  settledAtHome?: string
   /** Every member the key named, when it named more than one. */
   matches?: { name: string; key: string; host: string | null }[]
 }
@@ -53,7 +55,7 @@ export const formatGameRemove = (result: GameRemoveResult): string =>
       ].join('\n')
     : result.refusal
       ? `${result.name} not removed: ${result.refusal}`
-      : `${result.name} removed from the fleet${result.host ? ` (on ${result.host})` : ''}${stopText(result)}. No other member was touched.`
+      : `${result.name} removed from the fleet${result.host ? ` (on ${result.host})` : ''}${stopText(result)}${result.settledAtHome ? `; its dispatch ${result.settledAtHome} is settled here` : ''}. No other member was touched.`
 
 export const ORCHESTRATOR_GAME_REMOVE_HANDLERS: Record<string, CommandHandler> = {
   'game remove': async ({ flags, client, json }) => {
@@ -125,7 +127,7 @@ export const ORCHESTRATOR_GAME_REMOVE_HANDLERS: Record<string, CommandHandler> =
         refusal: `its session still runs and did not stop: ${stop.reason ?? 'no reason given'}`
       })
     }
-    await callGameBoard(
+    const { result: forgot } = await callGameBoard<{ settled?: string }>(
       client,
       'game.fleetForget',
       { ...gameBoardCaller(), agent: { paneKey: agent.paneKey, name: row.name } },
@@ -135,7 +137,8 @@ export const ORCHESTRATOR_GAME_REMOVE_HANDLERS: Record<string, CommandHandler> =
       ...base,
       removed: true,
       ...(stop ? { stop } : {}),
-      ...(silent ? { unproven: true } : {})
+      ...(silent ? { unproven: true } : {}),
+      ...(forgot.settled ? { settledAtHome: forgot.settled } : {})
     })
   }
 }
