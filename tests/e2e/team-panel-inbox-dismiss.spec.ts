@@ -130,5 +130,6 @@ test('the Inbox dismisses a wait no reply can settle, with a note, at every pane
   expect((await leadInbox()).messages.map((one) => one.body)).toContainEqual(
     `Settled ${stuckId} without a reply (inbox): Sender is gone; noted on ORCA-1482`
   )
-  await capture('settled', inbox, inbox.getByText('No member is waiting for an answer.'))
+  // Why the panel: with nothing left in any list the Inbox shows its empty state, not the tabs.
+  await capture('settled', panel, panel.getByText('Nothing waits for you'))
 })
