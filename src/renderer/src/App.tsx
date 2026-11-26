@@ -227,6 +227,7 @@ import { isGitRepoKind } from '../../shared/repo-kind'
 import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut-capture-notification'
 import { resolveMountedLazyModalIds, type LazyModalId } from './lazy-modal-mount-state'
 import { translate } from '@/i18n/i18n'
+import { useUnreadProtectedSecretsNotice } from './components/protected-secrets/unread-protected-secrets-notice'
 import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialog'
 import RunningTerminalCloseDialog from './components/terminal-pane/RunningTerminalCloseDialog'
 import WorktreeBaseFallbackDialog from './components/WorktreeBaseFallbackDialog'
@@ -465,6 +466,7 @@ function App(): React.JSX.Element {
   const clearUnreadDockBadge = useUnreadDockBadge()
   useRadixBodyPointerEventsRecovery()
   useWebSessionTabsSync()
+  useUnreadProtectedSecretsNotice()
   // Why restored: leaving the panel closed forces the user to reopen and re-maximize it,
   // and that size jump reflows a live TUI's buffer (see floating-terminal-panel-view-state).
   const [floatingTerminalOpen, setFloatingTerminalOpen] = useState(

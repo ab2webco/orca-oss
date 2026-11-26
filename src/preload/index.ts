@@ -2291,7 +2291,10 @@ const api = {
       ): void => callback(updates)
       ipcRenderer.on('settings:changed', listener)
       return () => ipcRenderer.removeListener('settings:changed', listener)
-    }
+    },
+
+    takeUnreadProtectedSecrets: (): Promise<unknown> =>
+      ipcRenderer.invoke('settings:take-unread-protected-secrets')
   },
 
   agentAwake: {

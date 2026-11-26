@@ -212,4 +212,39 @@ describe('getClients', () => {
 
     expect(clients.map((client) => client.headers['x-api-key'])).toEqual(['token-a'])
   })
+
+  it("under 'all' skips a workspace still waiting on the Keychain and keeps the others", async () => {
+    vi.useFakeTimers()
+    writeTokenFile('ws-a', CIPHERTEXT_A)
+    writeTokenFile('ws-b', CIPHERTEXT_B)
+    writeWorkspaceFile(['ws-a', 'ws-b'])
+    safeStorageMock.decryptStringAsync.mockImplementation((raw: Buffer) =>
+      raw.equals(CIPHERTEXT_A)
+        ? Promise.resolve({ result: 'token-a', shouldReEncrypt: false })
+        : new Promise(() => {})
+    )
+    const { getClients } = await loadStore()
+
+    const clients = getClients('all')
+    await vi.advanceTimersByTimeAsync(KEYCHAIN_WAIT_MS)
+
+    await expect(clients).resolves.toEqual([
+      expect.objectContaining({ headers: expect.objectContaining({ 'x-api-key': 'token-a' }) })
+    ])
+  })
+
+  it("under 'all' reports the Keychain wait when every workspace is waiting", async () => {
+    vi.useFakeTimers()
+    writeTokenFile('ws-a', CIPHERTEXT_A)
+    writeTokenFile('ws-b', CIPHERTEXT_B)
+    writeWorkspaceFile(['ws-a', 'ws-b'])
+    safeStorageMock.decryptStringAsync.mockReturnValue(new Promise(() => {}))
+    const { getClients } = await loadStore()
+
+    const clients = getClients('all')
+    const settled = expect(clients).rejects.toThrow('waiting for Keychain access')
+    await vi.advanceTimersByTimeAsync(KEYCHAIN_WAIT_MS)
+
+    await settled
+  })
 })

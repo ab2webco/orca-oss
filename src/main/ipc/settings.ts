@@ -96,6 +96,8 @@ export function registerSettingsHandlers(
     return store.getSettings()
   })
 
+  ipcMain.handle('settings:take-unread-protected-secrets', () => store.takeUnreadProtectedSecrets())
+
   ipcMain.handle(
     'settings:update-pr-bot-author-override',
     (event, args: { author: string; isBot: boolean }) => {

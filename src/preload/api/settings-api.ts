@@ -4,6 +4,7 @@ import type {
   WarpThemeImportSource
 } from '../../shared/terminal-custom-themes'
 import type { GhosttyImportPreview, GlobalSettings } from '../../shared/global-settings-types'
+import type { UnreadProtectedSecret } from '../../shared/unread-protected-secret'
 
 export type SettingsApi = {
   get: () => Promise<GlobalSettings>
@@ -19,6 +20,8 @@ export type SettingsApi = {
   previewWarpThemeImport: (source: WarpThemeImportSource) => Promise<WarpThemeImportPreview>
   /** Subscribe to out-of-band settings updates (e.g. View > Appearance toggles) to stay in sync with main. */
   onChanged: (callback: (updates: Partial<GlobalSettings>) => void) => () => void
+  /** Saved secrets the keychain did not give up at startup; returns them once per app session. */
+  takeUnreadProtectedSecrets: () => Promise<UnreadProtectedSecret[]>
 }
 
 export type KeybindingsApi = {

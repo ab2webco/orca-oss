@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const testState = { dir: '' }
+const { startupMilestones } = vi.hoisted(() => ({
+  startupMilestones: [] as { event: string; details: Record<string, unknown> }[]
+}))
 const { keychain, safeStorageMock, decode } = vi.hoisted(() => {
   const keychain = { syncCalls: 0, syncAllowed: true }
   const decode = (ciphertext: Buffer): string => {
@@ -42,6 +45,11 @@ vi.mock('electron', () => ({
   safeStorage: safeStorageMock
 }))
 vi.mock('./telemetry/client', () => ({ track: vi.fn() }))
+vi.mock('./startup/startup-diagnostics', () => ({
+  isStartupDiagnosticsEnabled: () => true,
+  logStartupDiagnostic: (event: string, details: Record<string, unknown> = {}) =>
+    startupMilestones.push({ event, details })
+}))
 vi.mock('./telemetry/cohort-classifier', () => ({
   getCohortAtEmit: vi.fn().mockReturnValue({ nth_repo_added: 2 })
 }))
@@ -397,6 +405,77 @@ describe('protected secrets at startup when the Keychain prompts', () => {
     const state = JSON.parse(readFileSync(join(testState.dir, 'orca-data.json'), 'utf-8'))
     expect(state.settings.httpProxyBypassRules).toBe('kept')
     expect(persistedBlobs().cookie).toBe(before.cookie)
+    expect(keychain.syncCalls).toBe(0)
+  })
+  // Why (ORCA-1341): a secret left sealed at startup was blank with no word to the user.
+  it('names the secrets a prompt nobody answers left sealed, once per app session', async () => {
+    await seedEncryptedProfile()
+    useAsyncKeychain(() => new Promise(() => {}))
+    const store = await createStore()
+    const unseal = store.unsealProtectedSecrets()
+    await vi.advanceTimersByTimeAsync(KEYCHAIN_WAIT_MS)
+    await unseal
+
+    expect(store.takeUnreadProtectedSecrets().sort()).toEqual([
+      'browserKagiSessionLink',
+      'httpProxyUrl',
+      'opencodeSessionCookie',
+      'sshSessionRecovery'
+    ])
+    expect(store.takeUnreadProtectedSecrets()).toEqual([])
+  })
+
+  it('a prompt answered after the bound takes its secrets off the unread list', async () => {
+    await seedEncryptedProfile()
+    let answer!: () => void
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve
+    })
+    useAsyncKeychain(async (ciphertext) => {
+      await answered
+      return { result: decode(ciphertext), shouldReEncrypt: false }
+    })
+    const store = await createStore()
+    const unseal = store.unsealProtectedSecrets()
+    await vi.advanceTimersByTimeAsync(KEYCHAIN_WAIT_MS)
+    await unseal
+    answer()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(store.takeUnreadProtectedSecrets()).toEqual([])
+  })
+
+  it('an answered prompt leaves nothing unread, and the startup trace records the wait', async () => {
+    await seedEncryptedProfile()
+    useAsyncKeychain(async (ciphertext) => ({ result: decode(ciphertext), shouldReEncrypt: false }))
+    startupMilestones.length = 0
+    const store = await createStore()
+    await store.unsealProtectedSecrets()
+
+    expect(store.takeUnreadProtectedSecrets()).toEqual([])
+    expect(startupMilestones.filter((m) => m.event.startsWith('protected-secrets'))).toEqual([
+      { event: 'protected-secrets-unseal-start', details: expect.objectContaining({ count: 4 }) },
+      { event: 'protected-secrets-unseal-done', details: expect.objectContaining({ decrypted: 4 }) }
+    ])
+  })
+
+  // Why: Electron sets shouldReEncrypt after a key rotation; reusing the old blob kept it forever.
+  it('a blob Electron asks to re-encrypt is written again off the main thread', async () => {
+    const seeded = await seedEncryptedProfile()
+    useAsyncKeychain(async (ciphertext) => ({ result: decode(ciphertext), shouldReEncrypt: true }))
+    safeStorageMock.encryptStringAsync = async (plaintext: string) =>
+      Buffer.from(`enc:${crypto.randomUUID()}:${plaintext}`, 'utf-8')
+
+    const store = await createStore()
+    await store.unsealProtectedSecrets()
+    await settleSave(store)
+    await settleSave(store)
+
+    const persisted = persistedBlobs()
+    expect(persisted.cookie).not.toBe(seeded.cookie)
+    expect(persisted.proxy).not.toBe(seeded.proxy)
+    expect(decode(Buffer.from(persisted.cookie, 'base64'))).toBe(ORIGINAL.cookie)
+    expect(decode(Buffer.from(persisted.proxy, 'base64'))).toBe(ORIGINAL.proxy)
     expect(keychain.syncCalls).toBe(0)
   })
 })

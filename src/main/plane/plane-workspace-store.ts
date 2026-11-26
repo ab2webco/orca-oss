@@ -8,6 +8,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
   CredentialDecryptionError,
+  CredentialKeychainWaitError,
   readIntegrationCredentialFileSyncText
 } from '../integration-credential-file'
 import {
@@ -247,6 +248,7 @@ export async function getClients(
   const workspaces = isAllSelection
     ? file.workspaces
     : file.workspaces.filter((workspace) => workspace.id === (selected ?? file.activeWorkspaceId))
+  const keychainWaits: CredentialKeychainWaitError[] = []
 
   const perWorkspace = workspaces.map(async (workspace): Promise<PlaneClientForWorkspace[]> => {
     let apiKey: string | null
@@ -261,6 +263,11 @@ export async function getClients(
         (error instanceof CredentialDecryptionError ||
           error instanceof IntegrationAccountPersistenceLimitError)
       ) {
+        return []
+      }
+      // Why: one workspace waiting on a Keychain prompt must not fail an 'all' read of the others.
+      if (isAllSelection && error instanceof CredentialKeychainWaitError) {
+        keychainWaits.push(error)
         return []
       }
       throw error
@@ -278,5 +285,10 @@ export async function getClients(
         ]
       : []
   })
-  return (await Promise.all(perWorkspace)).flat()
+  const clients = (await Promise.all(perWorkspace)).flat()
+  // Why: with nothing else to show, the wait is the answer, so the caller can say to answer the prompt.
+  if (clients.length === 0 && keychainWaits.length > 0) {
+    throw keychainWaits[0]
+  }
+  return clients
 }
