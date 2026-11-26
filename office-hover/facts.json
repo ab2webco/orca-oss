@@ -1,0 +1,15 @@
+{
+  "facts": {
+    "reducedMotion": false,
+    "panelWidth": 639
+  },
+  "office:0#0": {
+    "framesDiffer": true
+  },
+  "office:1#1": {
+    "framesDiffer": true
+  },
+  "office:0#2": {
+    "framesDiffer": true
+  }
+}
