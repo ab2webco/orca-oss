@@ -398,6 +398,40 @@ describe('TeamSceneCanvas', () => {
     expect(who()).toBeNull()
   })
 
+  // Why: a hover repaint mid-animation must draw the pose of the last frame, not the clock's start.
+  it('repaints a hover change while animating at the last frame time, without stepping', () => {
+    let next: FrameRequestCallback | null = null
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      next = cb
+      return 1
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      setTransform() {},
+      save() {},
+      beginPath() {},
+      roundRect() {},
+      stroke() {},
+      restore() {}
+    } as unknown as CanvasRenderingContext2D)
+    const members = new Map([['a', { title: 'Mario', detail: 'ORCA-501', open: () => {} }]])
+    const p = painter()
+    render(
+      <TeamSceneCanvas input={input(['a'])} painter={p.value} leadLine={null} members={members} />
+    )
+    for (let now = 0; now <= 2000; now += 50) {
+      act(() => next?.(now))
+    }
+    const last = p.frames.at(-1)!
+    expect(last.t).toBeGreaterThan(1.9)
+    const x = last.actors.find((a) => a.key === 'a')!.x
+    act(() => useTeamSceneHover.getState().set('a'))
+    const hovered = p.frames.at(-1)!
+    expect(p.frames).toHaveLength(p.frames.indexOf(last) + 2)
+    expect(hovered).toMatchObject({ t: last.t, dt: 0 })
+    expect(hovered.actors.find((a) => a.key === 'a')!.x).toBe(x)
+  })
+
   it('releases the canvas, the frame and the painter on close', () => {
     vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(7)
     const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
