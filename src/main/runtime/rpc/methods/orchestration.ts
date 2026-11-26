@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
 import { OptionalFiniteNumber, OptionalString, OptionalBoolean, requiredString } from '../schemas'
 import {
+  isEquivalentPaneKey,
   LEGACY_CONTRACT_VERSION,
   type MessageType,
   type MessagePriority,
@@ -922,8 +923,15 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
         })
         const generation = run.consumer_generation
         const address = `run:${run.id}`
+        const callerPaneKey = runtime.getTerminalPaneKey(handle)
+        // Why equivalent, not equal (ORCA-1482): a pane that moved tabs keeps its leaf, and mail to
+        // the lead's own handle is still the lead's.
         const terminalHandle =
-          runtime.getTerminalPaneKey(handle) === run.coordinator_pane_key ? handle : undefined
+          callerPaneKey &&
+          run.coordinator_pane_key &&
+          isEquivalentPaneKey(callerPaneKey, run.coordinator_pane_key)
+            ? handle
+            : undefined
         runtime.ensureOrchestrationFederationRelay(run.id)
         // Why (ORCA-191): re-arms the scan after a runtime restart — the first
         // consumer poll rebuilds the timer from the armed rows in the DB.
