@@ -699,13 +699,13 @@ describe('orca game fleet verbs', () => {
       expect(process.exitCode).toBeUndefined()
     })
 
-    it('stops only the named members, finds a dispatch by worktree and reports unknown tickets', async () => {
+    it('stops only the named members, finds a terminal-less one by its worktree and reports unknown tickets', async () => {
       const agents = [
         LEAD,
         member({
           paneKey: 'a',
           displayName: 'CIN-1',
-          terminalHandle: 'term_new',
+          terminalHandle: undefined,
           worktree: { id: 'wt_1', branch: 'cin-1', displayName: 'cin-1' }
         }),
         member({ paneKey: 'b', displayName: 'CIN-2', terminalHandle: 'term_2' })
@@ -726,8 +726,7 @@ describe('orca game fleet verbs', () => {
 
       expect(freeing(calls.slice(1))).toEqual([
         ['orchestration.workerList', {}],
-        ['orchestration.workerStop', { dispatch: 'd1' }],
-        ['terminal.close', { terminal: 'term_new' }]
+        ['orchestration.workerStop', { dispatch: 'd1' }]
       ])
       expect(printed().members).toEqual([
         expect.objectContaining({ ticket: 'CIN-1', outcome: 'stopped', dispatchId: 'd1' }),

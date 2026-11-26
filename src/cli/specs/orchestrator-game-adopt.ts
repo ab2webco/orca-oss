@@ -20,10 +20,11 @@ export const ORCHESTRATOR_GAME_ADOPT_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'drop'],
     summary: "Take an agent out of the lead's fleet without stopping it or touching its worktree",
-    usage: 'orca game drop <name|ticket> [--json]',
+    usage: 'orca game drop <dispatch-id|name|ticket> [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'name'],
     positionalArgs: ['name'],
     notes: [
+      "Names one agent by its dispatch id, pane key, name or ticket; a name or ticket several agents share is refused with each one's key.",
       'The agent stays out of the fleet and the Panel across refreshes and restarts, and is not resumed after a restart, until `orca game adopt` brings it back.',
       'A member on this machine whose dispatch still reports to the lead is detached first: the dispatch ends, its pane keeps running. One on a paired host is detached there the same way; a host whose Orca cannot is refused by name and version.'
     ],

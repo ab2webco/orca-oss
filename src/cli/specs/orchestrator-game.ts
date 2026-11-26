@@ -225,13 +225,14 @@ export const ORCHESTRATOR_GAME_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'stop'],
     summary: "Stop the lead's members so no member agent keeps running",
-    usage: 'orca game stop [<ticket>[,<ticket>...] | --all [--hold]] [--json]',
+    usage: 'orca game stop [<key>[,<key>...] | --all [--hold]] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'tickets', 'all', 'hold'],
     positionalArgs: ['tickets'],
     notes: [
       'Records each member in `orca game history`, stops its live dispatch, then closes its terminal when the agent is still there.',
       'Never touches the lead. Worktrees are left in place.',
-      'Name tickets or pass --all; each member is reported stopped, already stopped or failed.',
+      'Name members or pass --all; each member is reported stopped, already stopped or failed.',
+      "A key names one member: its dispatch id, its pane key, or the one member with that ticket or name. A ticket or name several members share is refused with each one's key, and none is stopped.",
       '--all --hold first sets a persistent STOP for the project: game launch, wave, push and move are refused until `orca game resume`, a member the stop could not end gets a STOP message, and `game state` shows stopped. If STOP cannot be set, the members are stopped anyway and the result says why.'
     ],
     examples: [

@@ -2,14 +2,15 @@ import type { CommandHandler } from '../dispatch'
 import { printResult } from '../format'
 import { RuntimeClientError } from '../runtime-client'
 import { readCallerGameState, setGameAgentDropped } from './orchestrator-game-board-call'
-import { isOurGameAgentNamed } from './orchestrator-game-adopt'
+import { isOurGameAgent, isOurGameAgentNamed } from './orchestrator-game-adopt'
 import { STOPPABLE, dispatchOf, type GameStopWorker } from './orchestrator-game-stop'
 import { remoteDispatchIdOf } from '../../shared/orchestrator-game-auto-release'
 import type { GameAgent } from '../../shared/orchestrator-game-state'
 import { gameDropTargetOf } from '../../shared/orchestrator-game-dropped-agents'
-import { ticketOfMember } from '../../shared/orchestrator-game-member-next'
-
-type Client = Parameters<CommandHandler>[0]['client']
+import {
+  gameMemberKeyMatchesOf,
+  gameRemoveKeyOf
+} from '../../shared/orchestrator-game-remove-target'
 
 export type GameDropResult = {
   name: string
@@ -20,38 +21,46 @@ export type GameDropResult = {
   /** The live dispatch it ended; the agent and its pane keep running (ORCA-943). */
   detached?: string
   refusal?: string
+  /** Every agent the name matched, when it matched more than one; none was dropped (ORCA-1477). */
+  matches?: { name: string; key: string; host: string | null }[]
 }
 
 /** The member's dispatch that still reports to the lead, if any; a found agent has none. */
-async function liveDispatchOf(client: Client, agent: GameAgent): Promise<string | null> {
+function liveDispatchOf(
+  agent: GameAgent,
+  workers: GameStopWorker[],
+  heldTerminals: ReadonlySet<string>
+): string | null {
   if (agent.found) {
     return null
   }
-  const { result } = await client.call<{ workers: GameStopWorker[] }>(
-    'orchestration.workerList',
-    {}
-  )
   const remoteId = remoteDispatchIdOf(agent)
   const live = remoteId
-    ? result.workers.find(
-        (worker) => worker.dispatchId === remoteId && STOPPABLE.has(worker.workerState)
-      )
+    ? workers.find((worker) => worker.dispatchId === remoteId && STOPPABLE.has(worker.workerState))
     : dispatchOf(
         {
           row: { terminalHandle: agent.terminalHandle ?? null },
           worktreeId: agent.worktree?.id ?? null
         },
-        result.workers
+        workers,
+        heldTerminals
       )
   return live?.dispatchId ?? null
 }
 
 export const formatGameDrop = (result: GameDropResult): string =>
-  result.refusal
-    ? `${result.name} not dropped: ${result.refusal}`
-    : result.already
-      ? `${result.name} is already out of the fleet; orca game adopt ${result.name} brings it back`
-      : `${result.name} dropped from the fleet${result.host ? ` (on ${result.host})` : ''}${result.detached ? `, its dispatch ${result.detached} ended` : ''}; its agent and worktree are untouched, and orca game adopt ${result.name} brings it back`
+  result.matches
+    ? [
+        `${result.name} names ${result.matches.length} agents; drop one by its key:`,
+        ...result.matches.map(
+          (one) => `  orca game drop ${one.key}   # ${one.name}${one.host ? ` on ${one.host}` : ''}`
+        )
+      ].join('\n')
+    : result.refusal
+      ? `${result.name} not dropped: ${result.refusal}`
+      : result.already
+        ? `${result.name} is already out of the fleet; orca game adopt ${result.name} brings it back`
+        : `${result.name} dropped from the fleet${result.host ? ` (on ${result.host})` : ''}${result.detached ? `, its dispatch ${result.detached} ended` : ''}; its agent and worktree are untouched, and orca game adopt ${result.name} brings it back`
 
 export const ORCHESTRATOR_GAME_DROP_HANDLERS: Record<string, CommandHandler> = {
   'game drop': async ({ flags, client, json }) => {
@@ -77,7 +86,25 @@ export const ORCHESTRATOR_GAME_DROP_HANDLERS: Record<string, CommandHandler> = {
     if (state.droppedAgents?.some(ours)) {
       return print({ name, dropped: true, already: true })
     }
-    const agent = state.agents.find(ours)
+    const { result: listed } = await client.call<{ workers: GameStopWorker[] }>(
+      'orchestration.workerList',
+      {}
+    )
+    const candidates = state.agents.filter((one) => isOurGameAgent(one, leadWorktreeId))
+    const byKey = gameMemberKeyMatchesOf(candidates, name, listed.workers)
+    const matches = byKey.length > 0 ? byKey : candidates.filter(ours)
+    if (matches.length > 1) {
+      return print({
+        name,
+        dropped: false,
+        matches: matches.map((one) => ({
+          name: one.displayName ?? one.paneKey,
+          key: gameRemoveKeyOf(one.paneKey),
+          host: one.remote?.host ?? null
+        }))
+      })
+    }
+    const agent = matches[0]
     if (!agent) {
       throw new RuntimeClientError(
         'invalid_argument',
@@ -85,7 +112,8 @@ export const ORCHESTRATOR_GAME_DROP_HANDLERS: Record<string, CommandHandler> = {
       )
     }
     const host = agent.remote?.host
-    const live = await liveDispatchOf(client, agent)
+    const held = new Set(state.agents.flatMap((one) => one.terminalHandle ?? []))
+    const live = liveDispatchOf(agent, listed.workers, held)
     // Why: a drop is kept by worktree, and a host that no longer knows the member shows none.
     if (!gameDropTargetOf(agent)) {
       return print({
@@ -93,7 +121,7 @@ export const ORCHESTRATOR_GAME_DROP_HANDLERS: Record<string, CommandHandler> = {
         dropped: false,
         ...(host ? { host } : {}),
         ...(live ? { dispatchId: live } : {}),
-        refusal: `${host ?? 'its host'} no longer shows its worktree, so there is nothing to keep the drop by; \`orca game stop ${ticketOfMember(agent) ?? name}\` ends it`
+        refusal: `${host ?? 'its host'} no longer shows its worktree, so there is nothing to keep the drop by; \`orca game stop ${gameRemoveKeyOf(agent.paneKey)}\` ends it`
       })
     }
     if (live) {

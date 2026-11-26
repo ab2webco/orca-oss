@@ -1,7 +1,12 @@
 import type { CommandHandler } from '../dispatch'
 import { RuntimeClientError } from '../runtime-client'
-import { gameStopTargetsOf, type GameStopTarget } from '../../shared/orchestrator-game-stop-targets'
+import {
+  gameStopTargetsOf,
+  type GameStopAmbiguous,
+  type GameStopTarget
+} from '../../shared/orchestrator-game-stop-targets'
 import { memberRosterOf } from '../../shared/orchestrator-game-member-names'
+import { gameFleetMembersOf } from '../../shared/orchestrator-game-fleet-verbs'
 import { recordFreedMember } from './orchestrator-game-history-record'
 import { closeFoundHostPane } from './orchestrator-game-found-host-close'
 import type { FoundHostPane } from '../../shared/orchestrator-game-found-host-pane'
@@ -32,6 +37,8 @@ export type GameStopEntry = {
   reason?: string
   /** Why its history record was not written; it is stopped anyway. */
   history?: string
+  /** Every member an ambiguous key named; none of them was stopped. */
+  matches?: GameStopAmbiguous['matches']
 }
 
 export type GameStopResult = { members: GameStopEntry[] }
@@ -54,19 +61,28 @@ const errorText = (error: unknown): string =>
 const isTabGone = (error: unknown): boolean =>
   error instanceof RuntimeClientError && error.message === 'tab_not_found'
 
-/** The member's live dispatch: the one on its terminal, else the one in its worktree. */
+/**
+ * The member's live dispatch: the one on its terminal; with no terminal, the only one in its
+ * worktree whose terminal no other member holds. Why: a stale row and a new member can share a
+ * worktree, and a stop must never end the other one's dispatch (ORCA-1477).
+ */
 export function dispatchOf(
   target: { row: Pick<GameStopTarget['row'], 'terminalHandle'>; worktreeId: string | null },
-  workers: GameStopWorker[]
+  workers: GameStopWorker[],
+  heldTerminals: ReadonlySet<string> = new Set()
 ): GameStopWorker | undefined {
   const handle = target.row.terminalHandle
   const live = workers.filter((worker) => STOPPABLE.has(worker.workerState))
-  return (
-    live.findLast((worker) => handle !== null && worker.agentTerminalHandle === handle) ??
-    live.findLast(
-      (worker) => target.worktreeId !== null && worker.resource?.worktreeId === target.worktreeId
-    )
+  if (handle !== null) {
+    return live.findLast((worker) => worker.agentTerminalHandle === handle)
+  }
+  const inWorktree = live.filter(
+    (worker) =>
+      target.worktreeId !== null &&
+      worker.resource?.worktreeId === target.worktreeId &&
+      !(worker.agentTerminalHandle !== null && heldTerminals.has(worker.agentTerminalHandle))
   )
+  return inWorktree.length === 1 ? inWorktree[0] : undefined
 }
 
 /** Ends one member's agent: its live dispatch first, then its terminal if one is left. */
@@ -79,7 +95,8 @@ export async function stopOne(
     remoteDispatchId?: string | null
     hostPane?: FoundHostPane | null
   },
-  workers: GameStopWorker[]
+  workers: GameStopWorker[],
+  heldTerminals?: ReadonlySet<string>
 ): Promise<GameStopEntry> {
   const entry: GameStopEntry = {
     ticket: target.row.ticket,
@@ -93,7 +110,7 @@ export async function stopOne(
     const remote = { row: target.row, remoteDispatchId: target.remoteDispatchId }
     return await stopRemote(client, entry, remote, workers)
   }
-  const dispatch = dispatchOf(target, workers)
+  const dispatch = dispatchOf(target, workers, heldTerminals)
   let closedByStop: string | null = null
   if (dispatch) {
     entry.dispatchId = dispatch.dispatchId
@@ -189,27 +206,32 @@ export async function stopGameMembers(
   state: Parameters<typeof gameStopTargetsOf>[0] & Parameters<typeof memberRosterOf>[0],
   tickets: 'all' | readonly string[]
 ): Promise<GameStopResult> {
-  const { targets, missing } = gameStopTargetsOf(state, tickets)
   const members: GameStopEntry[] = []
-  if (targets.length > 0) {
-    const { result } = await client.call<{ workers: GameStopWorker[] }>(
-      'orchestration.workerList',
-      {}
-    )
-    for (const target of targets) {
-      const entry = await stopOne(client, target, result.workers)
-      // Why after: a member whose stop failed still runs, so it was never freed (ORCA-1396).
-      const history =
-        entry.outcome === 'failed'
-          ? null
-          : await recordFreedMember({
-              client,
-              member: target.agent,
-              workers: result.workers,
-              roster: memberRosterOf(state)
-            })
-      members.push(history ? { ...entry, history } : entry)
-    }
+  // Why first: a dispatch id names its member only through the worker list.
+  const workers =
+    tickets === 'all' && gameStopTargetsOf(state, 'all').targets.length === 0
+      ? []
+      : (await client.call<{ workers: GameStopWorker[] }>('orchestration.workerList', {})).result
+          .workers
+  const { targets, missing, ambiguous } = gameStopTargetsOf(state, tickets, workers)
+  const held = new Set(gameFleetMembersOf(state).flatMap((agent) => agent.terminalHandle ?? []))
+  for (const target of targets) {
+    const entry = await stopOne(client, target, workers, held)
+    // Why after: a member whose stop failed still runs, so it was never freed (ORCA-1396).
+    const history =
+      entry.outcome === 'failed'
+        ? null
+        : await recordFreedMember({
+            client,
+            member: target.agent,
+            workers,
+            roster: memberRosterOf(state)
+          })
+    members.push(history ? { ...entry, history } : entry)
+  }
+  for (const { key, matches } of ambiguous) {
+    const reason = `${key} names ${matches.length} members; stop one by its key`
+    members.push({ ticket: key, name: key, outcome: 'failed', reason, matches })
   }
   for (const ticket of missing) {
     members.push({
@@ -238,7 +260,10 @@ export function formatStop(stop: GameStopResult): string {
           : '',
         member.alreadyClosedTerminal ? `${member.alreadyClosedTerminal} tab already closed` : ''
       ].filter(Boolean)
-      return `${member.ticket ?? member.name} ${member.outcome}${done.length > 0 ? ` (${done.join(', ')})` : ''}${member.reason ? `: ${member.reason}` : ''}${member.history ? `\n  history ${member.history}` : ''}`
+      const keys = (member.matches ?? []).map(
+        (one) => `\n  orca game stop ${one.key}   # ${one.name}${one.host ? ` on ${one.host}` : ''}`
+      )
+      return `${member.ticket ?? member.name} ${member.outcome}${done.length > 0 ? ` (${done.join(', ')})` : ''}${member.reason ? `: ${member.reason}` : ''}${keys.join('')}${member.history ? `\n  history ${member.history}` : ''}`
     })
     .join('\n')
 }

@@ -224,7 +224,9 @@ export const ORCHESTRATOR_GAME_FLEET_HANDLERS: Record<string, CommandHandler> = 
     printResult({ ...response, result: push }, json, formatPush)
   },
   'game stop': async ({ flags, client, json }) => {
-    const tickets = ticketsOf(flags)
+    const raw = flags.get('tickets')
+    // Why not ticketsOf: a dispatch id or pane key is matched as typed, never upper-cased.
+    const tickets = typeof raw === 'string' ? raw.split(/[\s,]+/).filter(Boolean) : []
     const all = flags.get('all') === true
     const holdFlag = flags.get('hold') === true
     if (tickets.length === 0 && !all) {

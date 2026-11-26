@@ -14,6 +14,18 @@ export function gameRemoveMatchesOf(
   key: string,
   workers: readonly DispatchOnTerminal[]
 ): GameAgent[] {
+  const byKey = gameMemberKeyMatchesOf(members, key, workers)
+  return byKey.length > 0
+    ? byKey
+    : members.filter((agent) => (agent.displayName ?? agent.paneKey) === key.trim())
+}
+
+/** The members a dispatch id or pane key names: a remote member's dispatch, a local dispatch's terminal, a pane key. */
+export function gameMemberKeyMatchesOf(
+  members: readonly GameAgent[],
+  key: string,
+  workers: readonly DispatchOnTerminal[]
+): GameAgent[] {
   const wanted = key.trim()
   const remote = members.filter((agent) => remoteDispatchIdOf(agent) === wanted)
   if (remote.length > 0) {
@@ -21,13 +33,7 @@ export function gameRemoveMatchesOf(
   }
   const handle = workers.find((worker) => worker.dispatchId === wanted)?.agentTerminalHandle
   const onTerminal = handle ? members.filter((agent) => agent.terminalHandle === handle) : []
-  if (onTerminal.length > 0) {
-    return onTerminal
-  }
-  const byPane = members.filter((agent) => agent.paneKey === wanted)
-  return byPane.length > 0
-    ? byPane
-    : members.filter((agent) => (agent.displayName ?? agent.paneKey) === wanted)
+  return onTerminal.length > 0 ? onTerminal : members.filter((agent) => agent.paneKey === wanted)
 }
 
 /** What `game remove` takes to name exactly this member again: a remote member's dispatch id, else its pane key. */
