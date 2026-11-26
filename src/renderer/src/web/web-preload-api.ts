@@ -766,7 +766,9 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       },
       updatePRBotAuthorOverride: (args) => updateRuntimePRBotAuthorOverride(args),
       listFonts: () => Promise.resolve([]),
-      onChanged: () => noopUnsubscribe
+      onChanged: () => noopUnsubscribe,
+      // Why: a web client keeps no keychain secrets, so there is never anything unread.
+      takeUnreadProtectedSecrets: async () => []
     } satisfies Partial<WebSettingsApi> as unknown as WebSettingsApi,
     agentAwake: {
       getStatus: async () => {

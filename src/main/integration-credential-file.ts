@@ -201,9 +201,19 @@ export async function readStoredCredentialTokenAsync(
   return usableToken(decrypted)
 }
 
+export type AsyncDecryption = { result: string; shouldReEncrypt: boolean }
+
 export async function decryptOffMainThread(
   raw: Buffer
 ): Promise<string | typeof ASYNC_DECRYPT_UNAVAILABLE | typeof ASYNC_DECRYPT_FAILED> {
+  const decrypted = await decryptOffMainThreadWithReEncrypt(raw)
+  return typeof decrypted === 'object' ? decrypted.result : decrypted
+}
+
+// Keeps Electron's shouldReEncrypt, which asks for a new blob after a key rotation.
+export async function decryptOffMainThreadWithReEncrypt(
+  raw: Buffer
+): Promise<AsyncDecryption | typeof ASYNC_DECRYPT_UNAVAILABLE | typeof ASYNC_DECRYPT_FAILED> {
   if (
     typeof safeStorage.decryptStringAsync !== 'function' ||
     typeof safeStorage.isAsyncEncryptionAvailable !== 'function' ||
@@ -212,7 +222,8 @@ export async function decryptOffMainThread(
     return ASYNC_DECRYPT_UNAVAILABLE
   }
   try {
-    return (await safeStorage.decryptStringAsync(raw)).result
+    const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(raw)
+    return { result, shouldReEncrypt: shouldReEncrypt === true }
   } catch {
     return ASYNC_DECRYPT_FAILED
   }

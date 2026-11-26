@@ -29,6 +29,7 @@ import type {
 } from '../../../shared/automations-types'
 import type { FolderWorkspace, WorkspaceKey } from '../../../shared/folder-workspace-types'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
+import type { UnreadProtectedSecret } from '../../../shared/unread-protected-secret'
 import type {
   ClaudeLivePtyAccountBinding,
   ClaudeLiveSharedPtyAccountBinding,
@@ -205,6 +206,7 @@ import {
   applyProtectedSecretReads,
   holdsSealedPlaceholder,
   protectedSecretReads,
+  unreadProtectedSecretOf,
   type ProtectedSecretRead
 } from './protected-secret-load'
 import { getDataFile, getGithubCacheFile, readGithubCacheSnapshot } from './user-data-path'
@@ -562,6 +564,9 @@ export class Store {
   private readonly gitUsernameCache = new Map<string, string>()
   private readonly protectedSecrets = new ProtectedSecretPersistence()
   private pendingProtectedSecretReads: ProtectedSecretRead[] = []
+  // Slots still sealed after the startup read; a late Keychain answer removes its slot.
+  private readonly unreadProtectedSlots = new Set<string>()
+  private unreadProtectedSecretsTaken = false
   private loadNeedsSave = false
   private settingsChangeListeners = new Set<
     (
@@ -625,6 +630,7 @@ export class Store {
     if (reads.length === 0) {
       return
     }
+    logPersistenceStartupMilestone('protected-secrets-unseal-start', { count: reads.length })
     const decrypted = await Promise.all(
       reads.map(
         async (read) =>
@@ -639,9 +645,33 @@ export class Store {
           ] as const
       )
     )
-    if (applyProtectedSecretReads(this.state, reads, new Map(decrypted), this.protectedSecrets)) {
+    const statuses: Record<string, number> = {}
+    for (const [slot, decryption] of decrypted) {
+      statuses[decryption.status] = (statuses[decryption.status] ?? 0) + 1
+      if (decryption.status !== 'decrypted' && !decryption.plaintext) {
+        this.unreadProtectedSlots.add(slot)
+      }
+    }
+    // Why: a launch held CREDENTIAL_KEYCHAIN_WAIT_MS by an unanswered prompt shows up in the startup trace.
+    logPersistenceStartupMilestone('protected-secrets-unseal-done', statuses)
+    const changed = applyProtectedSecretReads(
+      this.state,
+      reads,
+      new Map(decrypted),
+      this.protectedSecrets
+    )
+    if (changed || decrypted.some(([, decryption]) => decryption.shouldReEncrypt)) {
       this.scheduleSave()
     }
+  }
+
+  // Why once: the startup notice names what stayed sealed; a renderer reload must not repeat it.
+  takeUnreadProtectedSecrets(): UnreadProtectedSecret[] {
+    if (this.unreadProtectedSecretsTaken) {
+      return []
+    }
+    this.unreadProtectedSecretsTaken = true
+    return [...new Set([...this.unreadProtectedSlots].map(unreadProtectedSecretOf))]
   }
 
   // Why: a prompt answered after the bound fills the value in place; without the notice the
@@ -651,6 +681,7 @@ export class Store {
     late: ProtectedSecretDecryption,
     onLateProxy?: (settings: GlobalSettings) => void
   ): void {
+    this.unreadProtectedSlots.delete(read.slot)
     if (!holdsSealedPlaceholder(this.state, read)) {
       return
     }
@@ -661,7 +692,8 @@ export class Store {
         reads,
         new Map([[read.slot, late]]),
         this.protectedSecrets
-      )
+      ) ||
+      late.shouldReEncrypt
     ) {
       this.scheduleSave()
     }

@@ -16698,6 +16698,24 @@
           "overOne": "Game over · 1 pt",
           "overHint": "Space or tap to go back to Claude"
         }
+      },
+      "protected": {
+        "secrets": {
+          "unread": {
+            "protected": {
+              "secrets": {
+                "notice": {
+                  "f69e07d826": "Network proxy URL",
+                  "76b5a1c580": "OpenCode session cookie",
+                  "b15232f507": "Kagi session link",
+                  "45f9f59b29": "SSH session recovery",
+                  "ff65db1ab3": "Some saved secrets could not be read",
+                  "6a9d13afa9": "The system keychain did not answer at startup, so these stay saved but unused: {{names}}. Allow the keychain prompt if it is still open, or restart Orca Lab to try again."
+                }
+              }
+            }
+          }
+        }
       }
     },
     "i18n": {

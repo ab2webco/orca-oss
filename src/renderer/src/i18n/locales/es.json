@@ -15788,6 +15788,24 @@
         "5be0a3c6d1": "Orca Lab no pudo obtener permisos de administrador: este proceso se ejecuta con no_new_privs activado, así que pkexec no puede ejecutarse como root. Una causa probable es un reinicio automático de Orca Lab; si es así, cerrar Orca Lab y abrirlo de nuevo desde el menú de aplicaciones debería resolverlo. Para instalar ahora, ejecuta el comando en una terminal del sistema fuera de Orca Lab.",
         "7431e3df24": "Paquete",
         "8901895fb1": "Comando"
+      },
+      "protected": {
+        "secrets": {
+          "unread": {
+            "protected": {
+              "secrets": {
+                "notice": {
+                  "f69e07d826": "URL del proxy de red",
+                  "76b5a1c580": "Cookie de sesión de OpenCode",
+                  "b15232f507": "Enlace de sesión de Kagi",
+                  "45f9f59b29": "Recuperación de sesiones SSH",
+                  "ff65db1ab3": "No se pudieron leer algunos secretos guardados",
+                  "6a9d13afa9": "El llavero del sistema no respondió al iniciar, así que estos siguen guardados pero sin usar: {{names}}. Permite el aviso del llavero si sigue abierto, o reinicia Orca Lab para volver a intentarlo."
+                }
+              }
+            }
+          }
+        }
       }
     },
     "i18n": {

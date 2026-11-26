@@ -3,7 +3,8 @@ import {
   ASYNC_DECRYPT_FAILED,
   ASYNC_DECRYPT_UNAVAILABLE,
   CREDENTIAL_KEYCHAIN_WAIT_MS,
-  decryptOffMainThread
+  decryptOffMainThreadWithReEncrypt,
+  type AsyncDecryption
 } from './integration-credential-file'
 import { canEncryptOffMainThread, encryptSecretOffMainThread } from './safe-storage-async-encrypt'
 
@@ -20,6 +21,7 @@ export function sshPtyOwnerLeaseSecretSlot(targetId: string): string {
 export type ProtectedSecretDecryption = {
   plaintext: string
   status: 'decrypted' | 'failed' | 'unavailable'
+  shouldReEncrypt?: boolean
 }
 
 export type ProtectedSecretRetentionUpdate = {
@@ -249,7 +251,7 @@ export class ProtectedSecretPersistence {
     const timedOut = new Promise<'timed-out'>((resolve) => {
       timer = setTimeout(() => resolve('timed-out'), timeoutMs)
     })
-    const read = decryptOffMainThread(Buffer.from(ciphertext, 'base64'))
+    const read = decryptOffMainThreadWithReEncrypt(Buffer.from(ciphertext, 'base64'))
     const outcome = await Promise.race([read, timedOut]).finally(() => clearTimeout(timer))
     // Why: on macOS the sync fallback would read the Keychain on the main thread, unbounded.
     if (
@@ -282,29 +284,35 @@ export class ProtectedSecretPersistence {
       }
       return failed
     }
-    this.sealedSlots.delete(slot)
-    this.keychainDeferredSlots.delete(slot)
-    this.asyncDecryptedPlaintexts.set(slot, outcome)
-    return { plaintext: outcome, status: 'decrypted' }
+    return this.unsealAsync(slot, outcome)
   }
 
   private settleLateDecrypt(
     slot: string,
     ciphertext: string,
-    late: Awaited<ReturnType<typeof decryptOffMainThread>>,
+    late: Awaited<ReturnType<typeof decryptOffMainThreadWithReEncrypt>>,
     onLateDecrypt?: (decryption: ProtectedSecretDecryption) => void
   ): void {
     // Why: a save or clear since the timeout replaced this blob, so its late plaintext is stale.
     if (!this.pendingKeychainSlots.delete(slot) || this.retainedBlobs.get(slot) !== ciphertext) {
       return
     }
-    if (typeof late !== 'string') {
+    if (typeof late !== 'object') {
       return
     }
+    onLateDecrypt?.(this.unsealAsync(slot, late))
+  }
+
+  // Why: a blob Electron wants re-encrypted skips the reuse shortcut, so the next save encrypts it
+  // off the main thread; without the async encryptor the shortcut stays, as the sync one reads the Keychain.
+  private unsealAsync(slot: string, read: AsyncDecryption): ProtectedSecretDecryption {
     this.sealedSlots.delete(slot)
     this.keychainDeferredSlots.delete(slot)
-    this.asyncDecryptedPlaintexts.set(slot, late)
-    onLateDecrypt?.({ plaintext: late, status: 'decrypted' })
+    if (read.shouldReEncrypt && canEncryptOffMainThread()) {
+      return { plaintext: read.result, status: 'decrypted', shouldReEncrypt: true }
+    }
+    this.asyncDecryptedPlaintexts.set(slot, read.result)
+    return { plaintext: read.result, status: 'decrypted' }
   }
 
   private failDecryption(

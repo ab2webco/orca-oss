@@ -2,6 +2,7 @@ import { normalizeProxyUrl } from '../../../shared/network-proxy'
 import { normalizeKagiSessionLink } from '../../../shared/browser-url'
 import type { PersistedState } from '../../../shared/persisted-state-types'
 import type { SshPtyConsumerRecovery } from '../../../shared/ssh-types'
+import type { UnreadProtectedSecret } from '../../../shared/unread-protected-secret'
 import {
   PROTECTED_SECRET_SLOT,
   sshPtyOwnerLeaseSecretSlot,
@@ -19,6 +20,18 @@ export type ProtectedSecretRead = {
   slot: string
   ciphertext: string
   isLegacyPlaintext: LegacyPlaintextValidator
+}
+
+export function unreadProtectedSecretOf(slot: string): UnreadProtectedSecret {
+  if (slot === PROTECTED_SECRET_SLOT.httpProxyUrl) {
+    return 'httpProxyUrl'
+  }
+  if (slot === PROTECTED_SECRET_SLOT.opencodeSessionCookie) {
+    return 'opencodeSessionCookie'
+  }
+  return slot === PROTECTED_SECRET_SLOT.browserKagiSessionLink
+    ? 'browserKagiSessionLink'
+    : 'sshSessionRecovery'
 }
 
 // A slot with no result yet reads as sealed: blank in memory, ciphertext retained for saves.
