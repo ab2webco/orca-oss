@@ -171,6 +171,63 @@ describe('deleting a workspace settles and forgets its members (ORCA-1478)', () 
     expect(retired.errors).toEqual([])
   })
 
+  it('keeps the record of a paired host member whose worktree id reads the same, paused or live', async () => {
+    const { runtime, db, members } = setup()
+    databases.push(db)
+    const local = liveWorker(db, 'ORCA-1', 'repo-1::/w/orca-1')
+    const onImac = remoteWorker(db, 'repo-1::/w/orca-1')
+    const pausedOnImac = remoteWorker(db, 'repo-1::/w/orca-1')
+    db.settleGoneFederatedWorker(pausedOnImac)
+    const record = (ticket: string, dispatchId: string) =>
+      members.upsert(LEAD, {
+        ticket,
+        runId: 'run_1',
+        taskId: `task_${ticket}`,
+        worktreeId: 'repo-1::/w/orca-1',
+        dispatchId
+      })
+    await record('ORCA-1', local)
+    await record('ORCA-7', onImac)
+    await record('ORCA-8', pausedOnImac)
+
+    await runtime.noteIpcWorktreeLifecycle({
+      kind: 'removed',
+      worktreeId: 'repo-1::/w/orca-1',
+      path: '/w/orca-1'
+    })
+
+    expect(stateOf(db, onImac)).toEqual(LIVE)
+    expect(await savedOf(members, LEAD)).toEqual([
+      'ORCA-7 repo-1::/w/orca-1',
+      'ORCA-8 repo-1::/w/orca-1'
+    ])
+  })
+
+  it("a removed lead's repo keeps the record of a member still running in another repo", async () => {
+    const { runtime, db, members } = setup()
+    databases.push(db)
+    const elsewhere = liveWorker(db, 'ORCA-8', 'repo-10::/w/orca-8')
+    const stopped = liveWorker(db, 'ORCA-9', 'repo-10::/w/orca-9')
+    db.settleWorkersOfRemovedWorkspace({ worktreeId: 'repo-10::/w/orca-9' })
+    for (const [ticket, dispatchId] of [
+      ['ORCA-8', elsewhere],
+      ['ORCA-9', stopped]
+    ]) {
+      await members.upsert('repo:repo-1', {
+        ticket,
+        runId: 'run_1',
+        taskId: `task_${ticket}`,
+        worktreeId: `repo-10::/w/${ticket.toLowerCase()}`,
+        dispatchId
+      })
+    }
+
+    await runtime.retireGameWorkspace({ repoId: 'repo-1' })
+
+    expect(stateOf(db, elsewhere)).toEqual(LIVE)
+    expect(await savedOf(members, 'repo:repo-1')).toEqual(['ORCA-8 repo-10::/w/orca-8'])
+  })
+
   it('blocks the Task of a settled member, as a stop does, instead of leaving it dispatched', async () => {
     const { runtime, db } = setup()
     databases.push(db)

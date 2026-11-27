@@ -75,6 +75,7 @@ import {
 import { retireSettledRunMail, type RetiredRunMail } from './run-mail-settlement'
 import {
   liveLocalWorkersIn,
+  memberDispatchState,
   settleRemovedWorkspaceWorker,
   type RemovedWorkspace
 } from './removed-workspace-workers'
@@ -6646,6 +6647,11 @@ export class OrchestrationDb {
       this.db.exec('ROLLBACK')
       throw error
     }
+  }
+
+  /** Whether a saved member's dispatch still runs, here or on a paired host (ORCA-1478). */
+  memberDispatchState(dispatchId: string): { live: boolean; pairedHost: boolean } | null {
+    return memberDispatchState(this.db, dispatchId)
   }
 
   /**

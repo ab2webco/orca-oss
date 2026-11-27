@@ -163,7 +163,7 @@ export class GamePausedMembers {
 
   /** Frees the members saved for a worktree Orca just removed; returns their tickets. */
   async forgetWorktree(projectKey: string, worktreeId: string): Promise<string[]> {
-    return this.deps.store.removeInWorktrees(projectKey, (id) => id === worktreeId)
+    return this.deps.store.removeWhere(projectKey, (one) => one.worktreeId === worktreeId)
   }
 
   private async goneWorktreesOf(members: readonly GameMemberSession[]): Promise<Set<string>> {

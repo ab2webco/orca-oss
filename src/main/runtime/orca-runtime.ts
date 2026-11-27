@@ -6768,7 +6768,8 @@ export class OrcaRuntimeService {
         members: this.gameMemberSessions,
         drops: this.gameDroppedAgents,
         settleWorkers: (one) =>
-          this.getOrchestrationDbIfAvailable()?.settleWorkersOfRemovedWorkspace(one) ?? null
+          this.getOrchestrationDbIfAvailable()?.settleWorkersOfRemovedWorkspace(one) ?? null,
+        dispatchOf: (id) => this.getOrchestrationDbIfAvailable()?.memberDispatchState(id) ?? null
       },
       removal
     )

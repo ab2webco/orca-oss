@@ -87,16 +87,16 @@ export class GameMemberSessionStore {
     )
   }
 
-  /** Drops the members saved in removed worktrees, never by ticket: another worktree may share it. */
-  async removeInWorktrees(
+  /** Drops the members `gone` picks, never by ticket: another worktree may share it. */
+  async removeWhere(
     projectKey: string,
-    removed: (worktreeId: string | null) => boolean
+    gone: (member: GameMemberSession) => boolean
   ): Promise<string[]> {
     const tickets: string[] = []
     await this.update(projectKey, (members) => {
-      const gone = members.filter((one) => removed(one.worktreeId))
-      tickets.push(...gone.map((one) => one.ticket))
-      return gone.length > 0 ? members.filter((one) => !gone.includes(one)) : members
+      const goneMembers = members.filter(gone)
+      tickets.push(...goneMembers.map((one) => one.ticket))
+      return goneMembers.length > 0 ? members.filter((one) => !goneMembers.includes(one)) : members
     })
     return tickets
   }

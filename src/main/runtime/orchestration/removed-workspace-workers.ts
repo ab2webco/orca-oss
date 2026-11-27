@@ -52,3 +52,19 @@ export function settleRemovedWorkspaceWorker(db: Database.Database, dispatchId: 
                   WHERE d.task_id = tasks.id ORDER BY d.rowid DESC LIMIT 1)`
   ).run(dispatchId, dispatchId)
 }
+
+/** Whether a saved member's dispatch still runs, and whether it runs on a paired host; null if unknown here. */
+export function memberDispatchState(
+  db: Database.Database,
+  dispatchId: string
+): { live: boolean; pairedHost: boolean } | null {
+  const row = db
+    .prepare(
+      `SELECT w.state IN ('starting', 'ready', 'start_unknown', 'stopping', 'stop_unknown') AS live,
+              EXISTS (SELECT 1 FROM federated_dispatches f WHERE f.dispatch_id = w.dispatch_id)
+                AS paired_host
+         FROM worker_dispatches w WHERE w.dispatch_id = ?`
+    )
+    .get(dispatchId) as { live: number; paired_host: number } | undefined
+  return row ? { live: row.live === 1, pairedHost: row.paired_host === 1 } : null
+}
