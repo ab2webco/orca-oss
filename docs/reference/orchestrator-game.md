@@ -776,6 +776,7 @@ orchestratorGame:
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
     accounts: default # optional: auto (unset: the freest managed account, see below), default (Orca's own selection), or a list of allowed account emails or ids
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
+    recordAnswersOnTicket: false # optional: keep owner and member answers off the tracker (recorded on the ticket by default)
     replyAlertMinutes: 10 # optional: minutes a member's question, escalation or gate waits unanswered before game watch --lead alerts (10 by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
@@ -1570,6 +1571,14 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   writes an `escalation` from `owner` to the lead's terminal, a type the lead's watch passes, and
   the lead records it on the ticket. The same answer again is a no-op, a different one is refused,
   and a member can neither ask the person nor answer for them.
+- A project whose tracker QA or a client reads keeps answers off it (ORCA-1488):
+  `orchestrator.recordAnswersOnTicket: false` (orca.yaml, or the project Settings' **Record answers
+  on the ticket**) drops every instruction to comment an answer on the tracker from `game lead`'s
+  rules, the owner-answer escalation and the Inbox reply note. They say Orca already keeps the answer
+  (`game owner-questions`, `game history`) and that a tracker comment, if any, carries only
+  product-level information. Unset or true keeps the comment, and even then the escalation asks for
+  the question and the answer in product terms, never Orca's ids (`oq_`, relay), hosts or
+  authorizations.
 - A member checks an answer its lead relays instead of asking the person again (ORCA-1281):
   `game owner-question <id>` reads one question, the answer, when and where it was given (`via`:
   `inbox`, `phone`, or `cli` for `game answer-owner`; the host stamps it from the transport), and only

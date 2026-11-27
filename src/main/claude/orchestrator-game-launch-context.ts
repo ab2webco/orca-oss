@@ -141,3 +141,11 @@ export async function isOrchestratorGameMemberOn(
     resolveOrchestratorGameLead(layers).memberGame !== false
   )
 }
+
+/** Whether the project's lead is told to record answers on its tracker; unset is yes (ORCA-1488). */
+export async function isOrchestratorGameRecordOnTicketOn(
+  args: OrchestratorGameLayerSource
+): Promise<boolean> {
+  const layers = await orchestratorGameLayersOf(args)
+  return resolveOrchestratorGameLead(layers).recordAnswersOnTicket !== false
+}

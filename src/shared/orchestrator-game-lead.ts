@@ -16,6 +16,8 @@ export type OrchestratorGameLead = {
   autostart: boolean
   /** Ask the person before `game resume-members` after a restart; unset or false resumes at once. */
   askBeforeResume?: boolean
+  /** Tell the lead to record owner and member answers as tracker comments; on unless false (ORCA-1488). */
+  recordAnswersOnTicket?: boolean
   /** Members running at once; in a layer, the ceiling over the sum of every host's cap. */
   cap: number
   /** Minutes a member's question, escalation or gate waits unanswered before the watch alerts; 10 unset. */
@@ -157,7 +159,9 @@ const promptKey =
   }
 
 const switchKey =
-  (key: 'autostart' | 'actions' | 'askBeforeResume' | 'memberGame'): KeyParser =>
+  (
+    key: 'autostart' | 'actions' | 'askBeforeResume' | 'memberGame' | 'recordAnswersOnTicket'
+  ): KeyParser =>
   (value) =>
     typeof value === 'boolean' ? { [key]: value } : `${at(key)} must be true or false`
 
@@ -176,6 +180,7 @@ const KEY_PARSERS: Record<keyof OrchestratorGameLead, KeyParser> = {
   },
   autostart: switchKey('autostart'),
   askBeforeResume: switchKey('askBeforeResume'),
+  recordAnswersOnTicket: switchKey('recordAnswersOnTicket'),
   actions: switchKey('actions'),
   memberGame: switchKey('memberGame'),
   cap: (value) =>

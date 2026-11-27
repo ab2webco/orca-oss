@@ -723,6 +723,7 @@ import { WorkerSetupAdmission } from './orchestration/worker-setup-admission'
 import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import {
   isOrchestratorGameMemberOn,
+  isOrchestratorGameRecordOnTicketOn,
   prepareOrchestratorGameLaunch
 } from '../claude/orchestrator-game-launch-context'
 import type { DispatchBriefTarget } from './orchestration/dispatch-brief-delivery'
@@ -4209,6 +4210,17 @@ export class OrcaRuntimeService {
       ),
     inboxSourceOf: (lead) =>
       gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels()),
+    recordsAnswersOnTicket: async (caller) => {
+      const { key, worktree } = await this.gameHistoryProjectOf(caller)
+      return isOrchestratorGameRecordOnTicketOn({
+        settings: this.store?.getSettings?.(),
+        repoId: worktree?.repoId ?? (key.startsWith('repo:') ? key.slice('repo:'.length) : null),
+        worktreePath: worktree?.path ?? null,
+        connectionId: worktree
+          ? (this.store?.getRepo?.(worktree.repoId)?.connectionId ?? null)
+          : null
+      })
+    },
     tellLead: (lead, note) => {
       try {
         return tellGameLead(

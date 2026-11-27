@@ -1,5 +1,6 @@
 import type { OrchestrationDb } from './orchestration/db'
 import type { GameBoardLead, GameLeadNote } from './orchestrator-game-board'
+import { gameAnswerRecordLine } from '../../shared/orchestrator-game-owner-questions'
 
 export type OwnerMemberReplyDb = Pick<
   OrchestrationDb,
@@ -67,6 +68,7 @@ export function ownerMemberReplyNote(args: {
   ticket: string | null
   text: string
   reply: OwnerMemberReply
+  recordOnTicket?: boolean
 }): GameLeadNote {
   const on = args.ticket ? ` ${args.ticket}` : ''
   const verb = {
@@ -79,7 +81,7 @@ export function ownerMemberReplyNote(args: {
     body: [
       `Answer: ${args.text}`,
       `Question: ${args.reply.question}`,
-      args.ticket ? `Record this on ${args.ticket}.` : 'Record this.'
+      gameAnswerRecordLine(args.ticket, args.recordOnTicket !== false)
     ].join('\n'),
     payload: {
       ownerMemberReply: args.id,

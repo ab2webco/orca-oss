@@ -14,9 +14,8 @@ import {
   type GameInboxThreads
 } from '../../shared/orchestrator-game-inbox-threads'
 import {
-  deliverHeldOwnerAnswers,
   HeldOwnerAnswers,
-  ownerAnswerTellerOf
+  type RecordsAnswersOnTicket
 } from './orchestrator-game-owner-answer-delivery'
 import {
   ownerMemberReplyNote,
@@ -86,6 +85,7 @@ export class GameBoard {
       projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
       inboxSourceOf: (lead: GameBoardLead) => GameInboxSource
       tellLead: (lead: GameBoardLead, note: GameLeadNote) => boolean
+      recordsAnswersOnTicket?: RecordsAnswersOnTicket
       /** Lets an open Inbox refresh instead of polling. */
       ownerQuestionsChanged?: (projectKey: string) => void
       /** Asked (no answer) pushes it to a paired phone; answered clears that push. */
@@ -101,7 +101,7 @@ export class GameBoard {
   // Why a getter: deps is set after field initializers run.
   readonly heldAnswers = new HeldOwnerAnswers(() => this.deps)
 
-  /** The person answers or overrides for a member from the Inbox; the lead hears it once, to record it on the ticket. */
+  /** The person answers or overrides for a member from the Inbox; the lead hears it once, to record it. */
   async replyToMember(
     args: GameBoardCaller & { id: string; text: string; ticket?: string }
   ): Promise<{ mode: OwnerMemberReplyMode; delivered: boolean }> {
@@ -112,12 +112,13 @@ export class GameBoard {
     if (!project.lead || !this.deps.replyToMember) {
       throw new Error('This project has no live lead to answer its members through.')
     }
+    const recordOnTicket = await this.heldAnswers.recordsOnTicket(args)
     const reply = this.deps.replyToMember(project.lead, { id: args.id, text: args.text })
     // Why as written when not a ticket: a member with none is keyed by its name.
     const ticket = ticketInText(args.ticket) ?? (args.ticket?.trim() || null)
     const delivered = this.deps.tellLead(
       project.lead,
-      ownerMemberReplyNote({ id: args.id, ticket, text: args.text, reply })
+      ownerMemberReplyNote({ id: args.id, ticket, text: args.text, reply, recordOnTicket })
     )
     return { mode: reply.mode, delivered }
   }
@@ -146,7 +147,7 @@ export class GameBoard {
     args: GameBoardCaller & { ticket?: string; unread?: boolean; markRead?: boolean }
   ): Promise<{ inbox: GameInbox }> {
     const project = await this.deps.projectOf(args)
-    await deliverHeldOwnerAnswers(this.deps.store, project, this.deps.tellLead)
+    await this.heldAnswers.handOver(project, args)
     const key = project.isMember
       ? project.memberTicket
       : args.ticket?.trim().toUpperCase() || 'lead'
@@ -227,7 +228,7 @@ export class GameBoard {
     args: GameBoardCaller & { all?: boolean }
   ): Promise<{ questions: GameOwnerQuestion[]; open: number; undelivered: GameOwnerQuestion[] }> {
     const project = await this.deps.projectOf(args)
-    const undelivered = await deliverHeldOwnerAnswers(this.deps.store, project, this.deps.tellLead)
+    const undelivered = await this.heldAnswers.handOver(project, args)
     const list = await this.deps.store.ownerQuestions(project.key)
     const open = openGameOwnerQuestions(list)
     return {
@@ -259,7 +260,7 @@ export class GameBoard {
       throw new Error('A member cannot answer a question the lead asked the person.')
     }
     const at = this.now().toISOString()
-    const tell = ownerAnswerTellerOf(project, this.deps.tellLead)
+    const tell = await this.heldAnswers.tellerOf(project, args)
     const result = await this.deps.store.changeOwnerQuestions<GameOwnerAnswerResult<unknown>>(
       project.key,
       (list) => {

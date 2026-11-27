@@ -126,7 +126,7 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     notes: [
       'Only the lead asks the person; a member asks its lead with `orchestration ask`. Kept on the Orca host that runs the lead, next to `game events`, until it is answered.',
       'Repeat --option for each choice, at most 6. --context is a link or one line that lets the person answer without your chat.',
-      "The person's answer reaches you once as an escalation from `owner`, which your mail watch already passes. Record it on the ticket and act on it."
+      "The person's answer reaches you once as an escalation from `owner`, which your mail watch already passes. Act on it, and record it on the ticket unless the project sets `orchestrator.recordAnswersOnTicket: false`."
     ],
     examples: [
       'orca game ask-owner --ticket ORCA-12 --question "Ship the arcade in lab.111?" --option Yes --option "Wait for lab.112" --context "PR #41"'

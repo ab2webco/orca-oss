@@ -11705,6 +11705,7 @@
           "actions": "Lead buttons",
           "askBeforeResume": "Ask before resuming",
           "memberGame": "Game in member panes",
+          "recordAnswersOnTicket": "Record answers on the ticket",
           "accounts": "Member accounts",
           "accountsDefault": "Orca's account",
           "accountsAuto": "Most free quota",

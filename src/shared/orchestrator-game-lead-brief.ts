@@ -17,6 +17,8 @@ export function gameLeadBriefOf(
   const word = bashWordOfCli(cli)
   const run = (command: string): string => `\`${word} ${command}\``
   const language = personLanguageNameOf(locale)
+  // Why: on a project whose tracker QA and the client read, answers stay in Orca (ORCA-1488).
+  const onTicket = lead.recordAnswersOnTicket !== false
   const lines = [
     `# You are the lead of ${project}${name}`,
     '',
@@ -77,18 +79,38 @@ export function gameLeadBriefOf(
     `- Answer a member question or decision gate you can with ${run('orchestration reply --id <msg_id> --body <answer>')};`,
     `  if that reply fails, send the answer to the member's terminal handle with ${run('orchestration send --to <member terminal handle> --subject "Answer" --body <answer>')}.`,
     `  If the member is idle, ${run('game push')} it to continue.`,
-    '  Record each answer you give a member as a comment on its ticket: the question and the answer.',
+    ...(onTicket
+      ? [
+          '  Record each answer you give a member as a comment on its ticket: the question and the answer,',
+          "  in product terms, never Orca's ids (oq_, relay), hosts or merge authorizations."
+        ]
+      : [
+          '  Orca keeps each answer you give a member in its mail and game history: never comment it on the tracker.'
+        ]),
     '- Ask the person only what only they can decide: releases and publishing; spending money or quota beyond the plan;',
     '  hard-to-reverse or outward-facing actions (force pushes to shared branches, deleting work, credentials,',
     '  changing repo visibility); scope or product direction; anything the ticket or orca.yaml reserves to them.',
     '  Quote the member when you ask. Decide everything else yourself (technical choices, test strategy, naming,',
-    '  review fixes) and record it on the ticket.',
+    onTicket
+      ? '  review fixes) and record it on the ticket.'
+      : '  review fixes) and record it with `game decision add` (below), not on the tracker.',
     `  Put every question for the person on record with ${run('game ask-owner --ticket <id> --question <text> --option <a> --option <b>')}`,
     '  as well as in your reply, so it is never only in your chat. Their answer reaches your watch once as',
-    '  an escalation from `owner`: record it on the ticket and act on it. When you relay it to a member, cite',
+    onTicket
+      ? '  an escalation from `owner`: record it on the ticket and act on it. When you relay it to a member, cite'
+      : '  an escalation from `owner`, already recorded in Orca: act on it. When you relay it to a member, cite',
     `  its question id: the member checks it with ${run('game owner-question <id>')} instead of asking the person again.`,
     `  On every wake, and before asking the person again, read ${run('game owner-questions --all')}: an answer`,
-    '  there that you have not recorded on its ticket is new to you, even when no escalation reached you.',
+    onTicket
+      ? '  there that you have not recorded on its ticket is new to you, even when no escalation reached you.'
+      : '  there that you have not acted on is new to you, even when no escalation reached you.',
+    ...(onTicket
+      ? []
+      : [
+          '  This project keeps answers off its tracker: Orca keeps every one (game owner-questions, game history).',
+          '  A tracker comment, if any, carries only product-level information,',
+          "  never Orca's ids (oq_, relay), leads, members, hosts, test databases or merge authorizations."
+        ]),
     `- Record each decision you make for the project with ${run('game decision add --ticket <id> --decision <text> --why <text> --evidence <link>')}`,
     '  and each thing left for later with `--follow-up <text>` in place of --decision, so it outlives your chat.',
     `  On every start, resume or compaction read ${run('game decision list')}: the trail every lead of this project`,

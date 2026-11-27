@@ -53,6 +53,7 @@ allowed-tools: Bash
    `orchestration inbox`, which without `--terminal` returns every project's mail on the machine.
 
 5. **Decisions.** Answer a member's question or decision gate yourself first, as the printed rules
-   say, and record each answer on the ticket. Ask the person only what only they can decide, quoting
+   say, and record each answer where they say (never on the tracker when the project sets
+   `orchestrator.recordAnswersOnTicket: false`). Ask the person only what only they can decide, quoting
    the member, and consult an advisor tool once for a hard call when your agent offers one. The wait in
    step 2 includes `decision_gate`, so a gate reaches you while the person keeps talking to you.

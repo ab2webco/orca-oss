@@ -182,7 +182,7 @@ export function ProjectOrchestratorGameLeadSetting({
     `${text} · ${orchestratorGameSourceLabel(gameLeadSourceOf(layers, key))}`
   const onOff = orchestratorGameModeLabels()
   const switches: {
-    key: 'autostart' | 'actions' | 'askBeforeResume' | 'memberGame'
+    key: 'autostart' | 'actions' | 'askBeforeResume' | 'memberGame' | 'recordAnswersOnTicket'
     label: string
     isOn: (one: OrchestratorGameLead) => boolean
   }[] = [
@@ -219,6 +219,15 @@ export function ProjectOrchestratorGameLeadSetting({
       ),
       // Why: unset means on; a launched member loads the game unless a layer turns it off.
       isOn: (one) => one.memberGame !== false
+    },
+    {
+      key: 'recordAnswersOnTicket',
+      label: translate(
+        'auto.components.settings.OrchestratorGameLeadSetting.recordAnswersOnTicket',
+        'Record answers on the ticket'
+      ),
+      // Why: unset means on, so a project's lead keeps commenting answers until a layer turns it off.
+      isOn: (one) => one.recordAnswersOnTicket !== false
     }
   ]
   const accountsText = {
