@@ -66,7 +66,11 @@ describe('GameBoard.replyToMember (ORCA-878)', () => {
         lead: LEAD_TERMINAL,
         note: {
           subject: 'Owner answered ORCA-14: Which port?',
-          body: 'Answer: 8080\nQuestion: Which port?\nRecord this on ORCA-14.',
+          body: [
+            'Answer: 8080',
+            'Question: Which port?',
+            "Record this answer on ORCA-14: the question and the answer in product terms, never Orca's ids, hosts or authorizations."
+          ].join('\n'),
           payload: { ownerMemberReply: 'msg_1', mode: 'answered', ticket: 'ORCA-14', text: '8080' }
         }
       }
@@ -88,7 +92,7 @@ describe('GameBoard.replyToMember (ORCA-878)', () => {
     await game.replyToMember({ worktreeId: 'wt', id: 'msg_2', text: 'Yes' })
 
     expect(told[0]?.note.subject).toBe('Owner overrode your answer: Rebase?')
-    expect(told[0]?.note.body).toContain('Record this.')
+    expect(told[0]?.note.body).toContain('Record this answer: the question and the answer')
   })
 
   it('refuses a member, and a project with no live lead to speak through', async () => {

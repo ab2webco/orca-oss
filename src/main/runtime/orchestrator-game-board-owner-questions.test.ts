@@ -125,8 +125,8 @@ describe('GameBoard owner questions', () => {
           body: [
             'Answer: Wait for lab.112',
             'Question: Ship the arcade in lab.111?',
-            'Record this answer on CIN-1.',
-            `When you relay it to a member, cite ${question.id}: the member checks it with \`orca game owner-question ${question.id}\`.`
+            "Record this answer on CIN-1: the question and the answer in product terms, never Orca's ids, hosts or authorizations.",
+            `When you relay it to a member, cite ${question.id} in that mail, never on the tracker: the member checks it with \`orca game owner-question ${question.id}\`.`
           ].join('\n'),
           payload: { ownerQuestionId: question.id, ticket: 'CIN-1', answer: 'Wait for lab.112' }
         }

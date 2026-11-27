@@ -8,7 +8,9 @@ import {
 } from '../providers/ssh-filesystem-dispatch'
 import type { IFilesystemProvider } from '../providers/types'
 import {
+  gameProjectLayerSourceOf,
   isOrchestratorGameMemberOn,
+  isOrchestratorGameRecordOnTicketOn,
   prepareOrchestratorGameLaunch
 } from './orchestrator-game-launch-context'
 
@@ -303,5 +305,66 @@ describe('isOrchestratorGameMemberOn', () => {
         connectionId: 'ssh-1'
       })
     ).toBe(false)
+  })
+})
+
+describe('isOrchestratorGameRecordOnTicketOn (ORCA-1488)', () => {
+  const OFF = 'orchestratorGame:\n  orchestrator:\n    recordAnswersOnTicket: false\n'
+
+  it('is on by default, for a folder without orca.yaml too', async () => {
+    expect(
+      await isOrchestratorGameRecordOnTicketOn({
+        settings: undefined,
+        repoId: 'repo1',
+        worktreePath: worktreeWith(null)
+      })
+    ).toBe(true)
+  })
+
+  it("is off when the project's orca.yaml turns it off, and this machine's override wins", async () => {
+    const worktreePath = worktreeWith(OFF)
+    expect(
+      await isOrchestratorGameRecordOnTicketOn({
+        settings: undefined,
+        repoId: 'repo1',
+        worktreePath
+      })
+    ).toBe(false)
+    expect(
+      await isOrchestratorGameRecordOnTicketOn({
+        settings: {
+          orchestratorGameProjects: { repo1: { orchestrator: { recordAnswersOnTicket: true } } }
+        },
+        repoId: 'repo1',
+        worktreePath
+      })
+    ).toBe(true)
+  })
+
+  it("reads the caller's worktree, or its repo root before the first worktree scan", async () => {
+    const root = worktreeWith(OFF)
+    const repoOf = (id: string) => (id === 'repo1' ? { path: root, connectionId: null } : undefined)
+
+    const unscanned = gameProjectLayerSourceOf({
+      settings: undefined,
+      key: 'repo:repo1',
+      worktree: undefined,
+      repoOf
+    })
+    expect(unscanned).toEqual({
+      settings: undefined,
+      repoId: 'repo1',
+      worktreePath: root,
+      connectionId: null
+    })
+    expect(await isOrchestratorGameRecordOnTicketOn(unscanned)).toBe(false)
+
+    const scanned = gameProjectLayerSourceOf({
+      settings: undefined,
+      key: 'repo:repo1',
+      worktree: { path: worktreeWith(null), repoId: 'repo1' },
+      repoOf
+    })
+    expect(await isOrchestratorGameRecordOnTicketOn(scanned)).toBe(true)
   })
 })

@@ -11111,6 +11111,7 @@
           "actions": "Botones del líder",
           "askBeforeResume": "Preguntar antes de reanudar",
           "memberGame": "Juego en los paneles de miembros",
+          "recordAnswersOnTicket": "Registrar respuestas en el ticket",
           "accounts": "Cuentas de los miembros",
           "accountsDefault": "La cuenta de Orca",
           "accountsAuto": "La de más cuota libre",

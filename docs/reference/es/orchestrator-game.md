@@ -1,5 +1,5 @@
 ---
-sourceHash: 09b678d0c6328dc5
+sourceHash: b6683d7822c65c96
 ---
 
 # El juego orquestador de Agent Teams
@@ -807,6 +807,7 @@ orchestratorGame:
     actions: false # optional: hide Orca's lead buttons and their slash commands (on by default)
     accounts: default # optional: auto (unset: the freest managed account, see below), default (Orca's own selection), or a list of allowed account emails or ids
     askBeforeResume: true # optional: ask the person before resuming paused members (resumes at once by default)
+    recordAnswersOnTicket: false # optional: keep owner and member answers off the tracker (recorded on the ticket by default)
     replyAlertMinutes: 10 # optional: minutes a member's question, escalation or gate waits unanswered before game watch --lead alerts (10 by default)
     memberGame: false # optional: launch members as plain Claude, without their member band (on by default)
     memberNames: [Mario, Luigi, { en: Peach, es: Melocotón }] # optional: replaces the scene's roster
@@ -1679,6 +1680,15 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   un tipo que el watch del líder deja pasar, y el líder la registra en el ticket. La misma respuesta
   otra vez no hace nada, una distinta se rechaza, y un miembro no puede ni preguntarle a la persona
   ni responder por ella.
+- Un proyecto cuyo tracker leen QA o un cliente deja las respuestas fuera de él (ORCA-1488):
+  `orchestrator.recordAnswersOnTicket: false` (orca.yaml, o **Registrar respuestas en el ticket** en
+  los Settings del proyecto) quita toda instrucción de comentar una respuesta en el tracker de las
+  reglas de `game lead`, de la escalation con la respuesta de la persona y de la nota de respuesta
+  del Inbox. Dicen que Orca ya guarda la respuesta (`game owner-questions`, `game history`) y que un
+  comentario en el tracker, si lo hay, lleva solo información de producto. Sin definir o en true se
+  mantiene el comentario, y aun así la escalation pide la pregunta y la respuesta en términos de
+  producto, nunca los ids de Orca (`oq_`, relay), hosts ni autorizaciones. Orca lee el ajuste del
+  orca.yaml del worktree que llama, o del de la raíz del repo antes de su primer escaneo de worktrees.
 - Un miembro comprueba una respuesta que su líder le transmite en lugar de volver a preguntarle a la
   persona (ORCA-1281): `game owner-question <id>` lee una pregunta, la respuesta, cuándo y desde dónde
   se dio (`via`: `inbox`, `phone`, o `cli` para `game answer-owner`; el host la marca según el

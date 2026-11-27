@@ -141,3 +141,29 @@ export async function isOrchestratorGameMemberOn(
     resolveOrchestratorGameLead(layers).memberGame !== false
   )
 }
+
+/** Whether the project's lead is told to record answers on its tracker; unset is yes (ORCA-1488). */
+export async function isOrchestratorGameRecordOnTicketOn(
+  args: OrchestratorGameLayerSource
+): Promise<boolean> {
+  const layers = await orchestratorGameLayersOf(args)
+  return resolveOrchestratorGameLead(layers).recordAnswersOnTicket !== false
+}
+
+/** Where a project's lead settings come from: the caller's worktree, or its repo root before the first worktree scan (ORCA-1488). */
+export function gameProjectLayerSourceOf(args: {
+  settings: OrchestratorGameLayerSource['settings']
+  key: string
+  worktree: { path: string; repoId: string } | undefined
+  repoOf: (repoId: string) => { path: string; connectionId?: string | null } | undefined
+}): OrchestratorGameLayerSource {
+  const repoId =
+    args.worktree?.repoId ?? (args.key.startsWith('repo:') ? args.key.slice('repo:'.length) : null)
+  const repo = repoId ? args.repoOf(repoId) : undefined
+  return {
+    settings: args.settings,
+    repoId,
+    worktreePath: args.worktree?.path ?? repo?.path ?? null,
+    connectionId: repo?.connectionId ?? null
+  }
+}

@@ -168,6 +168,22 @@ describe('ProjectOrchestratorGameLeadSetting', () => {
     offInYaml.unmount()
   })
 
+  // Why (ORCA-1488): a lead posting answers on a client-read tracker; the project turns it off.
+  it('records answers on the ticket by default, and saves the opt-out on this machine', () => {
+    const updates: Partial<GlobalSettings>[] = []
+    const view = render({}, undefined, updates)
+    expect(view.container.textContent).toContain('Record answers on the ticket')
+    click(view.container, '[aria-label="Record answers on the ticket"] button', 'Off')
+    expect(updates).toEqual([
+      { orchestratorGameProjects: { repo1: { orchestrator: { recordAnswersOnTicket: false } } } }
+    ])
+    view.unmount()
+
+    const offInYaml = render({}, { orchestrator: { recordAnswersOnTicket: false } })
+    expect(offInYaml.container.textContent).toContain('Off · from orca.yaml')
+    offInYaml.unmount()
+  })
+
   it('spreads members over accounts automatically by default, and saves the opt-out', () => {
     const updates: Partial<GlobalSettings>[] = []
     const view = render({}, undefined, updates)

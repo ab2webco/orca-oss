@@ -14,20 +14,27 @@ import {
 
 export type TellGameLead = (lead: GameBoardLead, note: GameLeadNote) => boolean
 
+/** Whether the caller's project tells its lead to record answers on the tracker (ORCA-1488). */
+export type RecordsAnswersOnTicket = (caller: GameBoardCaller) => Promise<boolean>
+
 /** Tells the project's current lead one answer; a member or a project with no lead takes none. */
 export function ownerAnswerTellerOf(
   project: GameBoardProject,
-  tellLead: TellGameLead
+  tellLead: TellGameLead,
+  recordOnTicket = true
 ): (question: GameOwnerQuestion) => boolean {
   const lead = project.isMember ? null : project.lead
-  return lead ? (question) => tellLead(lead, gameOwnerAnswerNote(question)) : () => false
+  return lead
+    ? (question) => tellLead(lead, gameOwnerAnswerNote(question, recordOnTicket))
+    : () => false
 }
 
 /** Answers no lead received yet, each as it is after handing it to the project's current lead (ORCA-942). */
 export async function deliverHeldOwnerAnswers(
   store: Pick<GameHistoryStore, 'ownerQuestions' | 'changeOwnerQuestions'>,
   project: GameBoardProject,
-  tellLead: TellGameLead
+  tellLead: TellGameLead,
+  recordOnTicket: () => Promise<boolean> = () => Promise.resolve(true)
 ): Promise<GameOwnerQuestion[]> {
   if (project.isMember) {
     return []
@@ -37,7 +44,7 @@ export async function deliverHeldOwnerAnswers(
   if (!list.some((one) => parseGameOwnerQuestion(one)?.answer?.undelivered)) {
     return []
   }
-  const tell = ownerAnswerTellerOf(project, tellLead)
+  const tell = ownerAnswerTellerOf(project, tellLead, await recordOnTicket())
   return store.changeOwnerQuestions(project.key, (current) => {
     const sent = deliverGameOwnerAnswers(current, tell)
     return { list: sent.list, result: sent.held }
@@ -57,6 +64,7 @@ type HeldOwnerAnswerDeps = {
   store: Pick<GameHistoryStore, 'ownerQuestions' | 'changeOwnerQuestions'>
   projectOf: (caller: GameBoardCaller) => Promise<GameBoardProject>
   tellLead: TellGameLead
+  recordsAnswersOnTicket?: RecordsAnswersOnTicket
   ownerQuestionsChanged?: (projectKey: string) => void
   later?: (ms: number, run: () => void) => void
 }
@@ -69,14 +77,34 @@ export class HeldOwnerAnswers {
 
   /** Hands them to the project's live lead; resolves to the ones still held. */
   async deliver(caller: GameBoardCaller): Promise<GameOwnerQuestion[]> {
-    const { store, projectOf, tellLead, ownerQuestionsChanged } = this.deps()
+    const { projectOf, ownerQuestionsChanged } = this.deps()
     const project = await projectOf(caller)
-    const handed = await deliverHeldOwnerAnswers(store, project, tellLead)
+    const handed = await this.handOver(project, caller)
     const held = handed.filter((one) => one.answer?.undelivered)
     if (held.length < handed.length) {
       ownerQuestionsChanged?.(project.key)
     }
     return held
+  }
+
+  /** Whether the caller's project has its lead record answers on the tracker; unset or unreadable is yes. */
+  recordsOnTicket(caller: GameBoardCaller): Promise<boolean> {
+    const records = this.deps().recordsAnswersOnTicket
+    return records ? records(caller).catch(() => true) : Promise.resolve(true)
+  }
+
+  /** Hands the held answers to the project's lead, worded by the project's recordAnswersOnTicket. */
+  handOver(project: GameBoardProject, caller: GameBoardCaller): Promise<GameOwnerQuestion[]> {
+    const { store, tellLead } = this.deps()
+    return deliverHeldOwnerAnswers(store, project, tellLead, () => this.recordsOnTicket(caller))
+  }
+
+  /** Tells the project's lead an answer the person just gave. */
+  async tellerOf(
+    project: GameBoardProject,
+    caller: GameBoardCaller
+  ): Promise<(question: GameOwnerQuestion) => boolean> {
+    return ownerAnswerTellerOf(project, this.deps().tellLead, await this.recordsOnTicket(caller))
   }
 
   retry(caller: GameBoardCaller, projectKey: string): void {
