@@ -103,6 +103,7 @@
     "tests/e2e/game-per-host-member-caps.spec.ts": 3,
     "tests/e2e/game-text-layer-without-plugins.spec.ts": 46,
     "tests/e2e/game-ticket-branch-rename-badge.spec.ts": 24,
+    "tests/e2e/game-workspace-removed-members.spec.ts": 24,
     "tests/e2e/git-history-tooltip-wrap.spec.ts": 25,
     "tests/e2e/git-no-upstream-polling-churn.spec.ts": 14,
     "tests/e2e/github-cli-stall-repro.spec.ts": 15,
