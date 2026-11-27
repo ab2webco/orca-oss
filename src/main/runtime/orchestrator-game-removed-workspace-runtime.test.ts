@@ -171,6 +171,17 @@ describe('deleting a workspace settles and forgets its members (ORCA-1478)', () 
     expect(retired.errors).toEqual([])
   })
 
+  it('blocks the Task of a settled member, as a stop does, instead of leaving it dispatched', async () => {
+    const { runtime, db } = setup()
+    databases.push(db)
+    const removed = liveWorker(db, 'ORCA-5', 'repo-1::/w/orca-5')
+    const taskId = db.getDispatchContextById(removed)!.task_id
+
+    await runtime.retireGameWorkspace({ worktreeId: 'repo-1::/w/orca-5' })
+
+    expect(db.getTask(taskId)?.status).toBe('blocked')
+  })
+
   it('a deleted folder workspace settles and forgets the member that ran in it', async () => {
     const { runtime, db, members, removeFolderWorkspace } = setup()
     databases.push(db)
