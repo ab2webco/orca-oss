@@ -1578,7 +1578,8 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   (`game owner-questions`, `game history`) and that a tracker comment, if any, carries only
   product-level information. Unset or true keeps the comment, and even then the escalation asks for
   the question and the answer in product terms, never Orca's ids (`oq_`, relay), hosts or
-  authorizations.
+  authorizations. Orca reads the setting from the caller's worktree orca.yaml, or from the repo
+  root's before its first worktree scan.
 - A member checks an answer its lead relays instead of asking the person again (ORCA-1281):
   `game owner-question <id>` reads one question, the answer, when and where it was given (`via`:
   `inbox`, `phone`, or `cli` for `game answer-owner`; the host stamps it from the transport), and only

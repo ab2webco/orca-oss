@@ -29,7 +29,7 @@ export function waitingOnYouNextOf(question: GameWaitingMessage, now = Date.now(
 // Why the evidence: the lead can tell a missed reply from a watch that misread it (ORCA-1431).
 function waitLineOf(wait: GameWaitingMessage, age: string | null): string {
   if (wait.from === GAME_OWNER_HANDLE) {
-    return `owner answer unread ${age}, no reply threads it: "${wait.subject}". Record it, then ack its delivery or reply: orca orchestration reply --id ${wait.id}`
+    return `owner answer unread ${age}, no reply threads it: "${wait.subject}". Act on it, then ack its delivery or reply: orca orchestration reply --id ${wait.id}`
   }
   return `${wait.from} waiting on you ${age}, no reply threads it: "${wait.subject}". Answer it: orca orchestration reply --id ${wait.id}`
 }

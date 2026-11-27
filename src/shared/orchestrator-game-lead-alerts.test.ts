@@ -430,7 +430,7 @@ describe('gameLeadAlertsOf: a member waiting on the lead (ORCA-1154, folded into
 
   it('words an owner answer as one to record and ack, not one to answer (ORCA-1431)', () => {
     expect(linesOf(waitingFor(12, undefined, 'owner'))).toEqual([
-      'owner answer unread 12m, no reply threads it: "Which look?". Record it, then ack its delivery or reply: orca orchestration reply --id relay_887'
+      'owner answer unread 12m, no reply threads it: "Which look?". Act on it, then ack its delivery or reply: orca orchestration reply --id relay_887'
     ])
   })
 

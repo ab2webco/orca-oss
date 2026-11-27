@@ -57,8 +57,13 @@ describe('orchestrator.recordAnswersOnTicket (ORCA-1488)', () => {
     expect(brief).toContain(
       "in product terms, never Orca's ids (oq_, relay), hosts or merge authorizations."
     )
-    expect(brief).toContain('review fixes) and record it on the ticket.')
-    expect(brief).toContain('an escalation from `owner`: record it on the ticket and act on it.')
+    expect(brief).toContain('review fixes) and record it on the ticket in product terms.')
+    expect(brief).toContain(
+      'an escalation from `owner`: record it on the ticket in product terms and act on it.'
+    )
+    expect(brief).toContain('to done with a product-level comment')
+    expect(brief).toContain('A tracker comment, if any, carries only product-level information,')
+    expect(brief).toContain("never Orca's ids (oq_, relay), leads, members, hosts, test databases")
     expect(brief).toContain('that you have not recorded on its ticket is new to you')
     expect(brief).not.toContain('already recorded in Orca')
   })

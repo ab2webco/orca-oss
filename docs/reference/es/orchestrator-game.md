@@ -1,5 +1,5 @@
 ---
-sourceHash: 25318316d8c3daa4
+sourceHash: b6683d7822c65c96
 ---
 
 # El juego orquestador de Agent Teams
@@ -1687,7 +1687,8 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   del Inbox. Dicen que Orca ya guarda la respuesta (`game owner-questions`, `game history`) y que un
   comentario en el tracker, si lo hay, lleva solo información de producto. Sin definir o en true se
   mantiene el comentario, y aun así la escalation pide la pregunta y la respuesta en términos de
-  producto, nunca los ids de Orca (`oq_`, relay), hosts ni autorizaciones.
+  producto, nunca los ids de Orca (`oq_`, relay), hosts ni autorizaciones. Orca lee el ajuste del
+  orca.yaml del worktree que llama, o del de la raíz del repo antes de su primer escaneo de worktrees.
 - Un miembro comprueba una respuesta que su líder le transmite en lugar de volver a preguntarle a la
   persona (ORCA-1281): `game owner-question <id>` lee una pregunta, la respuesta, cuándo y desde dónde
   se dio (`via`: `inbox`, `phone`, o `cli` para `game answer-owner`; el host la marca según el

@@ -92,12 +92,12 @@ export function gameLeadBriefOf(
     '  changing repo visibility); scope or product direction; anything the ticket or orca.yaml reserves to them.',
     '  Quote the member when you ask. Decide everything else yourself (technical choices, test strategy, naming,',
     onTicket
-      ? '  review fixes) and record it on the ticket.'
+      ? '  review fixes) and record it on the ticket in product terms.'
       : '  review fixes) and record it with `game decision add` (below), not on the tracker.',
     `  Put every question for the person on record with ${run('game ask-owner --ticket <id> --question <text> --option <a> --option <b>')}`,
     '  as well as in your reply, so it is never only in your chat. Their answer reaches your watch once as',
     onTicket
-      ? '  an escalation from `owner`: record it on the ticket and act on it. When you relay it to a member, cite'
+      ? '  an escalation from `owner`: record it on the ticket in product terms and act on it. When you relay it to a member, cite'
       : '  an escalation from `owner`, already recorded in Orca: act on it. When you relay it to a member, cite',
     `  its question id: the member checks it with ${run('game owner-question <id>')} instead of asking the person again.`,
     `  On every wake, and before asking the person again, read ${run('game owner-questions --all')}: an answer`,
@@ -107,10 +107,10 @@ export function gameLeadBriefOf(
     ...(onTicket
       ? []
       : [
-          '  This project keeps answers off its tracker: Orca keeps every one (game owner-questions, game history).',
-          '  A tracker comment, if any, carries only product-level information,',
-          "  never Orca's ids (oq_, relay), leads, members, hosts, test databases or merge authorizations."
+          '  This project keeps answers off its tracker: Orca keeps every one (game owner-questions, game history).'
         ]),
+    '  A tracker comment, if any, carries only product-level information,',
+    "  never Orca's ids (oq_, relay), leads, members, hosts, test databases or merge authorizations.",
     `- Record each decision you make for the project with ${run('game decision add --ticket <id> --decision <text> --why <text> --evidence <link>')}`,
     '  and each thing left for later with `--follow-up <text>` in place of --decision, so it outlives your chat.',
     `  On every start, resume or compaction read ${run('game decision list')}: the trail every lead of this project`,
@@ -132,7 +132,7 @@ export function gameLeadBriefOf(
     `  ${run('orchestration worker-release --dispatch <dispatch_id> --json')}.`,
     '- A verified PR is not done until it merges. Act on each drop from the merge queue, red queue run or entry stuck',
     '  past its budget: find the cause, then fix it or queue it again. After each merge, in the same turn: the ticket',
-    '  to done with a comment, its worktree and branch removed on their host, its member freed.',
+    '  to done with a product-level comment, its worktree and branch removed on their host, its member freed.',
     `- ${run('game fleet')} is the members' status: ticket, state, PR, CI, phase and what to do next;`,
     '  run it for a status question. Read the NEXT column of every row before you give any status.',
     '- A `gone from <host>` row is a lost session: settle it at once. Compare the head of its worktree on that host',
