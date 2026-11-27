@@ -1118,7 +1118,7 @@ matches …` (ORCA-866).
   drops; its history, lessons and STOP switch stay for a re-add (ORCA-1011). A saved member whose
   dispatch still runs keeps its record, and so does a paired host's member whose worktree id reads
   the same as the deleted one: it is released through its home. An SSH project forgotten on one host
-  is left alone while another host has the same repo id.
+  is left alone while another host has the same repo id (ORCA-1491).
 - `orca game stop [<key>,... | --all]` — ends the named members, or all of them, so no member
   agent keeps running: each live dispatch is stopped, then the member's terminal is closed when the
   stop did not close it (a stopped dispatch can leave its terminal retained). Each key names one

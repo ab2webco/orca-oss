@@ -1183,7 +1183,7 @@ matches …` (ORCA-866).
   (ORCA-1011). Un miembro guardado cuyo dispatch sigue corriendo conserva su registro, y también lo
   conserva un miembro de un host emparejado cuyo id de worktree se lee igual que el borrado: se
   libera desde su casa. Un proyecto SSH olvidado en un host no se toca mientras otro host tenga el
-  mismo id de repo.
+  mismo id de repo (ORCA-1491).
 - `orca game stop [<key>,... | --all]` — termina los miembros nombrados, o todos, para que ningún
   agente miembro siga corriendo: cada dispatch vivo se detiene y luego se cierra la terminal del
   miembro cuando la detención no la cerró (un dispatch detenido puede dejar su terminal retenida).
