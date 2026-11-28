@@ -19,6 +19,7 @@ const LEAD_HANDLE = 'term_orca_1492_lead'
 const WORKTREE_ID = 'repo-orca-1492::/tmp/orca-1492'
 
 const sendMethod = ORCHESTRATION_METHODS.find((method) => method.name === 'orchestration.send')!
+const replyMethod = ORCHESTRATION_METHODS.find((method) => method.name === 'orchestration.reply')!
 
 describe('orchestration.send refuses a recipient no one reads (ORCA-1492)', () => {
   let db: OrchestrationDb | undefined
@@ -74,8 +75,13 @@ describe('orchestration.send refuses a recipient no one reads (ORCA-1492)', () =
     return { db, runtime, run }
   }
 
-  function send(runtime: OrcaRuntimeService, to: string) {
-    const params = sendMethod.params!.parse({ from: LEAD_HANDLE, to, subject: 'next step' })
+  function send(runtime: OrcaRuntimeService, to: string, extra: Record<string, string> = {}) {
+    const params = sendMethod.params!.parse({
+      from: LEAD_HANDLE,
+      to,
+      subject: 'next step',
+      ...extra
+    })
     return sendMethod.handler(params, { runtime } as never) as Promise<{
       message: { to_handle: string }
     }>
@@ -166,5 +172,51 @@ describe('orchestration.send refuses a recipient no one reads (ORCA-1492)', () =
 
     await expect(send(runtime, 'nobody')).rejects.toMatchObject({ code: 'runtime_unavailable' })
     expect(messageCount(db)).toBe(0)
+  })
+  // Why: the addresses Orca's own game commands and briefs send to must keep delivering.
+  it("delivers game stop's STOP to a member still running", async () => {
+    const { runtime } = createRuntime({ graph: true })
+    await runtime.listTerminals()
+
+    await expect(
+      send(runtime, MEMBER_HANDLE, { subject: 'STOP', type: 'status', priority: 'urgent' })
+    ).resolves.toMatchObject({ message: { to_handle: MEMBER_HANDLE } })
+  })
+
+  it('delivers to dispatch:<id> and run:<id>, which keep their own lookups', async () => {
+    const { db, runtime, run } = createRuntime({ graph: true })
+    const task = db.createTask({ spec: 'active work', runId: run.id })
+    const dispatch = db.createDispatchContext(task.id, MEMBER_HANDLE)
+
+    await expect(send(runtime, `dispatch:${dispatch.id}`)).resolves.toMatchObject({
+      message: { to_handle: `dispatch:${dispatch.id}` }
+    })
+    await expect(send(runtime, `run:${run.id}`)).resolves.toMatchObject({
+      message: { to_handle: `run:${run.id}` }
+    })
+  })
+
+  it('refuses a ticket id as a recipient, since game inbox reads handles and dispatch: only', async () => {
+    const { db, runtime } = createRuntime({ graph: true })
+
+    await expect(send(runtime, 'ORCA-1482')).rejects.toMatchObject({
+      code: 'recipient_not_found'
+    })
+    expect(messageCount(db)).toBe(0)
+  })
+
+  it('still replies to mail from a sender no pane holds now', async () => {
+    const { db, runtime, run } = createRuntime({ graph: true })
+    const original = db.insertMessage({
+      from: 'term_closed_peer',
+      to: LEAD_HANDLE,
+      subject: 'question',
+      runId: run.id
+    })
+    const params = replyMethod.params!.parse({ id: original.id, from: LEAD_HANDLE, body: 'answer' })
+
+    await expect(replyMethod.handler(params, { runtime } as never)).resolves.toMatchObject({
+      message: { to_handle: 'term_closed_peer' }
+    })
   })
 })
