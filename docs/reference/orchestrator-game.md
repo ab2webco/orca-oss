@@ -1133,7 +1133,7 @@ matches …` (ORCA-866).
 - `orca game events [--ticket] [--since]`, `orca game event <kind> [--text]` and
   `orca game inbox [--ticket] [--unread] [--mark-read]` — the shared board below. The lead's rules
   have it read events and inbox before answering "qué pasó".
-- `orca game ask-owner --question [--ticket] [--option]... [--context]`, `orca game owner-questions
+- `orca game ask-owner --question [--ticket]... [--option]... [--context]`, `orca game owner-questions
 [--all]`, `orca game owner-question <id>` and `orca game answer-owner <id> (--pick <n> | --answer <text>)` — the lead's questions
   to the person as records, below.
 - `orca game decision add (--decision | --follow-up) [--ticket] [--why] [--evidence]`,
@@ -1580,6 +1580,12 @@ or the app restarts. `game inbox` reads it by party instead of by terminal handl
   writes an `escalation` from `owner` to the lead's terminal, a type the lead's watch passes, and
   the lead records it on the ticket. The same answer again is a no-op, a different one is refused,
   and a member can neither ask the person nor answer for them.
+- One question can name several tickets (ORCA-1490): `--ticket` repeats, or takes `A,B`, up to 10.
+  The record keeps the first in `ticket`, so an older build still reads it, and all of them in an
+  optional `tickets`. The member of each named ticket reads it with `game owner-question <id>`; on a
+  paired host the lead's host shares it under that member's own ticket, so an older member host
+  keeps it too. A member whose ticket it does not name is refused, and the answer reaches the lead
+  once, naming every ticket.
 - A project whose tracker QA or a client reads keeps answers off it (ORCA-1488):
   `orchestrator.recordAnswersOnTicket: false` (orca.yaml, or the project Settings' **Record answers
   on the ticket**) drops every instruction to comment an answer on the tracker from `game lead`'s

@@ -1200,7 +1200,7 @@ matches …` (ORCA-866).
 - `orca game events [--ticket] [--since]`, `orca game event <kind> [--text]` y
   `orca game inbox [--ticket] [--unread] [--mark-read]` — el tablero compartido, más abajo. Las reglas
   del líder le piden leer los eventos y el inbox antes de responder "qué pasó".
-- `orca game ask-owner --question [--ticket] [--option]... [--context]`, `orca game owner-questions
+- `orca game ask-owner --question [--ticket]... [--option]... [--context]`, `orca game owner-questions
 [--all]`, `orca game owner-question <id>` y `orca game answer-owner <id> (--pick <n> | --answer <text>)` — las preguntas del líder a
   la persona como registros, más abajo.
 - `orca game decision add (--decision | --follow-up) [--ticket] [--why] [--evidence]`,
@@ -1691,6 +1691,12 @@ dispatch, o se reinicia la app. `game inbox` lo lee por participante en lugar de
   un tipo que el watch del líder deja pasar, y el líder la registra en el ticket. La misma respuesta
   otra vez no hace nada, una distinta se rechaza, y un miembro no puede ni preguntarle a la persona
   ni responder por ella.
+- Una pregunta puede nombrar hasta 10 tickets (ORCA-1490): `--ticket` se repite, o acepta `A,B`.
+  El registro guarda el primero en `ticket`, para que una versión anterior lo siga leyendo, y
+  todos en un `tickets` opcional. El miembro de cada ticket nombrado la lee con
+  `game owner-question <id>`; en un host emparejado el host del líder la comparte bajo el ticket de
+  ese miembro, así un host de miembro anterior también la guarda. A un miembro cuyo ticket no nombra
+  se le rechaza, y la respuesta llega al líder una sola vez, con todos los tickets.
 - Un proyecto cuyo tracker leen QA o un cliente deja las respuestas fuera de él (ORCA-1488):
   `orchestrator.recordAnswersOnTicket: false` (orca.yaml, o **Registrar respuestas en el ticket** en
   los Settings del proyecto) quita toda instrucción de comentar una respuesta en el tracker de las

@@ -100,6 +100,7 @@ export function gameLeadBriefOf(
       ? '  an escalation from `owner`: record it on the ticket in product terms and act on it. When you relay it to a member, cite'
       : '  an escalation from `owner`, already recorded in Orca: act on it. When you relay it to a member, cite',
     `  its question id: the member checks it with ${run('game owner-question <id>')} instead of asking the person again.`,
+    '  When one answer covers several tickets, repeat --ticket for each: only the members of the tickets named can read it.',
     `  On every wake, and before asking the person again, read ${run('game owner-questions --all')}: an answer`,
     onTicket
       ? '  there that you have not recorded on its ticket is new to you, even when no escalation reached you.'

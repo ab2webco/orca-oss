@@ -124,15 +124,17 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     path: ['game', 'ask-owner'],
     summary: 'Ask the person a question as a record they can find and answer, not chat text',
     usage:
-      'orca game ask-owner --question <text> [--ticket <id>] [--option <text>]... [--context <link or line>] [--json]',
+      'orca game ask-owner --question <text> [--ticket <id>]... [--option <text>]... [--context <link or line>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'question', 'ticket', 'option', 'context'],
     notes: [
       'Only the lead asks the person; a member asks its lead with `orchestration ask`. Kept on the Orca host that runs the lead, next to `game events`, until it is answered.',
       'Repeat --option for each choice, at most 6. --context is a link or one line that lets the person answer without your chat.',
+      'Repeat --ticket (or give A,B) when one answer covers several tickets, at most 10: the member of each named ticket can read it with `game owner-question`, on any host, and the answer reaches you once.',
       "The person's answer reaches you once as an escalation from `owner`, which your mail watch already passes. Act on it, and record it on the ticket unless the project sets `orchestrator.recordAnswersOnTicket: false`."
     ],
     examples: [
-      'orca game ask-owner --ticket ORCA-12 --question "Ship the arcade in lab.111?" --option Yes --option "Wait for lab.112" --context "PR #41"'
+      'orca game ask-owner --ticket ORCA-12 --question "Ship the arcade in lab.111?" --option Yes --option "Wait for lab.112" --context "PR #41"',
+      'orca game ask-owner --ticket ORCA-12 --ticket ORCA-14 --question "Merge both PRs today?" --option Yes --option No'
     ]
   },
   {
@@ -152,7 +154,7 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'id'],
     positionalArgs: ['id'],
     notes: [
-      "A member checks an owner answer its lead relays before a hard-to-undo step, instead of asking the person again. It reads only its own ticket's questions, from any host.",
+      'A member checks an owner answer its lead relays before a hard-to-undo step, instead of asking the person again. It reads only questions that name its ticket, including one asked for several tickets, from any host.',
       "On a paired host it reads what the lead's host shares on each change and every minute; when that copy is over 3 minutes old it says it cannot confirm, instead of 'not answered yet'.",
       'Shows when and where it was answered: the Inbox, a phone, or `game answer-owner` in a terminal.'
     ],

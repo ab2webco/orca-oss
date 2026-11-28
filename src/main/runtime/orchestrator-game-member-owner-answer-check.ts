@@ -1,6 +1,7 @@
 import type { GameBoardProject } from './orchestrator-game-board'
 import type { GameHistoryStore } from './orchestrator-game-history-store'
 import {
+  gameOwnerQuestionCoversTicket,
   gameOwnerQuestionForTicket,
   parseGameOwnerQuestion,
   type GameOwnerQuestion
@@ -33,9 +34,6 @@ export type RemoteMemberOwnerAnswers = {
 // Why the store: the member host keeps them across a restart, under a key no project uses.
 const keyOf = (dispatchId: string): string => `remote-dispatch:${dispatchId}`
 
-const sameTicket = (question: GameOwnerQuestion, ticket: string): boolean =>
-  question.ticket?.toUpperCase() === ticket.toUpperCase()
-
 /** On the member's host: keeps only the dispatch's own ticket, whatever the lead's host sent. */
 export async function keepRemoteMemberOwnerAnswers(
   store: GameHistoryStore,
@@ -43,7 +41,7 @@ export async function keepRemoteMemberOwnerAnswers(
 ): Promise<{ kept: number }> {
   const questions = shared.questions
     .flatMap((one) => parseGameOwnerQuestion(one) ?? [])
-    .filter((one) => sameTicket(one, shared.ticket))
+    .filter((one) => gameOwnerQuestionCoversTicket(one, shared.ticket))
   await store.changeOwnerQuestions(keyOf(shared.dispatchId), () => ({
     list: questions,
     result: null
@@ -88,7 +86,7 @@ export async function readRemoteMemberOwnerAnswer(
   }
   if (!question) {
     throw new Error(
-      `No question ${id} for your ticket reached this host. Your lead's host shares the person's answers on your ticket every minute and on each change.`
+      `No question ${id} naming your ticket reached this host. Your lead's host shares every question that names your ticket every minute and on each change; if the lead asked it for other tickets only, ask your lead to ask the person again with your ticket among its --ticket flags.`
     )
   }
   return { question, ...sharedAt }
@@ -135,7 +133,9 @@ export async function shareOwnerAnswersWithRemoteMember(
     }
     const questions = (await deps.questionsOf(member.projectKey))
       .flatMap((one) => parseGameOwnerQuestion(one) ?? [])
-      .filter((one) => sameTicket(one, member.ticket))
+      .filter((one) => gameOwnerQuestionCoversTicket(one, member.ticket))
+      // Why: a member host from before ORCA-1490 keeps only questions whose `ticket` is its own.
+      .map((one) => (one.tickets ? { ...one, ticket: member.ticket } : one))
     const signature = JSON.stringify(questions)
     const unchanged = last?.signature === signature && now < last.due
     if ((questions.length === 0 && !last?.signature) || unchanged) {

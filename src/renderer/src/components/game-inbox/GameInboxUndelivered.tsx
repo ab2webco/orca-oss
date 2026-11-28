@@ -1,5 +1,8 @@
 import React from 'react'
-import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
+import {
+  gameOwnerQuestionTickets,
+  type GameOwnerQuestion
+} from '../../../../shared/orchestrator-game-owner-questions'
 import { translate } from '@/i18n/i18n'
 
 /** Answers the person gave that the board still holds: no lead has taken them yet (ORCA-1100). */
@@ -31,7 +34,7 @@ export function GameInboxUndelivered({
           >
             {question.ticket ? (
               <span className="shrink-0 font-mono font-medium text-foreground">
-                {question.ticket}
+                {gameOwnerQuestionTickets(question).join(', ')}
               </span>
             ) : null}
             <span className="min-w-0 break-words">{question.question}</span>

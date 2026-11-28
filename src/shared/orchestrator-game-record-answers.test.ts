@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { gameLeadBriefOf } from './orchestrator-game-lead-brief'
 import { DEFAULT_GAME_LEAD, parseGameLead, resolveGameLead } from './orchestrator-game-lead'
-import { gameOwnerAnswerNote, type GameOwnerQuestion } from './orchestrator-game-owner-questions'
+import { gameOwnerAnswerNote } from './orchestrator-game-owner-answer-note'
+import type { GameOwnerQuestion } from './orchestrator-game-owner-questions'
 
 // Why: any rule that tells the lead to put an answer or decision on the tracker (ORCA-1488).
 const RECORD_ON_TRACKER = /(record|comment)[^\n]*\bon (the|its) ticket/i

@@ -3,6 +3,7 @@ import { defineMethod, type RpcContext, type RpcMethod } from '../core'
 import { GAME_EVENT_KINDS, GAME_EVENT_TEXT_MAX } from '../../../../shared/orchestrator-game-events'
 import {
   GAME_OWNER_CONTEXT_MAX,
+  GAME_OWNER_TICKETS_MAX,
   GAME_OWNER_OPTIONS_MAX,
   GAME_OWNER_OPTION_TEXT_MAX,
   GAME_OWNER_QUESTION_TEXT_MAX,
@@ -108,6 +109,7 @@ const GameOwnerReplyToMemberParams = z.object({
 const GameOwnerAskParams = z.object({
   ...Caller,
   ticket: z.string().max(40).optional(),
+  tickets: z.array(z.string().max(40)).max(GAME_OWNER_TICKETS_MAX).optional(),
   question: z.string().min(1).max(GAME_OWNER_QUESTION_TEXT_MAX),
   options: z
     .array(z.string().min(1).max(GAME_OWNER_OPTION_TEXT_MAX))
@@ -264,6 +266,7 @@ export const ORCHESTRATOR_GAME_BOARD_METHODS: RpcMethod[] = [
         worktreeId: params.worktreeId,
         terminalHandle: params.terminalHandle,
         ticket: params.ticket,
+        tickets: params.tickets,
         question: params.question,
         options: params.options,
         context: params.context

@@ -1,6 +1,6 @@
 import type { OrchestrationDb } from './orchestration/db'
 import type { GameBoardLead, GameLeadNote } from './orchestrator-game-board'
-import { gameAnswerRecordLine } from '../../shared/orchestrator-game-owner-questions'
+import { gameAnswerRecordLine } from '../../shared/orchestrator-game-owner-answer-note'
 
 export type OwnerMemberReplyDb = Pick<
   OrchestrationDb,
