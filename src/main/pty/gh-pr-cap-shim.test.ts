@@ -46,9 +46,9 @@ function setup(orcaExit: number | null) {
       `echo "orca $*" >> "${root}/log"\n[ ${orcaExit} -eq 3 ] && echo "refused here" >&2\nexit ${orcaExit}`
     )
   }
-  const run = (...args: string[]) => {
+  const runWith = (env: Record<string, string>, ...args: string[]) => {
     const result = spawnSync(join(wrap, 'gh'), args, {
-      env: { PATH: `${wrap}:${bin}:${tools}` },
+      env: { PATH: `${wrap}:${bin}:${tools}`, ...env },
       encoding: 'utf8'
     })
     let log = ''
@@ -57,7 +57,8 @@ function setup(orcaExit: number | null) {
     } catch {}
     return { status: result.status, stderr: result.stderr, log }
   }
-  return { run }
+  const run = (...args: string[]) => runWith({}, ...args)
+  return { root, script, run, runWith }
 }
 
 describe.skipIf(process.platform === 'win32')('the POSIX gh wrapper (ORCA-1301)', () => {
@@ -89,6 +90,24 @@ describe.skipIf(process.platform === 'win32')('the POSIX gh wrapper (ORCA-1301)'
     expect(result.status).toBe(0)
     expect(result.log).toBe('real gh pr create\n')
     expect(result.stderr).toMatch(/did not check this project's open-PR cap \(orca exited 127\)/)
+  })
+
+  it("asks the member's absolute ORCA_GAME_CLI, not the orca first on PATH (ORCA-1371)", () => {
+    // Why: the PATH orca stands in for GNOME's screen reader, which a user rc can put first.
+    const { root, script, runWith } = setup(1)
+    const cli = join(root, 'orca-ide')
+    script(cli, `echo "orca-ide $*" >> "${root}/log"\nexit 0`)
+    const result = runWith({ ORCA_GAME_CLI: cli }, 'pr', 'create')
+    expect(result.log).toBe('orca-ide game pr-cap-check\nreal gh pr create\n')
+    expect(result.stderr).toBe('')
+  })
+
+  it('falls back to orca on PATH when ORCA_GAME_CLI is bare or no longer exists', () => {
+    for (const cli of ['orca-ide', '/nonexistent/orca-ide']) {
+      expect(setup(0).runWith({ ORCA_GAME_CLI: cli }, 'pr', 'create').log).toBe(
+        'orca game pr-cap-check\nreal gh pr create\n'
+      )
+    }
   })
 })
 
