@@ -48,9 +48,16 @@ export class GameInboxSettler {
         `${args.id} is a question its member waits on: answer it with orca orchestration reply --id ${args.id}`
       )
     }
+    const stuck = stuckReasonOf(source)(row)
+    // Why: a live member blocks on its gate until a reply; a note would hide the gate it waits on.
+    if (row.type === 'decision_gate' && !stuck) {
+      throw new Error(
+        `${args.id} is a decision gate its member waits on: answer it with orca orchestration reply --id ${args.id}`
+      )
+    }
     const noteId = this.deps.write(project.lead, row, { note: args.note, via: args.via })
     return {
-      settled: { id: row.id, subject: row.subject, stuck: stuckReasonOf(source)(row) },
+      settled: { id: row.id, subject: row.subject, stuck },
       noteId
     }
   }

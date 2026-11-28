@@ -15,7 +15,7 @@ import {
 import { DEFAULT_GAME_LEAD } from '../../shared/orchestrator-game-lead'
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../shared/orchestration-rpc-contract'
 
-// Why a real DB (ORCA-1482): the legacy Run, the reminted handle and the Run mailbox are DB facts
+// Why a real DB (ORCA-1482): the legacy Run, the reminted handle and the Run are DB facts
 // a fake source would only restate.
 describe('the lead settles what no reply can settle', () => {
   const h = createOrchestrationRpcHarness()
@@ -141,13 +141,27 @@ describe('the lead settles what no reply can settle', () => {
     )
   })
 
-  it("sends an owner answer to the lead's Run mailbox, where the lead's reply settles it", async () => {
+  it("refuses a live member's decision gate, which only a reply to the member settles", async () => {
+    setupMember()
+    const gate = db.insertMessage({
+      from: 'term_worker',
+      to: `run:${runId}`,
+      subject: 'Ship now?',
+      type: 'decision_gate'
+    })
+    await expect(board().settle({ id: gate.id, note: 'x', via: 'inbox' })).rejects.toThrow(
+      /decision gate its member waits on/
+    )
+    expect(leadInbox().waiting.map((one) => one.id)).toEqual([gate.id])
+  })
+
+  it("sends an owner answer to the lead's own handle, where its parked watch reads it and a reply settles it", async () => {
     setupMember()
     expect(
       tellGameLead(db, () => {}, lead, { subject: 'Owner answer', body: 'Ship it', payload: {} })
     ).toBe(true)
     const [answer] = leadInbox().waiting
-    expect(db.getMessageById(answer!.id)?.to_handle).toBe(`run:${runId}`)
+    expect(db.getMessageById(answer!.id)?.to_handle).toBe('term_coord')
 
     await h.call(
       'orchestration.reply',
