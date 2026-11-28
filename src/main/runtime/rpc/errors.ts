@@ -76,6 +76,11 @@ const STRUCTURED_RUNTIME_PASSTHROUGH_CODES: ReadonlySet<string> = new Set([
   'task_not_found',
   'task_not_startable',
   'dispatch_not_found',
+  // Why: send refuses mail no one can read; the code says whether the handle ever existed (ORCA-1492).
+  'recipient_not_found',
+  'recipient_gone',
+  // Why: send names the recipient it could not confirm, which the bare code would drop.
+  'runtime_unavailable',
   'dispatch_run_mismatch',
   'dispatch_inactive',
   // Why: its message names the member's next step when the lead's Orca cannot reopen (ORCA-856).

@@ -76,6 +76,7 @@ export const ORCHESTRATION_COMMAND_SPECS: CommandSpec[] = [
       'worker_done from a dispatch created by this runtime requires a typed envelope: --envelope-file <path> (preferred) or --envelope <json>, with status, summary, artifacts, verification, outOfScopeWrites and notesForNextAgent. A rejected envelope is returned with the exact field errors and can be corrected and resent up to twice in the same session.',
       'From an active Dispatch, an omitted recipient defaults to its owning Run mailbox.',
       'Use --to dispatch:<id> for attempt-specific coordinator guidance; Orca Lab durably relays it to a connected worker server.',
+      'A terminal --to that no pane, active Dispatch or Run here reads is refused and nothing is queued: recipient_gone when Orca knew the handle (closed pane, settled Dispatch), recipient_not_found otherwise.',
       'Managed agent terminals authenticate the sender pane with their launch token, so --from cannot claim their identity; it still names the sender for panes without one (SSH without remote hooks, reattached or hand-opened shells).',
       'A worker_done with the active task/dispatch IDs completes that task only from the dispatched pane. When stable pane identity is unavailable, the sender handle must exactly match the dispatch assignee; injected preambles include the correct --from value.',
       'Prefer --task-id/--dispatch-id/etc. over raw --payload JSON in worker commands; PowerShell strips JSON quotes easily.'

@@ -144,6 +144,7 @@ function createUpdateHarness(): Harness {
       .mockImplementationOnce(getProcessIncarnation)
       .mockReturnValue(null)
     vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
+    vi.spyOn(runtime, 'describeOrchestrationRecipientHandle').mockReturnValue({ state: 'live' })
     return new RpcDispatcher({ runtime, methods: ORCHESTRATION_METHODS })
   }
   const harness = {

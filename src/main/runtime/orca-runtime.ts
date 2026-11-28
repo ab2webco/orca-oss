@@ -132,6 +132,7 @@ import { resolveWorktreeAddBaseRef } from '../../shared/worktree/base-ref'
 import { OrchestrationDb } from './orchestration/db'
 import { liveRunCoordinatorHandle } from './orchestration-run-coordinator-handle'
 import type { WorkerObservedModel } from './orchestration/worker-observed-model'
+import type { OrchestrationRecipientHandleState } from './orchestration/orchestration-recipient-check'
 import { reconcileRequestedWorkerTerminalReleases } from './orchestration/worker-terminal-release-reconciliation'
 import { expireDueDispatchDeadlines } from './orchestration/dispatch-deadline-monitor'
 import { escalateAgentExit } from './orchestration/agent-exit-escalation'
@@ -19482,6 +19483,40 @@ export class OrcaRuntimeService {
     return {
       ...session,
       unsubmittedInput: this.unsubmittedInput.read(this.findPtyIdForHandle(handle))
+    }
+  }
+
+  /** What a bare mail recipient names on this host, so orchestration send never queues for nobody (ORCA-1492). */
+  describeOrchestrationRecipientHandle(handle: string): OrchestrationRecipientHandleState {
+    if (this.sleepingHandleRecords.has(handle)) {
+      return { state: 'asleep' }
+    }
+    const pty = this.getLivePtyForHandle(handle)
+    if (pty) {
+      return this.isPotentiallyWritablePty(pty.pty)
+        ? { state: 'live' }
+        : { state: 'closed', detail: 'its terminal exited' }
+    }
+    if (this.graphStatus !== 'ready') {
+      return { state: 'unverifiable' }
+    }
+    const record = this.handles.get(handle)
+    if (!record || record.runtimeId !== this.runtimeId) {
+      return { state: 'unknown' }
+    }
+    try {
+      const { leaf } = this.getLiveLeafForHandle(handle)
+      return getTerminalState(leaf) === 'exited'
+        ? { state: 'closed', detail: 'its terminal exited' }
+        : { state: 'live' }
+    } catch {
+      const current = isTerminalLeafId(record.leafId)
+        ? this.getTerminalHandleForPaneKey(makePaneKey(record.tabId, record.leafId))
+        : null
+      return {
+        state: 'closed',
+        detail: current && current !== handle ? `its pane is now ${current}` : 'its pane closed'
+      }
     }
   }
 
