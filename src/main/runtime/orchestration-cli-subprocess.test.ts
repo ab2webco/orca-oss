@@ -202,6 +202,10 @@ describeIfBuilt('orca orchestration reset subprocess', () => {
     vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
       handle === 'term_cli' ? coordinatorPaneKey : null
     )
+    // Why: send refuses a recipient no pane reads (ORCA-1492); this fixture has no window graph.
+    vi.spyOn(runtime, 'describeOrchestrationRecipientHandle').mockImplementation((handle) =>
+      handle === 'term_target' ? { state: 'live' } : { state: 'unknown' }
+    )
     db.createRun({
       objective: 'CLI reset subprocess fixture',
       coordinatorHandle: 'term_cli',
