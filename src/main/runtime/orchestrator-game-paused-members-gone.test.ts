@@ -89,4 +89,19 @@ describe('paused members whose worktree is gone', () => {
     expect(await ticketsOf(store)).toEqual(['ORCA-2'])
     expect(await paused.forgetWorktree('repo:a', 'repo-a::/w/orca-9')).toEqual([])
   })
+
+  // Why: removal matched the worktree, then dropped by ticket, so a relaunch in another worktree went too (ORCA-1478).
+  it('keeps the ticket relaunched in another worktree while the removal runs', async () => {
+    const { store, paused } = setup(new Set())
+    await paused.record('repo:a', saved('ORCA-1', 'repo-a::/w/orca-1'))
+
+    const removal = paused.forgetWorktree('repo:a', 'repo-a::/w/orca-1')
+    await paused.record('repo:a', saved('ORCA-1', 'repo-a::/w/orca-1-again'))
+    await removal
+
+    const read = await store.read('repo:a')
+    expect(read.ok && read.members.map((one) => one.worktreeId)).toEqual([
+      'repo-a::/w/orca-1-again'
+    ])
+  })
 })

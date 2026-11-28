@@ -131,7 +131,7 @@ describe('a worktree removed from the desktop frees its paused member', () => {
       '[orchestrator-game] the removed worktree did not free its members',
       expect.objectContaining({
         worktreeId: 'repo-1::/w/orca-1',
-        error: expect.objectContaining({ message: expect.stringContaining('damaged') })
+        errors: [expect.stringContaining('damaged')]
       })
     )
   })

@@ -87,6 +87,20 @@ export class GameMemberSessionStore {
     )
   }
 
+  /** Drops the members `gone` picks, never by ticket: another worktree may share it. */
+  async removeWhere(
+    projectKey: string,
+    gone: (member: GameMemberSession) => boolean
+  ): Promise<string[]> {
+    const tickets: string[] = []
+    await this.update(projectKey, (members) => {
+      const goneMembers = members.filter(gone)
+      tickets.push(...goneMembers.map((one) => one.ticket))
+      return goneMembers.length > 0 ? members.filter((one) => !goneMembers.includes(one)) : members
+    })
+    return tickets
+  }
+
   /**
    * Moves a damaged file out of the way, bytes kept, and returns where it went; null when the file
    * is readable or missing. Only the person's discard calls this.

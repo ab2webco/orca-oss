@@ -1,5 +1,5 @@
 ---
-sourceHash: b6683d7822c65c96
+sourceHash: 223eb6e3e99445e5
 ---
 
 # El juego orquestador de Agent Teams
@@ -1173,6 +1173,17 @@ matches …` (ORCA-866).
   (ORCA-1475 C6), así que ninguna alerta ni ningún lugar espera por él. Otro miembro en el mismo
   worktree, carpeta o ticket nunca se toca. El Quitar de la tarjeta pregunta primero y luego le
   manda este comando al líder.
+- Borrar un worktree, un workspace de carpeta o un repo cierra y olvida a sus miembros
+  (ORCA-1478): cada dispatch vivo que esta máquina lanzó allí se detiene en casa con
+  `workspace_removed` y su tarea queda bloqueada, como la bloquea una detención. Los registros
+  guardados de miembros y los descartes locales de ese workspace salen de los archivos de cada
+  proyecto, por workspace y nunca por ticket, así que un miembro con el mismo ticket en otro
+  worktree se queda. Un repo quitado además vacía los miembros guardados y los descartes de su
+  propio proyecto; su historial, lecciones y STOP se quedan para cuando se vuelva a agregar
+  (ORCA-1011). Un miembro guardado cuyo dispatch sigue corriendo conserva su registro, y también lo
+  conserva un miembro de un host emparejado cuyo id de worktree se lee igual que el borrado: se
+  libera desde su casa. Un proyecto SSH olvidado en un host no se toca mientras otro host tenga el
+  mismo id de repo (ORCA-1491).
 - `orca game stop [<key>,... | --all]` — termina los miembros nombrados, o todos, para que ningún
   agente miembro siga corriendo: cada dispatch vivo se detiene y luego se cierra la terminal del
   miembro cuando la detención no la cerró (un dispatch detenido puede dejar su terminal retenida).

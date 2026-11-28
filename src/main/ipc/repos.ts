@@ -28,6 +28,7 @@ import type { BaseRefDefaultResult, BaseRefSearchResult, Repo } from '../../shar
 import type { SparsePreset } from '../../shared/worktree/create-types'
 import type { FolderWorkspacePathStatusRequest } from '../../shared/folder-workspace-path-status'
 import { isFolderRepo } from '../../shared/repo-kind'
+import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../shared/constants'
 import { normalizeRepoBadgeColor } from '../../shared/repo-badge-color'
 import { sanitizeRepoIcon } from '../../shared/repo-icon'
@@ -763,13 +764,25 @@ type ActiveRemoteCloneMetadata = {
   controller: AbortController
 }
 
-type RepoRemoteClientNotifier = Pick<OrcaRuntimeService, 'notifyReposChangedForRemoteClients'>
+type RepoRemoteClientNotifier = Pick<OrcaRuntimeService, 'notifyReposChangedForRemoteClients'> &
+  Partial<Pick<OrcaRuntimeService, 'retireGameWorkspace'>>
 
 // Why: notifyReposChanged is module-level and cannot close over a handler argument (#11994).
 let repoRemoteClientNotifier: RepoRemoteClientNotifier | null = null
 
 export function setRepoRemoteClientNotifier(notifier: RepoRemoteClientNotifier): void {
   repoRemoteClientNotifier = notifier
+}
+
+// Why: a removed repo or folder workspace must settle and forget its Agent Teams members (ORCA-1478).
+async function retireGameWorkspace(
+  removal: { repoId: string } | { worktreeId: string }
+): Promise<void> {
+  try {
+    await repoRemoteClientNotifier?.retireGameWorkspace?.(removal)
+  } catch (error) {
+    console.warn('[repos] the removed workspace did not retire its game members', error)
+  }
 }
 
 // Why: module-scoped so the abort handle survives macOS window re-creation, when registerRepoHandlers re-runs.
@@ -1583,6 +1596,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
     const deleted = store.removeFolderWorkspace(args.folderWorkspaceId)
     if (deleted) {
       notifyReposChanged(mainWindow)
+      void retireGameWorkspace({ worktreeId: folderWorkspaceKey(args.folderWorkspaceId) })
     }
     return deleted
   })
@@ -2083,6 +2097,8 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   )
 
   ipcMain.handle('repos:remove', async (_event, args: { repoId: string }) => {
+    // Why before: the game files are named by the repo's place, which the removal forgets.
+    await retireGameWorkspace({ repoId: args.repoId })
     store.removeProject(args.repoId)
     invalidateAuthorizedRootsCache()
     notifyReposChanged(mainWindow)
@@ -2095,6 +2111,13 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       const hostId = normalizeExecutionHostId(args.hostId)
       if (!hostId) {
         throw new Error(`Invalid host ID: ${args.hostId}`)
+      }
+      // Why only the last copy: the same repo id on another host may still run these members.
+      const lastCopy = store
+        .getRepos()
+        .every((repo) => repo.id !== args.repoId || getRepoExecutionHostId(repo) === hostId)
+      if (lastCopy) {
+        await retireGameWorkspace({ repoId: args.repoId })
       }
       store.removeProjectForHost(args.repoId, hostId)
       invalidateAuthorizedRootsCache()
