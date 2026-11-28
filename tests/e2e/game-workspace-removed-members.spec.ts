@@ -11,6 +11,7 @@ import { emitCodexHookStatus, readHookEndpoint } from './helpers/agent-hook-endp
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActivePanePtyId } from './helpers/terminal'
 import { writeSettings } from './helpers/settings-write'
+import { setTheme } from './helpers/settings-window'
 import { RuntimeClient } from '../../src/cli/runtime-client'
 
 function savedTickets(userDataDir: string): string[] {
@@ -24,12 +25,25 @@ function savedTickets(userDataDir: string): string[] {
   return saved.members.map((one) => one.ticket).sort()
 }
 
+// Why the panel's own widths: the desktop window keeps its size; the right sidebar is what changes.
+const WINDOW = { width: 1440, height: 900 }
+const SIDEBAR_WIDTHS = { min: 220, default: 350, max: WINDOW.width - 320 }
+
 async function capture(page: Page, outputPath: (name: string) => string, name: string) {
-  for (const width of [1440, 390]) {
-    await page.setViewportSize({ width, height: 900 })
-    await page.screenshot({ path: outputPath(`${name}-${width}.png`) })
+  const panel = page.getByTestId('team-panel')
+  await page.setViewportSize(WINDOW)
+  for (const [label, width] of Object.entries(SIDEBAR_WIDTHS)) {
+    await page.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), width)
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(page, theme)
+      await panel.screenshot({
+        animations: 'disabled',
+        path: outputPath(`${name}-${label}-${width}-${theme}.png`)
+      })
+    }
   }
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.evaluate((w) => window.__store!.getState().setRightSidebarWidth(w), 350)
+  await setTheme(page, 'dark')
 }
 
 test('deleting a folder workspace takes its member off the Team panel and keeps the others', async ({
