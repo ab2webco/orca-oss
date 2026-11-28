@@ -239,6 +239,41 @@ describe('deleting a workspace settles and forgets its members (ORCA-1478)', () 
     expect(db.getTask(taskId)?.status).toBe('blocked')
   })
 
+  // Why: the host keeps only an attachment row for another home's member; that home releases it.
+  it('leaves a member this machine hosts for another home to that home, even in the removed worktree', async () => {
+    const { runtime, db } = setup()
+    databases.push(db)
+    db.createRemoteDispatchAttachment({
+      dispatchId: 'ctx_hosted',
+      taskId: 'task_hosted',
+      homePeerFingerprint: 'fp_home',
+      protocolVersion: 2,
+      runtimeEpoch: runtime.getRuntimeId(),
+      mutationReceipt: {
+        callerFingerprint: 'fp_home',
+        requestId: 'attach',
+        method: 'orchestration.federationAttachStart',
+        payloadHash: 'attach-payload'
+      }
+    })
+    db.prepareRemoteAttachmentAuthority({
+      dispatchId: 'ctx_hosted',
+      paneKey: 'pane:hosted',
+      processIncarnation: 'proc-1',
+      worktreeId: 'repo-1::/w/orca-6',
+      terminalHandle: 'term_hosted',
+      setupState: 'not_applicable',
+      effects: []
+    })
+    db.markRemoteAttachmentReady('ctx_hosted')
+
+    const byWorktree = await runtime.retireGameWorkspace({ worktreeId: 'repo-1::/w/orca-6' })
+    const byRepo = await runtime.retireGameWorkspace({ repoId: 'repo-1' })
+
+    expect([...byWorktree.settled, ...byRepo.settled]).toEqual([])
+    expect(db.getRemoteDispatchAttachment('ctx_hosted')?.state).toBe('ready')
+  })
+
   it('a deleted folder workspace settles and forgets the member that ran in it', async () => {
     const { runtime, db, members, removeFolderWorkspace } = setup()
     databases.push(db)
