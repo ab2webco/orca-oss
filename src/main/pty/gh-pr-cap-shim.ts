@@ -39,7 +39,10 @@ is_pr_create() {
   return 1
 }
 if is_pr_create "$@"; then
-  ${ORCA_CLI_IN_SH} game pr-cap-check
+  orca_cli=${ORCA_CLI_IN_SH}
+  # Why: a user rc can put /usr/bin, and GNOME's screen reader, before Orca's CLI shim (ORCA-1371).
+  case $ORCA_GAME_CLI in /*) [ -x "$ORCA_GAME_CLI" ] && orca_cli=$ORCA_GAME_CLI ;; esac
+  "$orca_cli" game pr-cap-check
   code=$?
   [ $code -eq 3 ] && exit 1
   if [ $code -ne 0 ] && [ $code -ne 4 ]; then
