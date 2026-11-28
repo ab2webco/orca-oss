@@ -81,15 +81,14 @@ describe('tellGameLead', () => {
 
     expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
 
-    // Why the Run's mailbox (ORCA-1482): its consumer can reply after the lead's handle is reminted.
-    expect(notify).toHaveBeenCalledWith(`run:${run.id}`, 'escalation')
+    expect(notify).toHaveBeenCalledWith('term_lead', 'escalation')
     // Why (ORCA-861): mail from outside the lead's members wakes a watch whatever its types.
     expect(db.hasUnreadOutsideMemberRunMail(run.id, 'term_lead')).toBe(true)
     expect(leadDelivery(db, run.id, run.consumer_generation)?.messages).toMatchObject([
       {
         run_id: run.id,
         from_handle: 'owner',
-        to_handle: `run:${run.id}`,
+        to_handle: 'term_lead',
         type: 'escalation',
         priority: 'high',
         subject: 'Owner answered CIN-1: Ship it?',
@@ -111,7 +110,7 @@ describe('tellGameLead', () => {
 
     expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
 
-    expect(notify).toHaveBeenCalledWith(`run:${run.id}`, 'escalation')
+    expect(notify).toHaveBeenCalledWith('term_lead', 'escalation')
     expect(leadDelivery(db, run.id, run.consumer_generation)?.messages).toMatchObject([
       { run_id: run.id, from_handle: 'owner', type: 'escalation' }
     ])
@@ -138,21 +137,18 @@ describe('tellGameLead', () => {
 
     expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
 
+    expect(notify).toHaveBeenCalledWith('term_lead', 'escalation')
     const run = db.getCurrentRunForPane(LEAD_PANE)
-    expect(notify).toHaveBeenCalledWith(`run:${run!.id}`, 'escalation')
     expect(run).toMatchObject({ coordinator_handle: 'term_lead', legacy: 0 })
     // An unbound `check` refuses any unread mail filed under the legacy Run.
-    expect(db.getUnreadMessages(`run:${run!.id}`, [...LEAD_WATCH_TYPES])).toMatchObject([
+    expect(db.getUnreadMessages('term_lead', [...LEAD_WATCH_TYPES])).toMatchObject([
       { run_id: run?.id, from_handle: 'owner', type: 'escalation', subject: NOTE.subject }
     ])
     expect(leadDelivery(db, run!.id, run!.consumer_generation)?.messages).toHaveLength(1)
 
     // A second answer reuses that Run.
     expect(tellGameLead(db, notify, LEAD, NOTE)).toBe(true)
-    expect(db.getUnreadMessages(`run:${run!.id}`).map((one) => one.run_id)).toEqual([
-      run?.id,
-      run?.id
-    ])
+    expect(db.getUnreadMessages('term_lead').map((one) => one.run_id)).toEqual([run?.id, run?.id])
   })
 
   it('still refuses, for a retry, a lead with no Run whose pane Orca cannot tell', () => {
