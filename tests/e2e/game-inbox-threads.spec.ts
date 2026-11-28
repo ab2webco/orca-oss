@@ -238,7 +238,8 @@ test("the Inbox shows each ticket's thread, what waits on the lead and what it a
     await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).fill('Keep Inbox')
     await renameRow.getByRole('textbox', { name: 'Your answer to ORCA-14' }).press('Enter')
     await expect(renameRow).toHaveCount(0)
-    await expect(inbox.getByRole('tab', { name: /Waiting/ })).toContainText('1')
+    // Why 2: the gate and the CI escalation still wait on the lead, as game watch --lead alerts (ORCA-1482).
+    await expect(inbox.getByRole('tab', { name: /Waiting/ })).toContainText('2')
     expect(JSON.stringify(await renameAsk)).toContain('Keep Inbox')
     await expect.poll(leadMail).toContainEqual(expect.stringContaining('Owner answered ORCA-14'))
 

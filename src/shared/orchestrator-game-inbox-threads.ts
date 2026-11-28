@@ -1,5 +1,6 @@
 /** The Inbox's view of a project's mail: one thread per ticket, what waits on the lead, and what it answered. */
 import {
+  GAME_OWNER_HANDLE,
   isMemberFailure,
   leadWaitingRowsOf,
   payloadOf,
@@ -154,8 +155,11 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
       row.type === 'decision_gate' && ticketOf.has(row.from_handle) && lead.has(row.to_handle)
   )
 
-  // Why the inbox's own set (ORCA-1482): the Waiting list must show exactly what the watch alerts on.
-  const waitingRows = leadWaitingRowsOf(source)
+  // Why the inbox's own set (ORCA-1482): the Waiting list shows what the watch alerts on, less the
+  // person's own answers, which wait for the lead to record and are no question for the person.
+  const waitingRows = leadWaitingRowsOf(source).filter(
+    (row) => row.from_handle !== GAME_OWNER_HANDLE
+  )
   const waitingIds = new Set(waitingRows.map((row) => row.id))
   const stuck = stuckReasonOf(source)
   const waiting = waitingRows.map((row): GameWaitingItem => {

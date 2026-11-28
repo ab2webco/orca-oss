@@ -137,7 +137,7 @@ describe('gameInboxThreadsOf', () => {
   })
 
   // ORCA-1482: the Waiting list is the set `game watch --lead` alerts on, escalations and owner answers included.
-  it('lists as Waiting exactly what the lead inbox waits on, and no plain send settles a gate', () => {
+  it("lists as Waiting what the lead inbox waits on, less the person's own answers, and no plain send settles a gate", () => {
     sequence = 0
     const gate = mail('term_lead', 'term_1', { type: 'decision_gate', body: 'Ship it?' })
     const plainSend = mail('term_1', 'term_lead', { body: 'Keep going' })
@@ -148,11 +148,11 @@ describe('gameInboxThreadsOf', () => {
     const { waiting, answered } = gameInboxThreadsOf(all)
 
     const lead = gameInboxesOf(all, {}).find((inbox) => inbox.key === 'lead')?.waiting ?? []
-    expect(waiting.map((one) => one.id)).toEqual(lead.map((one) => one.id))
+    // Why less the owner's: the person's answer waits for the lead to record it, not for the person.
+    expect(lead.map((one) => one.id)).toEqual([gate.id, escalation.id, fromOwner.id])
     expect(waiting.map((one) => [one.id, one.kind])).toEqual([
       [gate.id, 'decision_gate'],
-      [escalation.id, 'escalation'],
-      [fromOwner.id, 'escalation']
+      [escalation.id, 'escalation']
     ])
     expect(answered).toEqual([])
   })
