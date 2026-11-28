@@ -256,11 +256,17 @@ describe('host worktrees a found row may not claim (ORCA-1377)', () => {
     expect([...listed]).toEqual(['env_m1\0orca-1374'])
   })
 
-  it('holds a released worktree only for a host read taken before its release', () => {
-    const released = [placed('d_a', 'orca-1351', 61_000), placed('d_b', 'orca-1300', 59_000)]
+  // Why the second before: sqlite's clock, which stamps a release, can trail the read's (ORCA-1497).
+  it('holds a released worktree for a host read taken before its release or in the second after it', () => {
+    const released = [
+      placed('d_a', 'orca-1351', 61_000),
+      placed('d_b', 'orca-1300', 59_000),
+      placed('d_c', 'orca-1299', 58_000)
+    ]
 
     expect([...listedRemoteWorktreesOf([], released, [m1([], 60_500)])]).toEqual([
-      'env_m1\0orca-1351'
+      'env_m1\0orca-1351',
+      'env_m1\0orca-1300'
     ])
   })
 

@@ -1,6 +1,9 @@
 import { gameAgentOf, type GameAgent } from '../../shared/orchestrator-game-state'
 import type { RuntimeWorktreePsSummary } from '../../shared/runtime-types'
-import type { RemoteMemberWorktree } from './orchestrator-game-remote-member-worktrees'
+import {
+  releaseCutoffSecondOf,
+  type RemoteMemberWorktree
+} from './orchestrator-game-remote-member-worktrees'
 
 /** One paired host's `worktree.ps` worktrees, as read at `readAt` (ms); `answering` is its last reread's outcome. */
 export type RemoteHostSessions = {
@@ -32,10 +35,13 @@ export function listedRemoteWorktreesOf(
     )
   )
   const readAt = new Map(hosts.map((one) => [one.environmentId, one.readAt]))
-  // Why whole seconds: the home records a release at sqlite's second precision.
   const releasedSinceRead = (one: RemoteMemberWorktree): boolean => {
     const read = readAt.get(one.environmentId)
-    return one.releasedAt !== null && read !== undefined && one.releasedAt >= read - (read % 1000)
+    return (
+      one.releasedAt !== null &&
+      read !== undefined &&
+      one.releasedAt / 1000 >= releaseCutoffSecondOf(read)
+    )
   }
   return new Set([
     ...agents.flatMap((agent) =>

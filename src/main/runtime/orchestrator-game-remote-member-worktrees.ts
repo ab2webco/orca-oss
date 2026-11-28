@@ -9,6 +9,14 @@ export type RemoteMemberWorktree = {
   releasedAt: number | null
 }
 
+// Why a margin (ORCA-1497): the release is stamped by sqlite's clock, the read by Date.now(), and on
+// Windows sqlite's trails by up to a timer tick, so a release just after a read can land a second early.
+const RELEASE_CLOCK_MARGIN_MS = 1_000
+
+/** The first whole second whose releases a host read started at `readAt` (ms) may still list. */
+export const releaseCutoffSecondOf = (readAt: number): number =>
+  Math.floor((readAt - RELEASE_CLOCK_MARGIN_MS) / 1000)
+
 /**
  * Host worktrees these dispatches placed, and those of any member released since `releasedSince`
  * (ms), which a host read from before its release still lists (ORCA-1377).
@@ -30,5 +38,8 @@ export function remoteMemberWorktreesOf(
           AND (f.dispatch_id IN (SELECT value FROM json_each(?))
             OR (w.stage = 'released' AND CAST(strftime('%s', w.updated_at) AS INTEGER) >= ?))`
     )
-    .all(JSON.stringify(dispatchIds), Math.floor(releasedSince / 1000)) as RemoteMemberWorktree[]
+    .all(
+      JSON.stringify(dispatchIds),
+      releaseCutoffSecondOf(releasedSince)
+    ) as RemoteMemberWorktree[]
 }
