@@ -1,5 +1,7 @@
 /** `orca game inbox`: the orchestration mail of a project's lead and of each ticket, which outlives a closed member. */
 
+import { ORCHESTRATION_LEGACY_RUN_ID } from './orchestration-rpc-contract'
+
 /** One orchestration message row, as the Orca host's orchestration database keeps it. */
 export type GameInboxMail = {
   id: string
@@ -94,7 +96,6 @@ export type GameInboxSummary = {
 const WAITS_ON_LEAD: ReadonlySet<string> = new Set(['escalation', 'decision_gate'])
 
 // Why a copy: shared code cannot import the main process's ORCHESTRATION_LEGACY_RUN_ID.
-const GAME_LEGACY_RUN_ID = 'run_legacy_local'
 
 /** The handle Orca sends the person's answers to the lead from. */
 export const GAME_OWNER_HANDLE = 'owner'
@@ -259,7 +260,7 @@ export function stuckReasonOf(
       return null
     }
     if (
-      row.run_id === GAME_LEGACY_RUN_ID ||
+      row.run_id === ORCHESTRATION_LEGACY_RUN_ID ||
       row.delivery_contract === 'legacy_direct' ||
       row.delivery_contract === 'audit_only'
     ) {

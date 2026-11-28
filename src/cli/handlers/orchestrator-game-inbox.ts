@@ -31,6 +31,12 @@ export const formatGameInboxSettle = ({ settled, noteId }: GameInboxSettleResult
 export const ORCHESTRATOR_GAME_INBOX_HANDLERS: Record<string, CommandHandler> = {
   'game inbox': async ({ flags, client, json }) => {
     const settle = optionalText(flags, 'settle')
+    if (settle === undefined && !flags.has('settle') && flags.has('note')) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        '--note goes with --settle: orca game inbox --settle <msg> --note "<why>"'
+      )
+    }
     if (settle !== undefined || flags.has('settle')) {
       const note = optionalText(flags, 'note')
       if (!settle || !note) {

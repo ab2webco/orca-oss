@@ -101,6 +101,7 @@ describe('orca game inbox', () => {
   it('settles one message with its note, and refuses a settle without one', async () => {
     const { client, calls } = fakeClient()
     await expect(run(client, [['settle', 'msg_7']])).rejects.toThrow(/--note/)
+    await expect(run(client, [['note', 'why']])).rejects.toThrow(/--note goes with --settle/)
     expect(calls).toEqual([])
 
     await run(client, [
