@@ -6,6 +6,7 @@ import { homedir } from 'node:os'
 import { z } from 'zod'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import type { RemovedWorkspace } from '../runtime/orchestration/removed-workspace-workers'
 import type { FolderWorkspace } from '../../shared/folder-workspace-types'
 import type {
   NestedRepoScanResult,
@@ -775,9 +776,7 @@ export function setRepoRemoteClientNotifier(notifier: RepoRemoteClientNotifier):
 }
 
 // Why: a removed repo or folder workspace must settle and forget its Agent Teams members (ORCA-1478).
-async function retireGameWorkspace(
-  removal: { repoId: string } | { worktreeId: string }
-): Promise<void> {
+async function retireGameWorkspace(removal: RemovedWorkspace): Promise<void> {
   try {
     await repoRemoteClientNotifier?.retireGameWorkspace?.(removal)
   } catch (error) {
@@ -2112,13 +2111,13 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       if (!hostId) {
         throw new Error(`Invalid host ID: ${args.hostId}`)
       }
-      // Why only the last copy: the same repo id on another host may still run these members.
+      // Why the host unless last: the same repo id on another host still runs its members (ORCA-1491).
       const lastCopy = store
         .getRepos()
         .every((repo) => repo.id !== args.repoId || getRepoExecutionHostId(repo) === hostId)
-      if (lastCopy) {
-        await retireGameWorkspace({ repoId: args.repoId })
-      }
+      await retireGameWorkspace(
+        lastCopy ? { repoId: args.repoId } : { repoId: args.repoId, hostId }
+      )
       store.removeProjectForHost(args.repoId, hostId)
       invalidateAuthorizedRootsCache()
       notifyReposChanged(mainWindow)

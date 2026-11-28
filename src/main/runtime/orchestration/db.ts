@@ -77,6 +77,8 @@ import {
   liveLocalWorkersIn,
   memberDispatchState,
   settleRemovedWorkspaceWorker,
+  worktreesOnlyOnRemovedHost,
+  type MemberDispatchState,
   type RemovedWorkspace
 } from './removed-workspace-workers'
 import {
@@ -6649,9 +6651,14 @@ export class OrchestrationDb {
     }
   }
 
-  /** Whether a saved member's dispatch still runs, here or on a paired host (ORCA-1478). */
-  memberDispatchState(dispatchId: string): { live: boolean; pairedHost: boolean } | null {
+  /** Whether a saved member's dispatch still runs, here or on a paired host, and where (ORCA-1478). */
+  memberDispatchState(dispatchId: string): MemberDispatchState | null {
     return memberDispatchState(this.db, dispatchId)
+  }
+
+  /** The repo's worktrees this machine's workers used on the removed host copy alone (ORCA-1491). */
+  worktreesOnlyOnRemovedHost(removal: RemovedWorkspace): Set<string> {
+    return worktreesOnlyOnRemovedHost(this.db, removal)
   }
 
   /**

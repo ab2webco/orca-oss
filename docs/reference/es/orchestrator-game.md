@@ -1,5 +1,5 @@
 ---
-sourceHash: e132d31c7f8ccc56
+sourceHash: a92b49a74136d281
 ---
 
 # El juego orquestador de Agent Teams
@@ -1182,8 +1182,11 @@ matches …` (ORCA-866).
   propio proyecto; su historial, lecciones y STOP se quedan para cuando se vuelva a agregar
   (ORCA-1011). Un miembro guardado cuyo dispatch sigue corriendo conserva su registro, y también lo
   conserva un miembro de un host emparejado cuyo id de worktree se lee igual que el borrado: se
-  libera desde su casa. Un proyecto SSH olvidado en un host no se toca mientras otro host tenga el
-  mismo id de repo (ORCA-1491).
+  libera desde su casa. Olvidar la copia de un host de un repo que otro host también tiene
+  (`orca repo rm` con un selector `path:` o `name:`, o el olvido de un host en el escritorio) retira
+  solo a los miembros cuya terminal corrió en ese host (ORCA-1491): los miembros de la otra copia
+  siguen vivos y guardados, el proyecto propio del repo no se vacía, y un miembro guardado o un
+  descarte que Orca no puede ubicar en el host olvidado se queda.
 - `orca game stop [<key>,... | --all]` — termina los miembros nombrados, o todos, para que ningún
   agente miembro siga corriendo: cada dispatch vivo se detiene y luego se cierra la terminal del
   miembro cuando la detención no la cerró (un dispatch detenido puede dejar su terminal retenida).
