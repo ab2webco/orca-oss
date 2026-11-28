@@ -1,8 +1,9 @@
 import React from 'react'
 import { ExternalLink } from 'lucide-react'
-import type {
-  GameOwnerQuestion,
-  GameOwnerReply
+import {
+  gameOwnerQuestionTickets,
+  type GameOwnerQuestion,
+  type GameOwnerReply
 } from '../../../../shared/orchestrator-game-owner-questions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -74,7 +75,7 @@ export function GameOwnerQuestionCard({
               needsYou && 'ml-auto text-muted-foreground'
             )}
           >
-            {question.ticket}
+            {gameOwnerQuestionTickets(question).join(', ')}
           </span>
         ) : null}
         {needsYou ? null : (

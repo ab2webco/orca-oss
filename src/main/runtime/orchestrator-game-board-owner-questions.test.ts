@@ -360,7 +360,7 @@ describe('GameBoard owner questions', () => {
       const { question } = await game.askOwner({ ...ask, ticket: 'CIN-2' })
 
       await expect(readBoardOwnerAnswer(store, MEMBER, { id: question.id })).rejects.toThrow(
-        `Question ${question.id} is not on your ticket CIN-1.`
+        `Question ${question.id} does not name your ticket CIN-1`
       )
       await expect(readBoardOwnerAnswer(store, MEMBER, { id: 'oq_missing' })).rejects.toThrow(
         'No question oq_missing is on record for CIN-1.'

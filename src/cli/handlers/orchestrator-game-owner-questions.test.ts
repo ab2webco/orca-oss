@@ -89,6 +89,52 @@ describe('orca game owner questions', () => {
     expect(output.join('\n')).toContain('Asked the person oq_1 (CIN-1)')
   })
 
+  // Why (ORCA-1490): one answer often authorizes several tickets' PRs.
+  it('asks once for several tickets, keeping the first in ticket for an older host', async () => {
+    const asked = { ...QUESTION, tickets: ['CIN-1', 'CIN-2', 'CIN-3'] }
+    const { client, calls } = fakeClient({ question: asked })
+
+    await run(
+      'game ask-owner',
+      client,
+      [
+        ['ticket', `cin-1${REPEATED_FLAG_SEPARATOR}CIN-2,cin-3${REPEATED_FLAG_SEPARATOR}CIN-1`],
+        ['question', 'Merge all three?']
+      ],
+      false
+    )
+
+    expect(calls[0]).toEqual([
+      'game.ownerAsk',
+      {
+        worktreeId: 'wt1',
+        terminalHandle: 'term_lead',
+        ticket: 'CIN-1',
+        tickets: ['CIN-1', 'CIN-2', 'CIN-3'],
+        question: 'Merge all three?'
+      }
+    ])
+    expect(output.join('\n')).toContain('Asked the person oq_1 (CIN-1, CIN-2, CIN-3).')
+  })
+
+  it('says which tickets a host from before ORCA-1490 dropped', async () => {
+    const { client } = fakeClient({ question: QUESTION })
+
+    await run(
+      'game ask-owner',
+      client,
+      [
+        ['ticket', `CIN-1${REPEATED_FLAG_SEPARATOR}CIN-2`],
+        ['question', 'Merge both?']
+      ],
+      false
+    )
+
+    expect(output.join('\n')).toContain(
+      'This Orca host kept only CIN-1: update it so the members of CIN-2 can read this question.'
+    )
+  })
+
   it('refuses an ask without a question before calling Orca', async () => {
     const { client, calls } = fakeClient({})
     await expect(run('game ask-owner', client, [])).rejects.toThrow(/--question/)

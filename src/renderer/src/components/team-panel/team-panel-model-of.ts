@@ -1,7 +1,10 @@
 import { gameCharacterLevelOf } from '../../../../shared/orchestrator-game-characters'
 import { DEFAULT_GAME_REWARD_WEIGHTS } from '../../../../shared/orchestrator-game-reward-weights'
 import { translate } from '@/i18n/i18n'
-import type { GameOwnerQuestion } from '../../../../shared/orchestrator-game-owner-questions'
+import {
+  gameOwnerQuestionTickets,
+  type GameOwnerQuestion
+} from '../../../../shared/orchestrator-game-owner-questions'
 import type { OrchestratorGameState } from '../../../../shared/orchestrator-game-state'
 import { gameMembersRunningOf, teamActionsOf } from '../../../../shared/team-panel-actions'
 import { teamAdvisorRowOf } from '../../../../shared/team-panel-activity-rows'
@@ -111,7 +114,7 @@ export function teamPanelModelOf(args: {
   const { state, questions } = args
   const openTickets = new Set(
     (questions ?? []).flatMap((one) =>
-      !one.answer && one.ticket ? [one.ticket.toUpperCase()] : []
+      one.answer ? [] : gameOwnerQuestionTickets(one).map((ticket) => ticket.toUpperCase())
     )
   )
   const open = (questions ?? []).filter((one) => !one.answer)

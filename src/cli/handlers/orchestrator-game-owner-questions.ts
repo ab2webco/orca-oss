@@ -8,9 +8,10 @@ import {
   gameCallerRole,
   optionalText
 } from './orchestrator-game-board-call'
-import type {
-  GameOwnerAnswerVia,
-  GameOwnerQuestion
+import {
+  gameOwnerQuestionTickets,
+  type GameOwnerAnswerVia,
+  type GameOwnerQuestion
 } from '../../shared/orchestrator-game-owner-questions'
 
 type AskResult = { question: GameOwnerQuestion }
@@ -38,8 +39,10 @@ const VIA_TEXT: Record<GameOwnerAnswerVia, string> = {
   cli: 'with `game answer-owner` in a terminal'
 }
 
+const ticketsText = (one: GameOwnerQuestion): string => gameOwnerQuestionTickets(one).join(', ')
+
 function formatQuestion(one: GameOwnerQuestion): string[] {
-  const head = `${one.id}${one.ticket ? ` ${one.ticket}` : ''} asked ${one.askedAt}: ${one.question}`
+  const head = `${one.id}${one.ticket ? ` ${ticketsText(one)}` : ''} asked ${one.askedAt}: ${one.question}`
   const options = one.options.map((option, index) => `${index + 1}) ${option}`).join('  ')
   return [
     head,
@@ -119,7 +122,15 @@ function replyOf(flags: Map<string, string | boolean>): { option: number } | { t
 export const ORCHESTRATOR_GAME_OWNER_QUESTION_HANDLERS: Record<string, CommandHandler> = {
   'game ask-owner': async ({ flags, client, json }) => {
     const question = requiredText(flags, 'question')
-    const ticket = optionalText(flags, 'ticket')?.toUpperCase()
+    // Why commas too: `--ticket A,B` reads as naturally as a repeated flag.
+    const tickets = [
+      ...new Set(
+        getRepeatedStringFlag(flags, 'ticket')
+          .flatMap((one) => one.split(','))
+          .map((one) => one.trim().toUpperCase())
+          .filter((one) => one !== '')
+      )
+    ]
     const context = optionalText(flags, 'context')
     const options = getRepeatedStringFlag(flags, 'option')
     const response = await callGameBoard<AskResult>(
@@ -127,19 +138,23 @@ export const ORCHESTRATOR_GAME_OWNER_QUESTION_HANDLERS: Record<string, CommandHa
       'game.ownerAsk',
       {
         ...gameBoardCaller(),
-        ...(ticket ? { ticket } : {}),
+        // Why ticket as well: a host from before ORCA-1490 drops `tickets` and keeps the first.
+        ...(tickets.length > 0 ? { ticket: tickets[0] } : {}),
+        ...(tickets.length > 1 ? { tickets } : {}),
         question,
         ...(options.length > 0 ? { options } : {}),
         ...(context ? { context } : {})
       },
       WHAT
     )
-    printResult(
-      response,
-      json,
-      ({ question: asked }) =>
-        `Asked the person ${asked.id}${asked.ticket ? ` (${asked.ticket})` : ''}. Their answer reaches you as an escalation.`
-    )
+    printResult(response, json, ({ question: asked }) => {
+      const kept = gameOwnerQuestionTickets(asked)
+      const dropped =
+        kept.length < tickets.length
+          ? ` This Orca host kept only ${kept.join(', ')}: update it so the members of ${tickets.filter((one) => !kept.includes(one)).join(', ')} can read this question.`
+          : ''
+      return `Asked the person ${asked.id}${kept.length ? ` (${kept.join(', ')})` : ''}. Their answer reaches you once, as an escalation.${dropped}`
+    })
   },
   'game owner-questions': async ({ flags, client, json }) => {
     const response = await callGameBoard<ListResult>(

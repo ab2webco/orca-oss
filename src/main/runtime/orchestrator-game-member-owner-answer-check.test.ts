@@ -55,7 +55,7 @@ describe("a remote member's host keeps its lead host's owner answers (ORCA-1281)
     })
     await expect(
       readRemoteMemberOwnerAnswer(memberHost, 'ctx_1', 'oq_other', fresh)
-    ).rejects.toThrow(/No question oq_other for your ticket reached this host/)
+    ).rejects.toThrow(/No question oq_other naming your ticket reached this host/)
     await expect(
       readRemoteMemberOwnerAnswer(memberHost, 'ctx_2', 'oq_mine', fresh)
     ).rejects.toThrow(/No question oq_mine/)

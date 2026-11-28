@@ -7,10 +7,10 @@ import type {
 } from './orchestrator-game-board'
 import {
   deliverGameOwnerAnswers,
-  gameOwnerAnswerNote,
   parseGameOwnerQuestion,
   type GameOwnerQuestion
 } from '../../shared/orchestrator-game-owner-questions'
+import { gameOwnerAnswerNote } from '../../shared/orchestrator-game-owner-answer-note'
 
 export type TellGameLead = (lead: GameBoardLead, note: GameLeadNote) => boolean
 

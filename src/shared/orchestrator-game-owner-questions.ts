@@ -15,7 +15,10 @@ export type GameOwnerAnswer = {
 
 export type GameOwnerQuestion = {
   id: string
+  /** The first ticket named, so a build from before ORCA-1490 still reads the question. */
   ticket: string | null
+  /** Every ticket named, set only when there are several (ORCA-1490). */
+  tickets?: string[]
   question: string
   options: string[]
   /** A link or one line that lets the person answer without the lead's chat. */
@@ -27,6 +30,7 @@ export type GameOwnerQuestion = {
 /** What the lead asks; the board stamps id, time and answer. */
 export type GameOwnerQuestionDraft = {
   ticket?: string
+  tickets?: readonly string[]
   question: string
   options?: readonly string[]
   context?: string
@@ -48,6 +52,7 @@ export const GAME_OWNER_QUESTION_TEXT_MAX = 2000
 export const GAME_OWNER_OPTION_TEXT_MAX = 200
 export const GAME_OWNER_OPTIONS_MAX = 6
 export const GAME_OWNER_CONTEXT_MAX = 500
+export const GAME_OWNER_TICKETS_MAX = 10
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -71,7 +76,20 @@ function answerOf(value: unknown): GameOwnerAnswer | null | undefined {
   }
 }
 
-/** One question by id; a member (`ticket` set) reads only its own ticket's (ORCA-1281). */
+/** Every ticket a question names, first one first. */
+export function gameOwnerQuestionTickets(question: GameOwnerQuestion): string[] {
+  return question.tickets ?? (question.ticket ? [question.ticket] : [])
+}
+
+export function gameOwnerQuestionCoversTicket(
+  question: GameOwnerQuestion,
+  ticket: string
+): boolean {
+  const upper = ticket.toUpperCase()
+  return gameOwnerQuestionTickets(question).some((one) => one.toUpperCase() === upper)
+}
+
+/** One question by id; a member (`ticket` set) reads only one that names its ticket (ORCA-1281). */
 export function gameOwnerQuestionForTicket(
   list: readonly unknown[],
   id: string,
@@ -83,8 +101,10 @@ export function gameOwnerQuestionForTicket(
   if (!question) {
     throw new Error(`No question ${id} is on record for ${ticket ?? 'this project'}.`)
   }
-  if (ticket !== null && question.ticket?.toUpperCase() !== ticket.toUpperCase()) {
-    throw new Error(`Question ${id} is not on your ticket ${ticket}.`)
+  if (ticket !== null && !gameOwnerQuestionCoversTicket(question, ticket)) {
+    throw new Error(
+      `Question ${id} does not name your ticket ${ticket}, so it does not cover your work. Ask your lead to ask the person with --ticket ${ticket}.`
+    )
   }
   return question
 }
@@ -97,6 +117,10 @@ export function parseGameOwnerQuestion(raw: unknown): GameOwnerQuestion | null {
   const ticket = textOrNull(raw.ticket)
   const context = textOrNull(raw.context)
   const answer = answerOf(raw.answer)
+  const tickets =
+    Array.isArray(raw.tickets) && raw.tickets.every((one) => typeof one === 'string')
+      ? (raw.tickets as string[])
+      : undefined
   if (
     typeof id !== 'string' ||
     typeof question !== 'string' ||
@@ -109,7 +133,16 @@ export function parseGameOwnerQuestion(raw: unknown): GameOwnerQuestion | null {
   ) {
     return null
   }
-  return { id, ticket, question, options, context, askedAt, answer }
+  return {
+    id,
+    ticket,
+    ...(tickets && tickets.length > 0 ? { tickets } : {}),
+    question,
+    options,
+    context,
+    askedAt,
+    answer
+  }
 }
 
 /** One project's open questions on a host, with a worktree the Inbox answers through. */
@@ -239,7 +272,7 @@ export function openGameOwnerQuestions(list: readonly unknown[]): GameOwnerQuest
   })
 }
 
-const clipped = (text: string, max: number): string =>
+export const clipped = (text: string, max: number): string =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text
 
 const NOTIFICATION_BODY_MAX = 180
@@ -274,8 +307,15 @@ export function gameOwnerQuestionMobileNotification(
 /** Throws the reason a draft cannot be kept. */
 export function gameOwnerQuestionDraftOf(
   draft: GameOwnerQuestionDraft
-): Pick<GameOwnerQuestion, 'ticket' | 'question' | 'options' | 'context'> {
+): Pick<GameOwnerQuestion, 'ticket' | 'tickets' | 'question' | 'options' | 'context'> {
   const question = draft.question.trim()
+  const tickets = [
+    ...new Set(
+      [draft.ticket, ...(draft.tickets ?? [])]
+        .map((one) => one?.trim().toUpperCase() ?? '')
+        .filter((one) => one !== '')
+    )
+  ]
   const options = (draft.options ?? []).map((one) => one.trim()).filter((one) => one !== '')
   const context = draft.context?.trim() || null
   if (question === '') {
@@ -293,37 +333,15 @@ export function gameOwnerQuestionDraftOf(
   if (context && context.length > GAME_OWNER_CONTEXT_MAX) {
     throw new Error(`The context is over ${GAME_OWNER_CONTEXT_MAX} characters.`)
   }
-  return { ticket: draft.ticket?.trim().toUpperCase() || null, question, options, context }
-}
-
-/** What the lead is told to do with an answer: Orca already keeps it, so the tracker gets product words only (ORCA-1488). */
-export function gameAnswerRecordLine(ticket: string | null, recordOnTicket: boolean): string {
-  if (!recordOnTicket) {
-    return 'Orca already keeps this answer (orca game owner-questions, orca game history): do not comment it on the tracker.'
+  if (tickets.length > GAME_OWNER_TICKETS_MAX) {
+    throw new Error(`Name at most ${GAME_OWNER_TICKETS_MAX} tickets.`)
   }
-  const where = ticket ? ` on ${ticket}` : ''
-  return `Record this answer${where}: the question and the answer in product terms, never Orca's ids, hosts or authorizations.`
-}
-
-// Why the answer first: it is what the lead acts on, so it leads the body.
-export function gameOwnerAnswerNote(
-  question: GameOwnerQuestion,
-  recordOnTicket = true
-): {
-  subject: string
-  body: string
-  payload: Record<string, unknown>
-} {
-  const answer = question.answer?.text ?? ''
-  const on = question.ticket ? ` ${question.ticket}` : ''
   return {
-    subject: `Owner answered${on}: ${clipped(question.question, 80)}`,
-    body: [
-      `Answer: ${answer}`,
-      `Question: ${question.question}`,
-      gameAnswerRecordLine(question.ticket, recordOnTicket),
-      `When you relay it to a member, cite ${question.id} in that mail, never on the tracker: the member checks it with \`orca game owner-question ${question.id}\`.`
-    ].join('\n'),
-    payload: { ownerQuestionId: question.id, ticket: question.ticket, answer }
+    ticket: tickets[0] ?? null,
+    // Why only for several: a one-ticket record stays exactly what older builds wrote.
+    ...(tickets.length > 1 ? { tickets } : {}),
+    question,
+    options,
+    context
   }
 }
