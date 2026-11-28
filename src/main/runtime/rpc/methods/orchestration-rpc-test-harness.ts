@@ -30,6 +30,8 @@ export function createOrchestrationRpcHarness() {
     vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
       handle === 'term_coord' ? coordinatorPaneKey : null
     )
+    // Why: no renderer graph here, so every fixture handle stands for a live pane unless a test says otherwise.
+    vi.spyOn(runtime, 'describeOrchestrationRecipientHandle').mockReturnValue({ state: 'live' })
     vi.spyOn(runtime, 'getTerminalProcessIncarnation').mockImplementation((handle) =>
       handle.startsWith('term_') ? `runtime_test:${handle}:1` : null
     )

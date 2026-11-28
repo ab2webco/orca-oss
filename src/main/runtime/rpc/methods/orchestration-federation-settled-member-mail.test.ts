@@ -428,6 +428,9 @@ describe('remote member mail to its Run home after worker_done', () => {
 
   it('keeps plain mail to a real terminal on the host local', async () => {
     const member = await settledMember()
+    vi.spyOn(workerRuntime, 'describeOrchestrationRecipientHandle').mockReturnValue({
+      state: 'live'
+    })
 
     await expect(
       report(member.capability, { to: 'term_windows_setup', body: 'local note' })

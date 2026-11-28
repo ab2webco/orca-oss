@@ -7752,6 +7752,14 @@ export class OrchestrationDb {
     )
   }
 
+  /** Whether this handle ever sent mail, the proof a refused recipient once named a pane (ORCA-1492). */
+  hasMessageFromHandle(handle: string): boolean {
+    return (
+      this.db.prepare('SELECT 1 FROM messages WHERE from_handle = ? LIMIT 1').get(handle) !==
+      undefined
+    )
+  }
+
   getLatestDispatchForTerminal(handle: string): DispatchContextRow | undefined {
     return this.db
       .prepare(

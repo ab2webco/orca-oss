@@ -33,6 +33,7 @@ describe('orchestration.send from a sender with no active Dispatch (ORCA-726)', 
     const runtime = new OrcaRuntimeService()
     runtime.setOrchestrationDb(adopted)
     vi.spyOn(runtime, 'getTerminalPaneKey').mockReturnValue(null)
+    vi.spyOn(runtime, 'describeOrchestrationRecipientHandle').mockReturnValue({ state: 'live' })
     return { adopted, runtime }
   }
 

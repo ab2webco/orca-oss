@@ -55,6 +55,7 @@ import type { AgentTurnAcceptance } from '../../agent-composer-readiness'
 import type { AgentPromptSubmitProbe } from '../../agent-prompt-submit-probe'
 import type { RunRow } from '../../orchestration/types'
 import { refuseRemoteMemberMail } from '../../orchestration/remote-member-mail-refusal'
+import { assertOrchestrationRecipient } from '../../orchestration/orchestration-recipient-check'
 import { ORCHESTRATION_FEDERATION_LIFECYCLE_SETTLEMENT_PROTOCOL_VERSION } from '../../../../shared/protocol-version'
 
 const TASK_STATUSES: TaskStatus[] = [
@@ -705,6 +706,7 @@ export const ORCHESTRATION_METHODS: RpcMethod[] = [
             { runId: routing.run?.id, beforeEnqueue: revalidateLegacyCoordinator }
           )
         }
+        assertOrchestrationRecipient(runtime, db, to)
         // Point-to-point — existing single-recipient behavior
         const contractRunId = routing.run?.id ?? legacyCoordinatorRunId
         revalidateLegacyCoordinator?.()

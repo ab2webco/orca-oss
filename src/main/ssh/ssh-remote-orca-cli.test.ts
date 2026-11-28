@@ -149,6 +149,8 @@ describe('runRemoteOrcaCli', () => {
           sections: {}
         }
       })),
+      // Why: the fake runtime has no pane graph; the recipients these tests mail stand for live panes.
+      describeOrchestrationRecipientHandle: vi.fn(() => ({ state: 'live' })),
       linearSearchForAgents: vi.fn(async (request: unknown) => ({
         request,
         issues: [],
