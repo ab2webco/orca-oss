@@ -891,7 +891,13 @@ import type {
   GameMemberSessionPatch
 } from '../../shared/orchestrator-game-member-sessions'
 import type { GameEffortPlan } from '../../shared/orchestrator-game-effort-plan'
-import { GameBoard, type GameBoardProject } from './orchestrator-game-board'
+import {
+  GameBoard,
+  type GameBoardCaller,
+  type GameBoardLead,
+  type GameBoardProject
+} from './orchestrator-game-board'
+import type { GameInboxSource } from '../../shared/orchestrator-game-inbox'
 import {
   keepRemoteMemberOwnerAnswers,
   readBoardOwnerAnswer,
@@ -931,6 +937,7 @@ import { adoptGameProjectHistory } from './orchestrator-game-history-adoption'
 import type { GameHistoryAdoption } from '../../shared/orchestrator-game-log-adoption'
 import { gameInboxSourceOf } from './orchestrator-game-inbox-source'
 import { tellGameLead } from './orchestrator-game-lead-note'
+import { GameInboxSettler, settleLeadInboxRow } from './orchestrator-game-inbox-settle'
 import { ticketInText } from '../../shared/orchestrator-game-fleet-verbs'
 import { filterGameHistory, type GameHistoryRecord } from '../../shared/orchestrator-game-history'
 import type { GameCharacter } from '../../shared/orchestrator-game-characters'
@@ -4203,14 +4210,8 @@ export class OrcaRuntimeService {
   private readonly gameBoard = new GameBoard({
     store: this.gameHistory,
     stops: this.gameStops,
-    projectOf: async (caller) =>
-      withProjectLead(
-        await this.gameBoardProjectOf(caller),
-        (projectKey) => this.gameLeads.liveLeadOf(projectKey),
-        (handle) => this.getPaneKeyForTerminalHandle(handle) ?? null
-      ),
-    inboxSourceOf: (lead) =>
-      gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels()),
+    projectOf: (caller) => this.gameBoardLeadProjectOf(caller),
+    inboxSourceOf: (lead) => this.gameInboxSourceOfLead(lead),
     recordsAnswersOnTicket: async (caller) => {
       const { key, worktree } = await this.gameHistoryProjectOf(caller)
       return isOrchestratorGameRecordOnTicketOn(
@@ -4263,6 +4264,15 @@ export class OrcaRuntimeService {
         lead,
         args
       )
+  })
+  private readonly gameInboxSettler = new GameInboxSettler({
+    projectOf: (caller) => this.gameBoardLeadProjectOf(caller),
+    inboxSourceOf: (lead) => this.gameInboxSourceOfLead(lead),
+    write: (lead, row, settle) => {
+      const noteId = settleLeadInboxRow(this.getOrchestrationDb(), lead, row, settle)
+      this.gameInboxChange.mailArrived('status')
+      return noteId
+    }
   })
   private readonly gameInboxChange = new GameInboxChangeSignal(() => {
     this.notifier?.gameInboxChanged?.()
@@ -31754,6 +31764,23 @@ export class OrcaRuntimeService {
 
   getGameBoard(): GameBoard {
     return this.gameBoard
+  }
+
+  getGameInboxSettler(): GameInboxSettler {
+    return this.gameInboxSettler
+  }
+
+  // Why one place: the board and the settler must find the same lead for a caller.
+  private async gameBoardLeadProjectOf(caller: GameBoardCaller): Promise<GameBoardProject> {
+    return withProjectLead(
+      await this.gameBoardProjectOf(caller),
+      (projectKey) => this.gameLeads.liveLeadOf(projectKey),
+      (handle) => this.getPaneKeyForTerminalHandle(handle) ?? null
+    )
+  }
+
+  private gameInboxSourceOfLead(lead: GameBoardLead): GameInboxSource {
+    return gameInboxSourceOf(this.getOrchestrationDb(), lead, this.gameLeads.labels())
   }
 
   // Why: what each remote member's host last received from this lead's host (ORCA-1281).

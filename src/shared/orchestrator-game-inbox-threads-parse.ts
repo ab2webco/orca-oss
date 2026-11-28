@@ -23,14 +23,17 @@ const Message: z.ZodType<GameThreadMessage> = z.object({
     .nullable()
 })
 
+// Why apart from Kind: an answered item is never an escalation, and an older build drops the new kind.
 const Waiting: z.ZodType<GameWaitingItem> = z.object({
   id: z.string(),
   ticket: z.string(),
-  kind: Kind,
+  kind: z.enum(['question', 'decision_gate', 'escalation']),
   subject: z.string(),
   body: z.string(),
   at: z.string(),
-  answerer: z.string()
+  answerer: z.string(),
+  // Why catch: a newer host's reason this build does not know still shows the row, without Dismiss.
+  stuck: z.enum(['legacy_run', 'reminted_lead', 'gone_sender']).optional().catch(undefined)
 })
 
 const Answered: z.ZodType<GameAnsweredItem> = z.object({

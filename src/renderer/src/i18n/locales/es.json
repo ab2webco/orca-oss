@@ -16746,7 +16746,15 @@
       "answeredEmpty": "Todavía no hay nada respondido.",
       "leadAnsweredText": "Respondió el lead: {{text}}",
       "answer": "Responder",
-      "answerFailed": "No se pudo enviar la respuesta. Abre la terminal."
+      "answerFailed": "No se pudo enviar la respuesta. Abre la terminal.",
+      "dismiss": "Descartar",
+      "dismissNote": "Por qué (queda como nota)",
+      "dismissNoteLabel": "Por qué lo descartas",
+      "dismissCancel": "Cancelar",
+      "dismissFailed": "No se descartó.",
+      "stuckLegacyRun": "Ninguna respuesta le llega: está en un Run antiguo.",
+      "stuckRemintedLead": "Ninguna respuesta le llega: fue a la terminal antigua del lead.",
+      "stuckGoneSender": "Ninguna respuesta le llega: quien lo envió ya no está."
     },
     "actions": {
       "label": "Acciones",

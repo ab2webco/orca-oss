@@ -123,6 +123,7 @@ function renderInbox(
       otherGroups={[other]}
       threads={THREADS}
       onReply={vi.fn(async () => {})}
+      onDismiss={vi.fn(async () => {})}
       agentQuestions={[]}
       answeredQuestions={[]}
       agentAnswers={[]}

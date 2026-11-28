@@ -1,5 +1,7 @@
 /** `orca game inbox`: the orchestration mail of a project's lead and of each ticket, which outlives a closed member. */
 
+import { ORCHESTRATION_LEGACY_RUN_ID } from './orchestration-rpc-contract'
+
 /** One orchestration message row, as the Orca host's orchestration database keeps it. */
 export type GameInboxMail = {
   id: string
@@ -16,12 +18,16 @@ export type GameInboxMail = {
   thread_id?: string | null
   /** The message `orchestration reply` answered; absent from older builds and plain sends. */
   reply_to?: string | null
+  run_id?: string | null
+  delivery_contract?: string | null
 }
 
 /** Every address mail to the lead or to a ticket's member ever went to, and that mail. */
 export type GameInboxSource = {
   /** The lead's terminal and its run mailbox. */
   leadAddresses: readonly string[]
+  /** The lead's terminal now: mail to an older handle of the lead's cannot be replied to. */
+  leadHandle?: string
   /** Each ticket's terminals and dispatch mailboxes, closed ones included; `ticket` is the name when it has none. */
   members: readonly { ticket: string; addresses: readonly string[] }[]
   mail: readonly GameInboxMail[]
@@ -42,6 +48,9 @@ export type GameAnsweredQuestionMail = GameInboxMail & {
   answered_at: string | null
 }
 
+/** Why `orchestration reply` cannot settle a waiting row, so the lead settles it with a note (ORCA-1482). */
+export type GameStuckReason = 'legacy_run' | 'reminted_lead' | 'gone_sender'
+
 /** A question a member asked that nobody has answered: it waits on the lead until it is. */
 export type GameWaitingMessage = {
   id: string
@@ -49,6 +58,8 @@ export type GameWaitingMessage = {
   from: string
   subject: string
   at: string
+  /** Set only when no reply can settle it: `game inbox --settle` does. */
+  stuck?: GameStuckReason
 }
 
 export type GameInboxMessage = {
@@ -83,6 +94,8 @@ export type GameInboxSummary = {
 }
 
 const WAITS_ON_LEAD: ReadonlySet<string> = new Set(['escalation', 'decision_gate'])
+
+// Why a copy: shared code cannot import the main process's ORCHESTRATION_LEGACY_RUN_ID.
 
 /** The handle Orca sends the person's answers to the lead from. */
 export const GAME_OWNER_HANDLE = 'owner'
@@ -187,6 +200,86 @@ function withoutSupersededFailures(
   return rows.filter((row) => !superseded.has(row.id))
 }
 
+const ticketOfAddress = (source: GameInboxSource): Map<string, string> =>
+  new Map(
+    source.members.flatMap((member) =>
+      member.addresses.map((address) => [address, member.ticket] as const)
+    )
+  )
+
+// Why: heartbeats are liveness, not mail; dozens of them would bury a worker_done past the 50-message cap.
+function mailOldestFirstOf(source: GameInboxSource): GameInboxMail[] {
+  const all = [...new Map(source.mail.map((row) => [row.id, row])).values()].sort(
+    (a, b) => a.sequence - b.sequence
+  )
+  return withoutSupersededFailures(all, ticketOfAddress(source)).filter(
+    (row) => row.type !== 'heartbeat'
+  )
+}
+
+/**
+ * What waits on the lead, oldest first: the one set `game watch --lead` alerts on and the Inbox's
+ * Waiting list shows (ORCA-1482). A member escalation or gate waits like a question until a reply
+ * names it (ORCA-1154, ORCA-1481); an owner answer until the lead reads it (ORCA-1431).
+ */
+export function leadWaitingRowsOf(
+  source: GameInboxSource,
+  oldestFirst: readonly GameInboxMail[] = mailOldestFirstOf(source)
+): GameInboxMail[] {
+  const lead = new Set(source.leadAddresses)
+  // Why every mail row, not only the window kept: a reply older than a superseded failure still settles.
+  const replied = repliedIdsOf([...source.mail, ...(source.ownerReplies ?? [])])
+  const fromReleased = releasedSenderOf(source)
+  const unanswered = oldestFirst.filter(
+    (row) =>
+      lead.has(row.to_handle) &&
+      WAITS_ON_LEAD.has(row.type) &&
+      !replied.has(row.id) &&
+      !fromReleased(row) &&
+      !(row.from_handle === GAME_OWNER_HANDLE && row.read !== 0)
+  )
+  const pending = (source.pendingQuestions ?? []).filter((row) => lead.has(row.to_handle))
+  return [...new Map([...pending, ...unanswered].map((row) => [row.id, row])).values()].sort(
+    (a, b) => a.sequence - b.sequence
+  )
+}
+
+// Why these three: `orchestration reply` refuses a legacy Run's mail and mail to a lead handle no
+// pane holds, and a reply to a sender outside the team reaches nobody (ORCA-1475 C12).
+export function stuckReasonOf(
+  source: GameInboxSource
+): (row: GameInboxMail) => GameStuckReason | null {
+  const ticketOf = ticketOfAddress(source)
+  const known = new Set([
+    GAME_OWNER_HANDLE,
+    ...source.leadAddresses,
+    ...Object.keys(source.peerLeads ?? {})
+  ])
+  return (row) => {
+    if (row.type === 'question') {
+      return null
+    }
+    if (
+      row.run_id === ORCHESTRATION_LEGACY_RUN_ID ||
+      row.delivery_contract === 'legacy_direct' ||
+      row.delivery_contract === 'audit_only'
+    ) {
+      return 'legacy_run'
+    }
+    if (
+      source.leadHandle &&
+      !row.to_handle.startsWith('run:') &&
+      row.to_handle !== source.leadHandle
+    ) {
+      return 'reminted_lead'
+    }
+    const dispatch = dispatchOfRow(row)
+    const member =
+      ticketOf.has(row.from_handle) || (dispatch !== null && ticketOf.has(`dispatch:${dispatch}`))
+    return member || known.has(row.from_handle) ? null : 'gone_sender'
+  }
+}
+
 /** The lead's inbox first, then one per ticket; a message is unread until an agent read it or the board's cursor passed it. */
 export function gameInboxesOf(
   source: GameInboxSource,
@@ -204,54 +297,33 @@ export function gameInboxesOf(
   for (const address of source.leadAddresses) {
     labelOf.set(address, 'lead')
   }
-  const ticketOf = new Map(
-    source.members.flatMap((member) =>
-      member.addresses.map((address) => [address, member.ticket] as const)
-    )
-  )
-  const allOldestFirst = [...new Map(source.mail.map((row) => [row.id, row])).values()].sort(
-    (a, b) => a.sequence - b.sequence
-  )
-  // Why: heartbeats are liveness, not mail; dozens of them would bury a worker_done past the 50-message cap.
-  const oldestFirst = withoutSupersededFailures(allOldestFirst, ticketOf).filter(
-    (row) => row.type !== 'heartbeat'
-  )
+  const oldestFirst = mailOldestFirstOf(source)
   const inboxes = [
     { key: 'lead', addresses: source.leadAddresses },
     ...source.members.map((member) => ({ key: member.ticket, addresses: member.addresses }))
   ]
-  const pending = source.pendingQuestions ?? []
-  // Why: an escalation or gate a member sent waits on the lead like a question until a reply threads it (ORCA-1154).
-  const replied = repliedIdsOf([...allOldestFirst, ...(source.ownerReplies ?? [])])
-  // Why (ORCA-1431): an owner answer asks for no reply, so the lead acking its delivery settles it.
-  const settledOwnerAnswer = (row: GameInboxMail): boolean =>
-    row.from_handle === GAME_OWNER_HANDLE && row.read !== 0
-  const fromReleased = releasedSenderOf(source)
+  const waitingOnLead = leadWaitingRowsOf(source, oldestFirst)
+  const stuck = stuckReasonOf(source)
   return inboxes.map(({ key, addresses }) => {
     const to = new Set(addresses)
     const cursor = cursors[key] ?? 0
     const rows = withoutRepeatedDone(oldestFirst.filter((row) => to.has(row.to_handle)))
-    const unanswered =
+    const waiting = (
       key === 'lead'
-        ? rows.filter(
-            (row) =>
-              WAITS_ON_LEAD.has(row.type) &&
-              !replied.has(row.id) &&
-              !fromReleased(row) &&
-              !settledOwnerAnswer(row)
-          )
-        : []
-    const waiting = [...new Map([...pending, ...unanswered].map((row) => [row.id, row])).values()]
-      .filter((row) => to.has(row.to_handle))
-      .sort((a, b) => a.sequence - b.sequence)
-      .map(
-        (row): GameWaitingMessage => ({
-          id: row.id,
-          from: labelOf.get(row.from_handle) ?? row.from_handle,
-          subject: row.subject,
-          at: row.created_at
-        })
-      )
+        ? waitingOnLead
+        : (source.pendingQuestions ?? [])
+            .filter((row) => to.has(row.to_handle))
+            .sort((a, b) => a.sequence - b.sequence)
+    ).map((row): GameWaitingMessage => {
+      const reason = stuck(row)
+      return {
+        id: row.id,
+        from: labelOf.get(row.from_handle) ?? row.from_handle,
+        subject: row.subject,
+        at: row.created_at,
+        ...(reason ? { stuck: reason } : {})
+      }
+    })
     const messages = rows.toReversed().map(
       (row): GameInboxMessage => ({
         id: row.id,

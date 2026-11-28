@@ -17704,7 +17704,15 @@
       "answeredEmpty": "Nothing answered yet.",
       "leadAnsweredText": "The lead answered: {{text}}",
       "answer": "Answer",
-      "answerFailed": "Could not send the answer. Open the terminal."
+      "answerFailed": "Could not send the answer. Open the terminal.",
+      "dismiss": "Dismiss",
+      "dismissNote": "Why (kept as a note)",
+      "dismissNoteLabel": "Why you dismiss it",
+      "dismissCancel": "Cancel",
+      "dismissFailed": "It was not dismissed.",
+      "stuckLegacyRun": "No reply can reach it: it is in an old Run.",
+      "stuckRemintedLead": "No reply can reach it: it went to the lead's old terminal.",
+      "stuckGoneSender": "No reply can reach it: its sender is gone."
     },
     "actions": {
       "label": "Actions",

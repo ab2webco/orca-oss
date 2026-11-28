@@ -102,19 +102,22 @@ export const ORCHESTRATOR_GAME_BOARD_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['game', 'inbox'],
     summary: "Messages to the lead or to one ticket's member, kept after the member closed",
-    usage: 'orca game inbox [--ticket <id>] [--unread] [--mark-read] [--json]',
-    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'unread', 'mark-read'],
+    usage:
+      'orca game inbox [--ticket <id>] [--unread] [--mark-read] [--settle <msg> --note <why>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'ticket', 'unread', 'mark-read', 'settle', 'note'],
     notes: [
       "Reads Orca orchestration mail, which outlives a closed member and an app restart: the lead's terminal and run mailbox, or every terminal and dispatch the ticket's members had in the lead's current run. Newest first, the last 50.",
       'A member reads only its own ticket; the lead its own inbox, or a ticket with --ticket.',
       "A message is unread until the agent it was sent to read it (orchestration check) or --mark-read passed it. --mark-read moves the game's own read cursor and never marks orchestration mail read, so the lead's `orchestration check --wait` still gets it.",
       'A worker_done is shown once per dispatch, even when it was sent twice.',
+      "--settle stops a message waiting on the lead without a reply, for mail no reply can settle (a legacy Run, a lead handle since reminted, a sender who is gone): it keeps --note in the lead's inbox as the audit and `game watch --lead` stops alerting on it. A member's question is answered, never settled.",
       '`game state` gives the lead each inbox with its unread count and last message (`inboxes`).'
     ],
     examples: [
       'orca game inbox --unread',
       'orca game inbox --ticket CIN-12 --json',
-      'orca game inbox --mark-read'
+      'orca game inbox --mark-read',
+      'orca game inbox --settle msg_620d927b806d --note "Recorded on ORCA-1431; legacy Run"'
     ]
   },
   {

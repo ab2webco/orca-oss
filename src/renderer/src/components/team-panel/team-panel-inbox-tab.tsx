@@ -42,6 +42,7 @@ import {
   TeamInboxWaitingRows
 } from './team-panel-inbox-items'
 import { TeamInboxGroupLabel, TeamInboxOtherProjects } from './team-panel-inbox-other-projects'
+import { TeamInboxDismiss } from './team-panel-inbox-dismiss'
 import {
   recordTeamInboxAgentAnswer,
   useTeamInboxAgentAnswersHere,
@@ -65,6 +66,8 @@ export type TeamInboxViewProps = {
   otherGroups: GameInboxQuestionGroup[]
   threads: GameInboxThreads
   onReply: (reply: GameMemberReply) => Promise<void>
+  /** Settles a waiting row no reply can settle, with the person's note. */
+  onDismiss: (settle: { id: string; note: string }) => Promise<void>
   /** Sessions blocked on a question, read from agent status: a team's lead and members, or every solo one. */
   agentQuestions: TeamInboxAgentQuestion[]
   /** This project's questions you already answered, newest first. */
@@ -214,15 +217,24 @@ export function TeamInboxView(props: TeamInboxViewProps): React.JSX.Element {
           items={threads.waiting}
           memberNames={props.memberNames}
           now={Date.now()}
-          renderActions={(item) => (
-            <GameMemberOverride
-              id={item.id}
-              ticket={item.ticket}
-              placeholder={yourAnswer}
-              label={translate('teamPanel.inbox.answer', 'Answer')}
-              onReply={reply(item)}
-            />
-          )}
+          renderActions={(item) =>
+            // Why no Answer on a stuck row: the reply would be refused or reach nobody (ORCA-1482).
+            item.stuck ? (
+              <TeamInboxDismiss
+                id={item.id}
+                reason={item.stuck}
+                onDismiss={(note) => props.onDismiss({ id: item.id, note })}
+              />
+            ) : (
+              <GameMemberOverride
+                id={item.id}
+                ticket={item.ticket}
+                placeholder={yourAnswer}
+                label={translate('teamPanel.inbox.answer', 'Answer')}
+                onReply={reply(item)}
+              />
+            )
+          }
         />
       </TabsContent>
       <TabsContent value="threads" className="mt-0 flex min-h-0 flex-1 flex-col">
@@ -331,6 +343,7 @@ export function TeamPanelInboxTab({
       otherGroups={otherGroups}
       threads={threads}
       onReply={threads.reply}
+      onDismiss={threads.dismiss}
       agentQuestions={agentQuestions}
       answeredQuestions={answered}
       agentAnswers={agentAnswers}

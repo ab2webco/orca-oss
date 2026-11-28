@@ -56,7 +56,7 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     threads: (count) => `Threads (${count})`,
     noMemberWrote: 'No member has written yet.',
     answered: (count) => `Answered (${count})`,
-    kind: { question: 'Question', decision_gate: 'Decision' },
+    kind: { question: 'Question', decision_gate: 'Decision', escalation: 'Escalation' },
     answeredBy: (who) => `Answered by ${who}`,
     youReplaced: "You replaced the lead's answer",
     thread: (open, ticket, count) =>
@@ -84,7 +84,7 @@ const WORDS: Record<SupportedUiLocale, Words> = {
     threads: (count) => `Hilos (${count})`,
     noMemberWrote: 'Ningún miembro ha escrito todavía.',
     answered: (count) => `Respondidas (${count})`,
-    kind: { question: 'Pregunta', decision_gate: 'Decisión' },
+    kind: { question: 'Pregunta', decision_gate: 'Decisión', escalation: 'Escalada' },
     answeredBy: (who) => `Respondida por ${who}`,
     youReplaced: 'Reemplazaste la respuesta del lead',
     thread: (open, ticket, count) =>

@@ -3,6 +3,7 @@ import type { GameInboxThreads } from '../../../../shared/orchestrator-game-inbo
 import {
   readGameInboxThreads,
   replyToGameMember,
+  settleGameInboxRow,
   type GameMemberReply
 } from './game-inbox-threads-client'
 import type { GameInboxScope } from './game-owner-questions-client'
@@ -17,6 +18,7 @@ export function useGameInboxThreads(
 ): GameInboxThreads & {
   reload: () => Promise<void>
   reply: (message: GameMemberReply) => Promise<void>
+  dismiss: (settle: { id: string; note: string }) => Promise<void>
 } {
   const [loaded, setLoaded] = useState<{ scope: GameInboxScope; threads: GameInboxThreads } | null>(
     null
@@ -77,5 +79,16 @@ export function useGameInboxThreads(
     [scope, read]
   )
 
-  return { ...current, reload, reply }
+  const dismiss = useCallback(
+    async (settle: { id: string; note: string }) => {
+      if (!scope) {
+        return
+      }
+      await settleGameInboxRow(scope, settle)
+      await read(scope)
+    },
+    [scope, read]
+  )
+
+  return { ...current, reload, reply, dismiss }
 }

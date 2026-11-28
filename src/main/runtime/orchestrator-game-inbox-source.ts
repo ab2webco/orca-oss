@@ -73,6 +73,7 @@ export function gameInboxSourceOf(
   const answeredQuestions = run ? db.listAnsweredQuestions(run.id, ANSWERED_QUESTIONS_MAX) : []
   return {
     leadAddresses,
+    leadHandle: lead.handle,
     members,
     mail,
     peerLeads,

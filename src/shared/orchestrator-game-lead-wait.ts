@@ -26,8 +26,18 @@ export function waitingOnYouNextOf(question: GameWaitingMessage, now = Date.now(
   return `waiting on you${age ? ` ${age}` : ''}: orchestration reply --id ${question.id}`
 }
 
+const STUCK_TEXT: Record<NonNullable<GameWaitingMessage['stuck']>, string> = {
+  legacy_run: 'it is in the legacy Run',
+  reminted_lead: "it went to the lead's older handle",
+  gone_sender: 'its sender is gone'
+}
+
 // Why the evidence: the lead can tell a missed reply from a watch that misread it (ORCA-1431).
 function waitLineOf(wait: GameWaitingMessage, age: string | null): string {
+  // Why the settle command (ORCA-1482): a reply is refused or reaches nobody, so it would alert forever.
+  if (wait.stuck) {
+    return `${wait.from} waiting on you ${age}, no reply can settle it (${STUCK_TEXT[wait.stuck]}): "${wait.subject}". Settle it with why: orca game inbox --settle ${wait.id} --note "<why>"`
+  }
   if (wait.from === GAME_OWNER_HANDLE) {
     return `owner answer unread ${age}, no reply threads it: "${wait.subject}". Act on it, then ack its delivery or reply: orca orchestration reply --id ${wait.id}`
   }

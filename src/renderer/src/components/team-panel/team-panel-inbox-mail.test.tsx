@@ -90,7 +90,9 @@ afterEach(() => {
 
 function renderSheet(
   onReply: (reply: GameMemberReply) => Promise<void> = async () => {},
-  undelivered: GameOwnerQuestion[] = []
+  undelivered: GameOwnerQuestion[] = [],
+  threads: GameInboxThreads = THREADS,
+  onDismiss: (settle: { id: string; note: string }) => Promise<void> = async () => {}
 ) {
   return render(
     <TeamInboxView
@@ -101,8 +103,9 @@ function renderSheet(
       undelivered={undelivered}
       onAnswer={async () => {}}
       otherGroups={[]}
-      threads={THREADS}
+      threads={threads}
       onReply={onReply}
+      onDismiss={onDismiss}
       agentQuestions={[]}
       answeredQuestions={[]}
       agentAnswers={[]}
@@ -170,6 +173,46 @@ describe("Inbox tab: the lead's mail", () => {
     expect(within(row).getByText('ORCA-12')).toBeTruthy()
     expect(within(row).getByText('Which port?')).toBeTruthy()
     expect(row.textContent).toMatch(/1 h/)
+  })
+
+  // ORCA-1482: a reply would be refused or reach nobody, so a stuck row offers Dismiss, never Answer.
+  it('dismisses a stuck wait only after a second Dismiss with a note', async () => {
+    const onDismiss = vi.fn(async () => {})
+    const stuck = {
+      ...THREADS,
+      waiting: [
+        {
+          id: 'e1',
+          ticket: 'ORCA-12',
+          kind: 'escalation' as const,
+          subject: 'Blocked: CI',
+          body: 'CI is red on main.',
+          at: AN_HOUR_AGO,
+          answerer: 'lead',
+          stuck: 'legacy_run' as const
+        }
+      ]
+    }
+    const view = renderSheet(undefined, [], stuck, onDismiss)
+    tab(view, /Waiting/)
+    const row = view.getByTestId('team-inbox-waiting-e1')
+    expect(within(row).queryByRole('button', { name: 'Answer' })).toBeNull()
+    expect(row.textContent).toContain('No reply can reach it: it is in an old Run.')
+
+    act(() => fireEvent.click(within(row).getByRole('button', { name: 'Dismiss' })))
+    expect(onDismiss).not.toHaveBeenCalled()
+    const confirm = within(row).getByRole('button', { name: 'Dismiss' })
+    expect(confirm.hasAttribute('disabled')).toBe(true)
+    act(() => {
+      fireEvent.change(within(row).getByRole('textbox', { name: 'Why you dismiss it' }), {
+        target: { value: 'Recorded on ORCA-12' }
+      })
+    })
+    act(() => fireEvent.click(confirm))
+
+    await waitFor(() =>
+      expect(onDismiss).toHaveBeenCalledWith({ id: 'e1', note: 'Recorded on ORCA-12' })
+    )
   })
 
   it("opens a ticket's thread from Threads: typed messages in order and the failure shown", () => {

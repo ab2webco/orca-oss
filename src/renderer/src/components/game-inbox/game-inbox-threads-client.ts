@@ -33,3 +33,16 @@ export async function replyToGameMember(
     delivered: result.delivered === true
   }
 }
+
+/** Settles a wait no reply can settle, keeping the note in the lead's inbox (ORCA-1482); throws why it failed. */
+export async function settleGameInboxRow(
+  scope: GameInboxScope,
+  settle: { id: string; note: string }
+): Promise<void> {
+  await callRuntimeRpc<unknown>(
+    scope.target,
+    'game.inboxSettle',
+    { worktreeId: scope.worktreeId, ...settle },
+    { timeoutMs: GAME_INBOX_THREADS_RPC_TIMEOUT_MS }
+  )
+}

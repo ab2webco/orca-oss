@@ -1,10 +1,13 @@
 /** The Inbox's view of a project's mail: one thread per ticket, what waits on the lead, and what it answered. */
 import {
+  GAME_OWNER_HANDLE,
   isMemberFailure,
+  leadWaitingRowsOf,
   payloadOf,
-  releasedSenderOf,
+  stuckReasonOf,
   type GameInboxMail,
-  type GameInboxSource
+  type GameInboxSource,
+  type GameStuckReason
 } from './orchestrator-game-inbox'
 
 export type GameMessageFailure = { kind: 'rejected' | 'failed'; reason: string | null }
@@ -33,12 +36,14 @@ export type GameInboxThread = {
 export type GameWaitingItem = {
   id: string
   ticket: string
-  kind: 'question' | 'decision_gate'
+  kind: 'question' | 'decision_gate' | 'escalation'
   subject: string
   body: string
   at: string
   /** Who must answer: `lead`, or a peer lead's label. */
   answerer: string
+  /** Set only when no reply can settle it, so the Inbox offers Dismiss instead (ORCA-1482). */
+  stuck?: GameStuckReason
 }
 
 export type GameAnsweredItem = {
@@ -150,22 +155,26 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
       row.type === 'decision_gate' && ticketOf.has(row.from_handle) && lead.has(row.to_handle)
   )
 
-  const fromReleased = releasedSenderOf(source)
-  const waitingRows = [
-    ...(source.pendingQuestions ?? []).filter((row) => lead.has(row.to_handle)),
-    ...gates.filter((gate) => !leadReplyAfter(gate) && !fromReleased(gate))
-  ].sort((a, b) => a.sequence - b.sequence)
-  const waiting = waitingRows.map(
-    (row): GameWaitingItem => ({
+  // Why the inbox's own set (ORCA-1482): the Waiting list shows what the watch alerts on, less the
+  // person's own answers, which wait for the lead to record and are no question for the person.
+  const waitingRows = leadWaitingRowsOf(source).filter(
+    (row) => row.from_handle !== GAME_OWNER_HANDLE
+  )
+  const waitingIds = new Set(waitingRows.map((row) => row.id))
+  const stuck = stuckReasonOf(source)
+  const waiting = waitingRows.map((row): GameWaitingItem => {
+    const reason = stuck(row)
+    return {
       id: row.id,
       ticket: askerOf(row),
-      kind: row.type === 'decision_gate' ? 'decision_gate' : 'question',
+      kind: row.type === 'decision_gate' || row.type === 'escalation' ? row.type : 'question',
       subject: row.subject,
       body: row.body,
       at: row.created_at,
-      answerer: label(row.to_handle)
-    })
-  )
+      answerer: label(row.to_handle),
+      ...(reason ? { stuck: reason } : {})
+    }
+  })
 
   const overrideOf = (questionId: string): GameAnsweredItem['overriddenBy'] => {
     // Why the lead's note too: a waiting question the person answered has no other owner mark.
@@ -198,7 +207,7 @@ export function gameInboxThreadsOf(source: GameInboxSource): GameInboxThreads {
     ]
   })
   const answeredGates = gates.flatMap((gate): GameAnsweredItem[] => {
-    const reply = leadReplyAfter(gate)
+    const reply = waitingIds.has(gate.id) ? undefined : leadReplyAfter(gate)
     return reply
       ? [
           {
