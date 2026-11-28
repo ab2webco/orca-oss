@@ -65,12 +65,13 @@ describe('desktop removal retires the Agent Teams members it held', () => {
     expect(order).toEqual(['retire {"repoId":"repo-1"}', 'removeProjectForHost'])
   })
 
-  it('leaves the members alone while another host still has the same repo id', async () => {
+  // Why the host: the same repo id on another host still runs its own members (ORCA-1491).
+  it("retires only the forgotten host's members while another host still has the same repo id", async () => {
     mockStore.getRepos.mockReturnValue([sshRepo('ssh:box'), sshRepo('local')])
 
     await handlers.get('repos:removeForHost')!(null, { repoId: 'repo-1', hostId: 'ssh:box' })
 
-    expect(order).toEqual(['removeProjectForHost'])
+    expect(order).toEqual(['retire {"repoId":"repo-1","hostId":"ssh:box"}', 'removeProjectForHost'])
   })
 
   it('retires a deleted folder workspace by its workspace key', async () => {

@@ -6779,7 +6779,9 @@ export class OrcaRuntimeService {
         drops: this.gameDroppedAgents,
         settleWorkers: (one) =>
           this.getOrchestrationDbIfAvailable()?.settleWorkersOfRemovedWorkspace(one) ?? null,
-        dispatchOf: (id) => this.getOrchestrationDbIfAvailable()?.memberDispatchState(id) ?? null
+        dispatchOf: (id) => this.getOrchestrationDbIfAvailable()?.memberDispatchState(id) ?? null,
+        hostWorktrees: (one) =>
+          this.getOrchestrationDbIfAvailable()?.worktreesOnlyOnRemovedHost(one) ?? null
       },
       removal
     )
@@ -22121,6 +22123,8 @@ export class OrcaRuntimeService {
       if (!this.store.removeProjectForHost) {
         throw new Error('runtime_unavailable')
       }
+      // Why the host: the other copy's members share this repo id and keep running (ORCA-1491).
+      await this.retireGameWorkspace({ repoId: repo.id, hostId })
       this.store.removeProjectForHost(repo.id, hostId)
     } else {
       // Why before: the game files are named by the repo's place, which the removal forgets.
